@@ -25,7 +25,7 @@ Service providing REST API to use WeasyPrint functionality
 ```
 
 ## Access service
-WeasyPrint Service provides the following endpoints:
+Weasyprint Service provides the following endpoints:
 
 ------------------------------------------------------------------------------------------
 #### Getting version info

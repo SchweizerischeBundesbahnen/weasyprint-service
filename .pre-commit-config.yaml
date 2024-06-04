@@ -5,7 +5,7 @@ repos:
     rev: 1.13.0
     hooks:
       - id: yamlfix
-        args: [-c .yamlfix]
+        args: [-c .yamlfix.toml]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:

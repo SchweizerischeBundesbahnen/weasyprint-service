@@ -33,7 +33,6 @@ body:
   - type: textarea
     attributes:
       label: Anything else
-      description: Further hints, links, or references? Any additional information
-        probably helping in root cause analysis.
+      description: Further hints, links, or references? Any additional information probably helping in root cause analysis.
     validations:
       required: false

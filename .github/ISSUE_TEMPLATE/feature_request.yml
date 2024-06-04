@@ -17,10 +17,8 @@ body:
   - type: textarea
     attributes:
       label: Motivation
-      description: Describe additional context such as examples or use cases helping
-        in understanding the feature request.
-      placeholder: 'This feature would be helpful because ... so that the following
-        use case is addressed: ...'
+      description: Describe additional context such as examples or use cases helping in understanding the feature request.
+      placeholder: 'This feature would be helpful because ... so that the following use case is addressed: ...'
     validations:
       required: true
   - type: textarea

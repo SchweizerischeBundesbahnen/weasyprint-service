@@ -36,8 +36,7 @@ jobs:
         env:
           # When release-please is skipped, these values will be empty
           is_release: ${{ steps.rp.outputs.release_created }}
-          version: v${{ steps.rp.outputs.major }}.${{ steps.rp.outputs.minor }}.${{
-            steps.rp.outputs.patch }}
+          version: v${{ steps.rp.outputs.major }}.${{ steps.rp.outputs.minor }}.${{ steps.rp.outputs.patch }}
         run: |
           tags=""
           if [[ "$is_release" = 'true' ]]; then

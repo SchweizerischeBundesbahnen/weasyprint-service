@@ -82,12 +82,3 @@ Weasyprint Service provides the following endpoints:
 > ```
 
 </details>
-
-------------------------------------------------------------------------------------------
-
-## Changelog
-| Version | Changes                                      |
-|---------|----------------------------------------------|
-| v1.2.0  | Replacing svg images with png using chromium |
-| v1.1.0  | Repository refactored + readme updated       |
-| v1.0.0  | Initial contribution                         |

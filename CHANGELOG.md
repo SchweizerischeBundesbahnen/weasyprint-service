@@ -1,5 +1,17 @@
 # Changelog
 
+## [62.2.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v61.2.0...v62.2.0) (2024-06-11)
+
+
+### Features
+
+* Return Weasyprint and Python versions in header ([#19](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/19)) ([7a7ef22](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7a7ef22f850125efea41ec5d3d5e0f44126df16c))
+
+
+### Miscellaneous Chores
+
+* release 62.2.0 ([#21](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/21)) ([555c0e5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/555c0e522629ffd01292db4f7d73b8209d93a963))
+
 ## 61.2.0 (2024-06-05)
 
 

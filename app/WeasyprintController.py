@@ -25,6 +25,7 @@ def convert_html():
         encoding = request.args.get("encoding", default="utf-8")
         media_type = request.args.get("media_type", default="print")
         file_name = request.args.get("file_name", default="converted-document.pdf")
+        pdf_variant = request.args.get("pdf_variant", default=None)
         presentational_hints = request.args.get("presentational_hints", default=False)
 
         base_url = request.args.get("base_url", default=None)
@@ -34,7 +35,7 @@ def convert_html():
         html = request.get_data().decode(encoding)
         html = SvgUtils.process_svg(html)
         weasyprint_html = weasyprint.HTML(string=html, base_url=base_url, media_type=media_type, encoding=encoding)
-        output_pdf = weasyprint_html.write_pdf(presentational_hints=presentational_hints)
+        output_pdf = weasyprint_html.write_pdf(pdf_variant=pdf_variant, presentational_hints=presentational_hints)
 
         response = Response(output_pdf, mimetype="application/pdf", status=200)
         response.headers.add("Content-Disposition", "attachment; filename=" + file_name)

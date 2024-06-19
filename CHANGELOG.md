@@ -1,5 +1,17 @@
 # Changelog
 
+## [62.3.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.2.0...v62.3.0) (2024-06-18)
+
+
+### Features
+
+* support of pdf_variant parameter ([#26](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/26)) ([9059188](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9059188060746c704837c51f775222a7b3a5258e))
+
+
+### Bug Fixes
+
+* add CODEOWNERS ([#22](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/22)) ([09cad9f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/09cad9f7abe0c5e81340dc30ccf9d0ce346d8f4a))
+
 ## [62.2.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v61.2.0...v62.2.0) (2024-06-11)
 
 

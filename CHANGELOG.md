@@ -1,5 +1,12 @@
 # Changelog
 
+## [62.3.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.3.0...v62.3.1) (2024-06-22)
+
+
+### Miscellaneous Chores
+
+* **deps:** update dependency weasyprint to v62.3 ([#32](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/32)) ([94d200c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/94d200c1d75b480af48148e89de8d0a37943bc16))
+
 ## [62.3.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.2.0...v62.3.0) (2024-06-18)
 
 

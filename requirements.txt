@@ -2,4 +2,4 @@
 flask
 gevent
 ###### Requirements with Version Specifiers ######
-weasyprint==62.2
+weasyprint==62.3

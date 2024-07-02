@@ -1,4 +1,4 @@
-FROM python:3.12.4-slim@sha256:da2d7af143dab7cd5b0d5a5c9545fe14e67fc24c394fcf1cf15e8ea16cbd8637
+FROM python:3.12.4-slim@sha256:44fa7d815050f3dc43b1d5d50c3f4d19870a83c96301c9653e8cf908ccd7892b
 LABEL maintainer="Team Polarion (CLEW/WZU/POLARION) <polarion@sbb.ch>"
 
 RUN apt-get update && \

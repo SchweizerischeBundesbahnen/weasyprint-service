@@ -1,5 +1,12 @@
 # Changelog
 
+## [62.3.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.3.1...v62.3.2) (2024-07-22)
+
+
+### Bug Fixes
+
+* check for SVG is changed ([#36](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/36)) ([4951a52](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4951a52c8ba09c9bf6e2f9859010f653f2e16186)), closes [#35](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/35)
+
 ## [62.3.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.3.0...v62.3.1) (2024-06-22)
 
 

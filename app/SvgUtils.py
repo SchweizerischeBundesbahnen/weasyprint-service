@@ -15,34 +15,48 @@ def process_svg(html):
     return re.sub(pattern, replace_img_base64, html)
 
 
+def get_svg_content(content_type, content_base64):
+    # We do not require to have 'image/svg+xml' content type coz not all systems will properly set it
+
+    if content_type in NON_SVG_CONTENT_TYPES:
+        return False  # Skip processing if content type set explicitly as not svg
+
+    decoded_content = base64.b64decode(content_base64)
+    if b'\0' in decoded_content:
+        return False  # Skip processing if decoded content is binary (not text)
+
+    svg_content = decoded_content.decode('utf-8')
+
+    # Fast check that this is a svg
+    if '</svg>' not in svg_content:
+        return False
+
+    return svg_content
+
+
 def replace_img_base64(match):
     entry = match.group(0)
     content_type = match.group('type')
-    if content_type in NON_SVG_CONTENT_TYPES:
-        return entry  # Skip processing if content type isn't svg explicitly
+    content_base64 = match.group('base64')
+
+    svg_content = get_svg_content(content_type, content_base64)
+    if svg_content is False:
+        return entry
     else:
-        # We do not require to have 'image/svg+xml' content type coz not all systems will properly set it
-        content_base64 = match.group('base64')
-        replaced_content_base64 = replace_svg_with_png(content_base64)
+        replaced_content_base64 = replace_svg_with_png(svg_content)
         if replaced_content_base64 == content_base64:
-            # For some reason content wasn't replaced (e.g. it was not a svg)
-            return entry
+            return entry  # For some reason content wasn't replaced
         else:
             return f'<img{match.group("intermediate")}image/svg+xml;base64, {replaced_content_base64}"'
 
 
 # Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chrome
-def replace_svg_with_png(possible_svg_base64_content):
-    svg_content = base64.b64decode(possible_svg_base64_content).decode('utf-8')
-
-    # Fast check that this is a svg
-    if '</svg>' not in svg_content:
-        return possible_svg_base64_content
+def replace_svg_with_png(svg_content):
 
     chrome_executable = os.environ.get('CHROME_EXECUTABLE_PATH')
     if not chrome_executable:
         logging.error('CHROME_EXECUTABLE_PATH not set')
-        return possible_svg_base64_content
+        return svg_content
 
     # Fetch width & height from root svg tag
     match = re.search(r'<svg[^>]+?width="(?P<width>[\d.]+)', svg_content)
@@ -50,14 +64,14 @@ def replace_svg_with_png(possible_svg_base64_content):
         width = match.group('width')
     else:
         logging.error('Cannot find svg width in ' + svg_content)
-        return possible_svg_base64_content
+        return svg_content
 
     match = re.search(r'<svg[^>]+?height="(?P<height>[\d.]+)', svg_content)
     if match:
         height = match.group('height')
     else:
         logging.error('Cannot find svg height in ' + svg_content)
-        return possible_svg_base64_content
+        return svg_content
 
     # Will be used as a name for tmp files
     uuid = str(uuid4())
@@ -94,6 +108,6 @@ def replace_svg_with_png(possible_svg_base64_content):
 
     if result.returncode != 0:
         logging.error('Error converting to png')
-        return possible_svg_base64_content
+        return svg_content
     else:
         return png_base64

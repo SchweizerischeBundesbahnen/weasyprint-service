@@ -44,15 +44,15 @@ def convert_html():
         return response
 
     except AssertionError as e:
-        return process_error(e, "Assertion error, check the request body html: " + str(e), 400)
+        return process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
-        return process_error(e, "Cannot decode request html body: " + str(e), 400)
+        return process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
-        return process_error(e, "Unexpected error due converting to PDF: " + str(e), 500)
+        return process_error(e, "Unexpected error due converting to PDF", 500)
 
 
 def process_error(e, err_msg, status):
-    logging.exception(e)
+    logging.exception(msg=err_msg + ": " + str(e))
     return Response(err_msg, mimetype="plain/text", status=status)
 
 

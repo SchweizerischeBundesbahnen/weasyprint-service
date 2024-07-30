@@ -1,4 +1,5 @@
 import logging
+import os
 import platform
 from urllib.parse import unquote
 
@@ -15,7 +16,8 @@ app = Flask(__name__)
 def version():
     return {
         "python": platform.python_version(),
-        "weasyprint": weasyprint.__version__
+        "weasyprint": weasyprint.__version__,
+        "serviceVersion": os.environ.get('SERVICE_VERSION')
     }
 
 

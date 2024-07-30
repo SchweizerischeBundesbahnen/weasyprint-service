@@ -5,6 +5,7 @@ Service providing REST API to use WeasyPrint functionality
 
 ```bash
   docker build \
+    --build-arg APP_VERSION=62.3.0 \
     --file Dockerfile \
     --tag weasyprint-service:62.3.0 .
 ```

@@ -17,7 +17,7 @@ def version():
     return {
         "python": platform.python_version(),
         "weasyprint": weasyprint.__version__,
-        "serviceVersion": os.environ.get('SERVICE_VERSION')
+        "weasyprintServiceVersion": os.environ.get('WEASYPRINT_SERVICE_VERSION')
     }
 
 

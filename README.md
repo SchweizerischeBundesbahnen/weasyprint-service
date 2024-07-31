@@ -5,9 +5,9 @@ Service providing REST API to use WeasyPrint functionality
 
 ```bash
   docker build \
-    --build-arg APP_VERSION=62.3.0 \
+    --build-arg APP_IMAGE_VERSION=62.4.0 \
     --file Dockerfile \
-    --tag weasyprint-service:62.3.0 .
+    --tag weasyprint-service:62.4.0 .
 ```
 
 ## Start Docker container
@@ -16,7 +16,7 @@ Service providing REST API to use WeasyPrint functionality
   docker run --detach \
     --publish 9080:9080 \
     --name weasyprint-service \
-    weasyprint-service:62.3.0
+    weasyprint-service:62.4.0
 ```
 
 ## Stop Docker container

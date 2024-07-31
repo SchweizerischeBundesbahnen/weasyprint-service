@@ -17,7 +17,7 @@ def version():
     return {
         "python": platform.python_version(),
         "weasyprint": weasyprint.__version__,
-        "weasyprintServiceVersion": os.environ.get('WEASYPRINT_SERVICE_VERSION')
+        "weasyprintService": os.environ.get('WEASYPRINT_SERVICE_VERSION')
     }
 
 
@@ -41,8 +41,9 @@ def convert_html():
 
         response = Response(output_pdf, mimetype="application/pdf", status=200)
         response.headers.add("Content-Disposition", "attachment; filename=" + file_name)
-        response.headers.add("Weasyprint-Version", weasyprint.__version__)
         response.headers.add("Python-Version", platform.python_version())
+        response.headers.add("Weasyprint-Version", weasyprint.__version__)
+        response.headers.add("Weasyprint-Service-Version", os.environ.get('WEASYPRINT_SERVICE_VERSION'))
         return response
 
     except AssertionError as e:

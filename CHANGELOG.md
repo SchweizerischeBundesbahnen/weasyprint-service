@@ -1,5 +1,18 @@
 # Changelog
 
+## [62.4.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.3.2...v62.4.0) (2024-07-31)
+
+
+### Features
+
+* Added info about the used weasyprint docker-image version ([#40](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/40)) ([ad27a7a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ad27a7a17b8c995ba6de824c831a91938830d7ab)), closes [#104](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/104)
+* info about the used weasyprint docker-image version ([#41](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/41)) ([b63b7c5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b63b7c54b40e9960e8363f351fbd59b344eced20))
+
+
+### Bug Fixes
+
+* Fixed exception exposure into service response ([#38](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/38)) ([494f811](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/494f8110b5795809cf58befe55e0a998c98268e0)), closes [#1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/1)
+
 ## [62.3.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.3.1...v62.3.2) (2024-07-22)
 
 

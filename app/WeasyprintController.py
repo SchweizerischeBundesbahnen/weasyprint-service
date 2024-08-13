@@ -56,7 +56,7 @@ def convert_html():
 
 def process_error(e, err_msg, status):
     logging.exception(msg=err_msg + ": " + str(e))
-    return Response(err_msg, mimetype="plain/text", status=status)
+    return Response(err_msg + ": " + getattr(e, 'message', repr(e)), mimetype="plain/text", status=status)
 
 
 def start_server(port):

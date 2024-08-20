@@ -1,5 +1,3 @@
-###### Requirements without Version Specifiers ######
-flask
-gevent
-###### Requirements with Version Specifiers ######
+flask==3.0.3
+gevent==24.2.1
 weasyprint==62.3

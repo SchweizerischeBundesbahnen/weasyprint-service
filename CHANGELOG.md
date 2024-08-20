@@ -1,5 +1,17 @@
 # Changelog
 
+## [62.4.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.0...v62.4.1) (2024-08-20)
+
+
+### Features
+
+* More information about raised error ([#45](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/45)) ([8aa5e35](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/8aa5e35bfed95a91c0f4f2353283e70d49e9bd53)), closes [#43](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/43)
+
+
+### Miscellaneous Chores
+
+* release 62.4.1 ([#47](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/47)) ([48bb581](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/48bb5814bee5c1149d5adb4245013eb7ae919423))
+
 ## [62.4.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.3.2...v62.4.0) (2024-07-31)
 
 

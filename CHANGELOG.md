@@ -1,5 +1,13 @@
 # Changelog
 
+## [62.4.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.1...v62.4.2) (2024-09-06)
+
+
+### Bug Fixes
+
+* chromium gpu usage disabled, proper error result handling when t… ([#54](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/54)) ([f551bd7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f551bd739fe427826e70316cbfe5ad101777cd82)), closes [#53](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/53)
+* chromium gpu usage disabled, proper error result handling when taking a chromium screenshot ([f551bd7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f551bd739fe427826e70316cbfe5ad101777cd82))
+
 ## [62.4.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.0...v62.4.1) (2024-08-20)
 
 

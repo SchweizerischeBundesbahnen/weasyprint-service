@@ -72,6 +72,11 @@ def replace_svg_with_png(svg_content):
     else:
         logging.error('Cannot find svg height in ' + svg_content)
         return svg_content
+    
+    # Log large svg content size
+    svg_content_length = len(svg_content)
+    if svg_content_length > 100_000:
+        logging.warning(f"SVG content length: {svg_content_length}")
 
     # Will be used as a name for tmp files
     uuid = str(uuid4())
@@ -90,6 +95,9 @@ def replace_svg_with_png(svg_content):
         f'{chrome_executable}',
         '--headless',
         '--no-sandbox',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-dev-shm-usage',
         '--default-background-color=00000000',
         '--hide-scrollbars',
         f'--screenshot={png_filepath}',
@@ -97,17 +105,19 @@ def replace_svg_with_png(svg_content):
         f'{svg_filepath}',
     ])
 
+    # Remove tmp svg file
+    os.remove(svg_filepath)
+
+    if result.returncode != 0:
+        logging.error(f'Error converting to png, returncode = {result.returncode}')
+        return svg_content
+
     # Get resulting screenshot content
     with open(png_filepath, 'rb') as img_file:
         img_data = img_file.read()
         png_base64 = base64.b64encode(img_data).decode('utf-8')
 
-    # Remove tmp files
-    os.remove(svg_filepath)
+    # Remove tmp png file
     os.remove(png_filepath)
 
-    if result.returncode != 0:
-        logging.error('Error converting to png')
-        return svg_content
-    else:
-        return png_base64
+    return png_base64

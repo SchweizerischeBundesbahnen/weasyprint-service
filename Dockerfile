@@ -9,6 +9,8 @@ RUN apt-get update && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*
 
+COPY fonts /usr/share/fonts/truetype/
+
 ENV WORKING_DIR=/opt/weasyprint
 ENV CHROME_EXECUTABLE_PATH=/usr/bin/chromium
 ENV WEASYPRINT_SERVICE_VERSION=$APP_IMAGE_VERSION

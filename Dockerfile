@@ -3,11 +3,13 @@ LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
 
 ARG APP_IMAGE_VERSION
 
-RUN apt-get update && \
-    apt-get --no-install-recommends --yes install fonts-dejavu fonts-liberation libpango-1.0-0 libpangoft2-1.0-0 python3-brotli python3-cffi
+# Architecture from --platform (arm64, amd64 etc.)
+ARG TARGETARCH
 
-# Chromium dependencies
-RUN apt-get --no-install-recommends --yes install \
+RUN apt-get update && \
+    apt-get --no-install-recommends --yes install fonts-dejavu fonts-liberation libpango-1.0-0 libpangoft2-1.0-0 python3-brotli python3-cffi && \
+    # Chromium dependencies
+    apt-get --no-install-recommends --yes install \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -42,21 +44,15 @@ RUN apt-get --no-install-recommends --yes install \
     libxslt1.1 \
     wget \
     x11-utils \
-    xdg-utils
-
-# Architecture from --platform (arm64, amd64 etc.)
-ARG TARGETARCH
-
-# Download Chromium (urls taken from http://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/)
-RUN wget -P /tmp https://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
-    wget -P /tmp https://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb
-
-# Install the downloaded packages
-# DO NOT USE """|| apt-get install -f -y""" COZ THIS CAN FORCE TO UPDATE CHROMIUM TO THE LATEST VERSION
-RUN dpkg -i /tmp/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && dpkg -i /tmp/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb
-
-# Clean up to reduce image size
-RUN apt-get -y autoremove && \
+    xdg-utils && \
+    # Download Chromium (urls taken from https://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/)
+    wget -P /tmp https://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
+    wget -P /tmp https://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
+    # Install the downloaded packages
+    # DO NOT USE """|| apt-get install -f -y""" COZ THIS CAN FORCE TO UPDATE CHROMIUM TO THE LATEST VERSION
+    dpkg -i /tmp/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && dpkg -i /tmp/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
+    # Clean up to reduce image size
+    apt-get -y autoremove && \
     apt-get -y clean && \
     rm -rf /tmp/* /var/lib/apt/lists/* /var/tmp/*
 

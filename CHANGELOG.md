@@ -1,5 +1,13 @@
 # Changelog
 
+## [62.4.3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.2...v62.4.3) (2024-09-12)
+
+
+### Bug Fixes
+
+* svg images bottom part is missing ([#65](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/65)) ([85b15ef](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/85b15ef3f6af200f2a1bc10bda11acbd0cff88fc)), closes [#63](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/63)
+* use extra font for rendering special symbols ([#58](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/58)) ([b2a4126](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b2a41261dbe1c04fd1d30b112eaa22f68d5d32cc)), closes [#57](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/57)
+
 ## [62.4.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.1...v62.4.2) (2024-09-06)
 
 

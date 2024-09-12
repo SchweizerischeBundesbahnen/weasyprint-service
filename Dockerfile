@@ -12,6 +12,7 @@ RUN apt-get update && \
     apt-get --no-install-recommends --yes install fonts-dejavu fonts-liberation libpango-1.0-0 libpangoft2-1.0-0 python3-brotli python3-cffi && \
     # Chromium dependencies
     apt-get --no-install-recommends --yes install \
+    dbus \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -44,6 +45,7 @@ RUN apt-get update && \
     libxkbcommon0 \
     libxnvctrl0 \
     libxslt1.1 \
+    vim \
     wget \
     x11-utils \
     xdg-utils && \
@@ -52,7 +54,7 @@ RUN apt-get update && \
     wget -P /tmp https://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_${CHROMIUM_VERSION}_${TARGETARCH}.deb && \
     # Install the downloaded packages
     # DO NOT USE """|| apt-get install -f -y""" COZ THIS CAN FORCE TO UPDATE CHROMIUM TO THE LATEST VERSION
-    dpkg -i /tmp/chromium-common_${CHROMIUM_VERSION}_${TARGETARCH}.deb && dpkg -i /tmp/chromium_${CHROMIUM_VERSION}_${TARGETARCH}.deb && \
+    dpkg -i /tmp/chromium-common_${CHROMIUM_VERSION}_${TARGETARCH}.deb /tmp/chromium_${CHROMIUM_VERSION}_${TARGETARCH}.deb && \
     # Clean up to reduce image size
     apt-get -y autoremove && \
     apt-get -y clean && \

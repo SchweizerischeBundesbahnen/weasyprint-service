@@ -38,8 +38,8 @@ RUN apt-get --no-install-recommends --yes install \
     libx11-xcb1 \
     libxdamage1 \
     libxkbcommon0 \
-    libxslt1.1 \
     libxnvctrl0 \
+    libxslt1.1 \
     wget \
     x11-utils \
     xdg-utils
@@ -48,8 +48,8 @@ RUN apt-get --no-install-recommends --yes install \
 ARG TARGETARCH
 
 # Download Chromium (urls taken from http://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/)
-RUN wget -P /tmp http://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
-    wget -P /tmp http://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb
+RUN wget -P /tmp https://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
+    wget -P /tmp https://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb
 
 # Install the downloaded packages
 # DO NOT USE """|| apt-get install -f -y""" COZ THIS CAN FORCE TO UPDATE CHROMIUM TO THE LATEST VERSION

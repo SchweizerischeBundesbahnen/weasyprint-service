@@ -44,13 +44,16 @@ RUN apt-get --no-install-recommends --yes install \
     x11-utils \
     xdg-utils
 
+# Architecture from --platform (arm64, amd64 etc.)
+ARG TARGETARCH
+
 # Download Chromium (urls taken from http://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/)
-RUN wget http://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/chromium_126.0.6478.182-1~deb12u1_amd64.deb && \
-    wget http://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_126.0.6478.182-1~deb12u1_amd64.deb
+RUN wget -P /tmp http://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
+    wget -P /tmp http://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb
 
 # Install the downloaded packages
 # DO NOT USE """|| apt-get install -f -y""" COZ THIS CAN FORCE TO UPDATE CHROMIUM TO THE LATEST VERSION
-RUN dpkg -i chromium-common_126.0.6478.182-1~deb12u1_amd64.deb && dpkg -i chromium_126.0.6478.182-1~deb12u1_amd64.deb
+RUN dpkg -i /tmp/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && dpkg -i /tmp/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb
 
 # Clean up to reduce image size
 RUN apt-get -y autoremove && \

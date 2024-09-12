@@ -6,6 +6,8 @@ ARG APP_IMAGE_VERSION
 # Architecture from --platform (arm64, amd64 etc.)
 ARG TARGETARCH
 
+ARG CHROMIUM_VERSION=126.0.6478.182-1~deb12u1
+
 RUN apt-get update && \
     apt-get --no-install-recommends --yes install fonts-dejavu fonts-liberation libpango-1.0-0 libpangoft2-1.0-0 python3-brotli python3-cffi && \
     # Chromium dependencies
@@ -46,11 +48,11 @@ RUN apt-get update && \
     x11-utils \
     xdg-utils && \
     # Download Chromium (urls taken from https://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/)
-    wget -P /tmp https://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
-    wget -P /tmp https://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
+    wget -P /tmp https://snapshot.debian.org/archive/debian/20240820T082737Z/pool/main/c/chromium/chromium_${CHROMIUM_VERSION}_${TARGETARCH}.deb && \
+    wget -P /tmp https://snapshot.debian.org/archive/debian/20240825T022815Z/pool/main/c/chromium/chromium-common_${CHROMIUM_VERSION}_${TARGETARCH}.deb && \
     # Install the downloaded packages
     # DO NOT USE """|| apt-get install -f -y""" COZ THIS CAN FORCE TO UPDATE CHROMIUM TO THE LATEST VERSION
-    dpkg -i /tmp/chromium-common_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && dpkg -i /tmp/chromium_126.0.6478.182-1~deb12u1_${TARGETARCH}.deb && \
+    dpkg -i /tmp/chromium-common_${CHROMIUM_VERSION}_${TARGETARCH}.deb && dpkg -i /tmp/chromium_${CHROMIUM_VERSION}_${TARGETARCH}.deb && \
     # Clean up to reduce image size
     apt-get -y autoremove && \
     apt-get -y clean && \

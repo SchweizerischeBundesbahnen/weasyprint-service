@@ -93,13 +93,14 @@ def replace_svg_with_png(svg_content):
     png_filepath = os.path.join(temp_folder, uuid + '.png')
     result = subprocess.run([
         f'{chrome_executable}',
-        '--headless',
+        '--headless=old',
         '--no-sandbox',
         '--disable-gpu',
         '--disable-software-rasterizer',
         '--disable-dev-shm-usage',
         '--default-background-color=00000000',
         '--hide-scrollbars',
+        '--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb',
         f'--screenshot={png_filepath}',
         f'--window-size={width},{height}',
         f'{svg_filepath}',

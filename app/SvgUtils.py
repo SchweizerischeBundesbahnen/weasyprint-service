@@ -50,12 +50,11 @@ def replace_img_base64(match):
             return f'<img{match.group("intermediate")}image/svg+xml;base64, {replaced_content_base64}"'
 
 
-# Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chrome
+# Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chromium
 def replace_svg_with_png(svg_content):
-
-    chrome_executable = os.environ.get('CHROME_EXECUTABLE_PATH')
-    if not chrome_executable:
-        logging.error('CHROME_EXECUTABLE_PATH not set')
+    chromium_executable = os.environ.get('CHROMIUM_EXECUTABLE_PATH')
+    if not chromium_executable:
+        logging.error('CHROMIUM_EXECUTABLE_PATH not set')
         return svg_content
 
     # Fetch width & height from root svg tag
@@ -72,7 +71,7 @@ def replace_svg_with_png(svg_content):
     else:
         logging.error('Cannot find svg height in ' + svg_content)
         return svg_content
-    
+
     # Log large svg content size
     svg_content_length = len(svg_content)
     if svg_content_length > 100_000:
@@ -89,22 +88,18 @@ def replace_svg_with_png(svg_content):
     f.write(svg_content)
     f.close()
 
-    # Feed svg file to chrome
+    # Feed svg file to chromium
     png_filepath = os.path.join(temp_folder, uuid + '.png')
-    result = subprocess.run([
-        f'{chrome_executable}',
-        '--headless=old',
-        '--no-sandbox',
-        '--disable-gpu',
-        '--disable-software-rasterizer',
-        '--disable-dev-shm-usage',
-        '--default-background-color=00000000',
-        '--hide-scrollbars',
-        '--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb',
-        f'--screenshot={png_filepath}',
-        f'--window-size={width},{height}',
-        f'{svg_filepath}',
-    ])
+
+    chromium_command = create_chromium_command(
+        chromium_executable,
+        height,
+        width,
+        png_filepath,
+        svg_filepath,
+    )
+
+    result = subprocess.run(chromium_command)
 
     # Remove tmp svg file
     os.remove(svg_filepath)
@@ -122,3 +117,32 @@ def replace_svg_with_png(svg_content):
     os.remove(png_filepath)
 
     return png_base64
+
+
+def create_chromium_command(chromium_executable, height, width, png_filepath, svg_filepath):
+    # Check if the ENABLE_HARDWARE_ACCELERATION environment variable is set to true
+    enable_hardware_acceleration = os.getenv('ENABLE_HARDWARE_ACCELERATION', 'false').lower() == 'true'
+
+    command = [
+        f'{chromium_executable}',
+    ]
+
+    if not enable_hardware_acceleration:
+        command.extend([
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-dev-shm-usage',
+        ])
+
+    command.extend([
+        '--headless=old',  # because of issue in new with SVG conversion
+        '--no-sandbox',
+        '--default-background-color=00000000',
+        '--hide-scrollbars',
+        '--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb',
+        f'--screenshot={png_filepath}',
+        f'--window-size={width},{height}',
+        f'{svg_filepath}',
+    ])
+
+    return command

@@ -6,12 +6,15 @@ import subprocess
 import tempfile
 from uuid import uuid4
 
+IMAGE_PNG = 'image/png'
+IMAGE_SVG = 'image/svg+xml'
+
 NON_SVG_CONTENT_TYPES = ('image/jpeg', 'image/png', 'image/gif')
 
 
 # Process img tags, replacing base64 SVG images with PNGs
 def process_svg(html):
-    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]*?);base64,\s?(?P<base64>[^">]*?)"')
+    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src=(?P<quote>[\'"]))(data:(?P<type>[^;>]*?);base64,\s?(?P<base64>.*?)(?P=quote))')
     return re.sub(pattern, replace_img_base64, html)
 
 
@@ -20,23 +23,23 @@ def get_svg_content(content_type, content_base64):
     # We do not require to have 'image/svg+xml' content type coz not all systems will properly set it
 
     if content_type in NON_SVG_CONTENT_TYPES:
-        return False  # Skip processing if content type set explicitly as not svg
+        return None  # Skip processing if content type set explicitly as not svg
 
     try:
         decoded_content = base64.b64decode(content_base64)
         if b'\0' in decoded_content:
-            return False  # Skip processing if decoded content is binary (not text)
+            return None  # Skip processing if decoded content is binary (not text)
 
         svg_content = decoded_content.decode('utf-8')
 
         # Fast check that this is a svg
         if '</svg>' not in svg_content:
-            return False
+            return None
 
         return svg_content
     except Exception as e:
         logging.error(f"Failed to decode base64 content: {e}")
-        return False
+        return None
 
 
 # Replace base64 SVG images with PNG equivalents in the HTML img tag.
@@ -46,31 +49,35 @@ def replace_img_base64(match):
     content_base64 = match.group('base64')
 
     svg_content = get_svg_content(content_type, content_base64)
-    if svg_content is False:
+    if not svg_content:
         return entry
 
-    replaced_content_base64 = replace_svg_with_png(svg_content)
+    image_type, content = replace_svg_with_png(svg_content)
+    replaced_content_base64 = to_base64(content)
     if replaced_content_base64 == content_base64:
         return entry  # For some reason content wasn't replaced
 
-    return f'<img{match.group("intermediate")}image/svg+xml;base64,{replaced_content_base64}"'
+    return f'<img{match.group("intermediate")}{image_type};base64,{replaced_content_base64}"'
 
 
 # Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chromium
 def replace_svg_with_png(svg_content):
     width, height = extract_svg_dimensions(svg_content)
     if not width or not height:
-        return svg_content
+        return IMAGE_SVG, svg_content
 
     svg_filepath, png_filepath = prepare_temp_files(svg_content)
     if not svg_filepath or not png_filepath:
-        return svg_content
+        return IMAGE_SVG, svg_content
 
     if not convert_svg_to_png(width, height, png_filepath, svg_filepath):
-        return svg_content
+        return IMAGE_SVG, svg_content
 
-    png_base64 = read_and_cleanup_png(png_filepath)
-    return png_base64 if png_base64 else svg_content
+    png_content = read_and_cleanup_png(png_filepath)
+    if not png_content:
+        return IMAGE_SVG, svg_content
+
+    return IMAGE_PNG, png_content
 
 
 # Extract the width and height from the SVG tag
@@ -107,7 +114,14 @@ def prepare_temp_files(svg_content):
 # Convert the SVG file to PNG using Chromium and return success status
 def convert_svg_to_png(width, height, png_filepath, svg_filepath):
     command = create_chromium_command(width, height, png_filepath, svg_filepath)
-    result = subprocess.run(command)
+    if not command:
+        return False
+
+    try:
+        result = subprocess.run(command)
+    except Exception as e:
+        logging.error(f"Failed to convert SVG to PNG: {e}")
+        return False
 
     if result.returncode != 0:
         logging.error(f"Error converting SVG to PNG, return code = {result.returncode}")
@@ -116,15 +130,14 @@ def convert_svg_to_png(width, height, png_filepath, svg_filepath):
     return True
 
 
-# Read the PNG file, encode it in base64, and clean up the temporary file.
+# Read the PNG file and clean up the temporary file
 def read_and_cleanup_png(png_filepath):
     try:
         with open(png_filepath, 'rb') as img_file:
             img_data = img_file.read()
 
-        png_base64 = base64.b64encode(img_data).decode('utf-8')
         os.remove(png_filepath)
-        return png_base64
+        return img_data
     except Exception as e:
         logging.error(f"Failed to read or clean up PNG file: {e}")
         return None
@@ -159,3 +172,10 @@ def create_chromium_command(width, height, png_filepath, svg_filepath):
         ])
 
     return command
+
+
+# Encode string or byte array to base64
+def to_base64(content):
+    if isinstance(content, str):
+        content = content.encode('utf-8')  # encode the string to bytes
+    return base64.b64encode(content).decode('utf-8')

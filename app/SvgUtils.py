@@ -11,7 +11,7 @@ NON_SVG_CONTENT_TYPES = ('image/jpeg', 'image/png', 'image/gif')
 
 # Process img tags, replacing base64 SVG images with PNGs
 def process_svg(html):
-    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]*?);base64,(?P<base64>[^">]*?)"')
+    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]*?);base64,\s?(?P<base64>[^">]*?)"')
     return re.sub(pattern, replace_img_base64, html)
 
 

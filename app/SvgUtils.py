@@ -119,15 +119,13 @@ def convert_svg_to_png(width, height, png_filepath, svg_filepath):
 
     try:
         result = subprocess.run(command)
+        if result.returncode != 0:
+            logging.error(f"Error converting SVG to PNG, return code = {result.returncode}")
+            return False
+        return True
     except Exception as e:
         logging.error(f"Failed to convert SVG to PNG: {e}")
         return False
-
-    if result.returncode != 0:
-        logging.error(f"Error converting SVG to PNG, return code = {result.returncode}")
-        return False
-
-    return True
 
 
 # Read the PNG file and clean up the temporary file

@@ -1,5 +1,6 @@
 import base64
 import logging
+import math
 import os
 import re
 import subprocess
@@ -62,7 +63,7 @@ def replace_img_base64(match):
 
 # Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chromium
 def replace_svg_with_png(svg_content):
-    width, height = extract_svg_dimensions(svg_content)
+    width, height = extract_svg_dimensions_as_px(svg_content)
     if not width or not height:
         return IMAGE_SVG, svg_content
 
@@ -80,17 +81,21 @@ def replace_svg_with_png(svg_content):
     return IMAGE_PNG, png_content
 
 
-# Extract the width and height from the SVG tag
-def extract_svg_dimensions(svg_content):
-    width_match = re.search(r'<svg[^>]+?width="(?P<width>[\d.]+)', svg_content)
-    height_match = re.search(r'<svg[^>]+?height="(?P<height>[\d.]+)', svg_content)
+# Extract the width and height from the SVG tag (and convert it to px)
+def extract_svg_dimensions_as_px(svg_content):
+    width_match = re.search(r'<svg[^>]+?width="(?P<width>[\d.]+)(?P<unit>\w+)?', svg_content)
+    height_match = re.search(r'<svg[^>]+?height="(?P<height>[\d.]+)(?P<unit>\w+)?', svg_content)
 
     width = width_match.group('width') if width_match else None
     height = height_match.group('height') if height_match else None
 
     if not width or not height:
         logging.error(f"Cannot find SVG dimensions. Width: {width}, Height: {height}")
-    return width, height
+
+    width_unit = width_match.group('unit') if width_match else None
+    height_unit = height_match.group('unit') if height_match else None
+
+    return convert_to_px(width, width_unit), convert_to_px(height, height_unit)
 
 
 # Save the SVG content to a temporary file and return the file paths for the SVG and PNG.
@@ -177,3 +182,22 @@ def to_base64(content):
     if isinstance(content, str):
         content = content.encode('utf-8')  # encode the string to bytes
     return base64.b64encode(content).decode('utf-8')
+
+
+# Conversion to px
+def convert_to_px(value, unit):
+    value = float(value)
+    if unit == 'px':
+        return math.ceil(value)
+    elif unit == 'pt':
+        return math.ceil(value * 4 / 3)
+    elif unit == 'in':
+        return math.ceil(value * 96)
+    elif unit == 'cm':
+        return math.ceil(value * 96 / 2.54)
+    elif unit == 'mm':
+        return math.ceil(value * 96 / 2.54 * 10)
+    elif unit == 'pc':
+        return math.ceil(value * 16)
+    else:
+        return math.ceil(value) # Unknown unit, assume px

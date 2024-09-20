@@ -1,5 +1,15 @@
 # Changelog
 
+## [62.4.4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.3...v62.4.4) (2024-09-20)
+
+
+### Bug Fixes
+
+* enable hardware acceleration using env variable ([#68](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/68)) ([58c8198](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/58c8198ba8bf2aea87a4db449789d79302d9f34a)), closes [#62](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/62)
+* fixed "Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory" ([#66](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/66)) ([269ee1c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/269ee1c493426668e2413ccbc603c8d3a02b9144)), closes [#60](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/60)
+* refactor to reduce cognitive complexity ([#71](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/71)) ([f4b733d](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f4b733de50e87f92a0a4bcb65de0b468b33196ec)), closes [#69](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/69)
+* refactoring + error handling ([#72](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/72)) ([4c836c4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4c836c48f9f79f7c25cc90238f7267f184399cad)), closes [#69](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/69)
+
 ## [62.4.3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.2...v62.4.3) (2024-09-12)
 
 

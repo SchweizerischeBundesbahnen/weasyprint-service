@@ -1,35 +1,87 @@
 # WeasyPrint Service
-Service providing REST API to use WeasyPrint functionality
 
-## Build Docker image
+A Dockerized service providing a REST API interface to leverage WeasyPrint's functionality for generating PDF documents
+from HTML and CSS.
+
+## Features
+
+- Simple REST API to access WeasyPrint
+- Compatible with amd64 and arm64 architectures
+- Easily deployable via Docker
+
+## Getting Started
+
+### Installation
+
+To install the latest version of the WeasyPrint Service, run the following command:
 
 ```bash
-  docker build \
-    --build-arg APP_IMAGE_VERSION=62.4.3 \
-    --file Dockerfile \
-    --tag weasyprint-service:62.4.3 .
+docker pull ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
-## Start Docker container
+### Running the Service
+
+To start the WeasyPrint service container, execute:
 
 ```bash
   docker run --detach \
     --publish 9080:9080 \
     --name weasyprint-service \
-    weasyprint-service:62.4.3
+    ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
-## Stop Docker container
+The service will be accessible on port 9080.
+
+### Using as a Base Image
+
+To extend or customize the service, use it as a base image in the Dockerfile:
+
+```Dockerfile
+FROM ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+## Development
+
+### Building the Docker Image
+
+To build the Docker image from the source with a custom version, use:
+
+```bash
+  docker build \
+    --build-arg APP_IMAGE_VERSION=0.0.0 \
+    --file Dockerfile \
+    --tag weasyprint-service:0.0.0-test .
+```
+
+Replace 0.0.0 with the desired version number.
+
+### Running the Development Container
+
+To start the Docker container with your custom-built image:
+
+```bash
+  docker run --detach \
+    --publish 9080:9080 \
+    --name weasyprint-service \
+    weasyprint-service:0.0.0-test
+```
+
+### Stopping the Container
+
+To stop the running container, execute:
 
 ```bash
   docker container stop weasyprint-service
 ```
 
-## Access service
+### Access service
+
 Weasyprint Service provides the following endpoints:
 
 ------------------------------------------------------------------------------------------
+
 #### Getting version info
+
 <details>
   <summary>
     <code>GET</code> <code>/version</code>
@@ -51,6 +103,7 @@ Weasyprint Service provides the following endpoints:
 
 
 ------------------------------------------------------------------------------------------
+
 #### Convert HTML to PDF
 
 <details>

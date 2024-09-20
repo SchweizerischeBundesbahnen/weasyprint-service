@@ -153,12 +153,13 @@ def create_chromium_command(width, height, png_filepath, svg_filepath):
         logging.error('CHROMIUM_EXECUTABLE_PATH is not set.')
         return None
 
-    enable_hardware_acceleration = os.getenv('ENABLE_HARDWARE_ACCELERATION', 'false').lower() == 'true'
-
     command = [
         chromium_executable,
         '--headless=old',
         '--no-sandbox',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-dev-shm-usage',
         '--default-background-color=00000000',
         '--hide-scrollbars',
         '--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb',
@@ -166,13 +167,6 @@ def create_chromium_command(width, height, png_filepath, svg_filepath):
         f'--window-size={width},{height}',
         svg_filepath,
     ]
-
-    if not enable_hardware_acceleration:
-        command.extend([
-            '--disable-gpu',
-            '--disable-software-rasterizer',
-            '--disable-dev-shm-usage',
-        ])
 
     return command
 

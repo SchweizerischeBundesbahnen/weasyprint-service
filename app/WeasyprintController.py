@@ -17,7 +17,9 @@ def version():
     return {
         "python": platform.python_version(),
         "weasyprint": weasyprint.__version__,
-        "weasyprintService": os.environ.get('WEASYPRINT_SERVICE_VERSION')
+        "weasyprintService": os.environ.get('WEASYPRINT_SERVICE_VERSION'),
+        "timestamp": os.environ.get('WEASYPRINT_SERVICE_BUILD_TIMESTAMP'),
+        "chromium": os.environ.get('WEASYPRINT_SERVICE_CHROMIUM_VERSION'),
     }
 
 

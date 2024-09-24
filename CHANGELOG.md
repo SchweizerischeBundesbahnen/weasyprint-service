@@ -1,5 +1,12 @@
 # Changelog
 
+## [62.4.5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.4...v62.4.5) (2024-09-24)
+
+
+### Bug Fixes
+
+* extend version endpoint with build timestamp and chromium version ([#76](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/76)) ([1abd8f9](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1abd8f9cd7d9ab3ec8611e7d59c36c5f8c647c71)), closes [#74](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/74)
+
 ## [62.4.4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.3...v62.4.4) (2024-09-20)
 
 

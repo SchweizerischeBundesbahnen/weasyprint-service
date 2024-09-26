@@ -1,5 +1,12 @@
 # Changelog
 
+## [62.4.6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.5...v62.4.6) (2024-09-26)
+
+
+### Bug Fixes
+
+* better handling of SVG dimensions ([#79](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/79)) ([89580f2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/89580f27fe4c66c55aaf4f38b2ef77254e99fded)), closes [#78](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/78)
+
 ## [62.4.5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.4...v62.4.5) (2024-09-24)
 
 

@@ -180,7 +180,12 @@ def to_base64(content):
 
 # Conversion to px
 def convert_to_px(value, unit):
-    value = float(value)
+    try:
+        value = float(value)
+    except ValueError:
+        logging.error(f"Invalid value for conversion: {value}")
+        return None
+
     if unit == 'px':
         return math.ceil(value)
     elif unit == 'pt':

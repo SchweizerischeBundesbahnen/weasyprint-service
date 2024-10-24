@@ -104,4 +104,3 @@ To ensure consistency throughout the source code, keep these rules in mind as yo
 * All features or bug fixes **must be tested** by one or more specs (unit-tests).
 * All API methods **must be documented**.
 * Also see [CODING_STANDARDS.md](./CODING_STANDARDS.md)
-

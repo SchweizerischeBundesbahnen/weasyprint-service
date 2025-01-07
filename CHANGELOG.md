@@ -1,5 +1,12 @@
 # Changelog
 
+## [63.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.6...v63.1.0) (2025-01-07)
+
+
+### Miscellaneous Chores
+
+* release 63.1.0 ([#97](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/97)) ([f201389](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f2013897cb2bc23625d169d2f78083304f5be19f))
+
 ## [62.4.6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.5...v62.4.6) (2024-09-26)
 
 

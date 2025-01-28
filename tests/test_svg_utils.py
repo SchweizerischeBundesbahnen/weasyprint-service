@@ -4,6 +4,8 @@ from pathlib import Path
 
 from app.svg_utils import *
 
+test_script_path = "./tests/test.sh"
+
 
 def setup_env_variables(f: Callable[[], None]) -> Callable[[], None]:
     def inner():
@@ -28,7 +30,7 @@ def test_process_svg():
     content = process_svg(html)
     assert content == html
 
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = "./test.sh"
+    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["SET_WRITE_OUTPUT"] = "true"
     html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+"/>"'
     expected_output = f'<img src="data:image/png;base64,{base64.b64encode(b"test\n").decode("utf-8")}"/>"'
@@ -69,12 +71,12 @@ def test_replace_svg_with_png():
     mime, content = replace_svg_with_png(svg_content)
     assert mime == IMAGE_SVG, content == svg_content
 
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = "./test.sh"
+    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     svg_content = r'<svg height="200px" width="100px"'
     mime, content = replace_svg_with_png(svg_content)
     assert mime == IMAGE_SVG, content == svg_content
 
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = "./test.sh"
+    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["SET_WRITE_OUTPUT"] = "true"
     svg_content = r'<svg height="200px" width="100px"'
     mime, content = replace_svg_with_png(svg_content)
@@ -105,14 +107,14 @@ def test_prepare_temp_files():
 def test_convert_svg_to_png():
     res = convert_svg_to_png(1, 1, Path("/"), Path("/"))
     assert not res
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = "./test.sh"
+    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["SET_TEST_EXIT_ONE"] = "true"
     res = convert_svg_to_png(1, 1, Path("/"), Path("/"))
     assert not res
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = "definitely_not_a_valid_command"
     res = convert_svg_to_png(1, 1, Path("/"), Path("/"))
     assert not res
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = "./test.sh"
+    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["SET_TEST_EXIT_ONE"] = ""
     res = convert_svg_to_png(1, 1, Path("/"), Path("/"))
     assert res

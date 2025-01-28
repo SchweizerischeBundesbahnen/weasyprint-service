@@ -3,6 +3,8 @@ import platform
 
 from app.weasyprint_controller import app
 
+test_script_path = "./tests/test.sh"
+
 
 def test_version():
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
@@ -19,7 +21,7 @@ def test_version():
 
 
 def test_convert_html():
-    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     with app.test_client() as test_client:
         result = test_client.post("/convert/html?base_url=/", json='<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+"/>"')
         assert result.status_code == 200

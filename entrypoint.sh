@@ -15,7 +15,7 @@ if ! pgrep -x 'dbus-daemon' > /dev/null; then
     export DBUS_SESSION_BUS_ADDRESS=${BUS_ADDRESS};
 fi
 
-python app/WeasyprintServiceApplication.py &
+python app/weasyprint_service_application.py &
 
 wait -n
 

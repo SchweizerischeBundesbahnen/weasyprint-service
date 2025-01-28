@@ -1,4 +1,5 @@
-FROM python:3.13.1-slim@sha256:f41a75c9cee9391c09e0139f7b49d4b1fbb119944ec740ecce4040626dc07bed
+# hadolint global ignore=DL3008
+FROM python:3.13.1-slim@sha256:23a81be7b258c8f516f7a60e80943cace4350deb8204cf107c7993e343610d47
 LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
 
 ARG APP_IMAGE_VERSION=0.0.0-dev
@@ -15,8 +16,8 @@ ENV WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION}
 
 WORKDIR ${WORKING_DIR}
 
-RUN BUILD_TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ") && \
-    echo ${BUILD_TIMESTAMP} > "${WORKING_DIR}/.build_timestamp"
+RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
+    echo "${BUILD_TIMESTAMP}" > "${WORKING_DIR}/.build_timestamp"
 
 COPY requirements.txt ${WORKING_DIR}/requirements.txt
 

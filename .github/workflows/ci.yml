@@ -2,7 +2,7 @@
 name: Build & Release
 on:
   push:
-    branches: ['**/**']
+    branches: ['**']
   pull_request:
     branches: [main]
 permissions:
@@ -15,18 +15,61 @@ env:
   REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   IMAGE_NAME: ${{ github.repository }}  # Image name will be <account>/<repo>
 jobs:
-  release:
+  verify-with-tox:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
-      - id: rp
+      - name: 📄 Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: 🧱 Install Poetry
+        run: curl -sSL https://install.python-poetry.org | python3 -
+      - name: 🧱 Setup Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: '3.13'
+          cache: poetry
+      - name: 🧱 Install dependencies
+        run: poetry install --all-extras
+      - name: 🧪 Run tests
+        run: poetry run tox
+      - name: SonarCloud scan for PR
+        uses: sonarsource/sonarqube-scan-action@13990a695682794b53148ff9f6a8b6e22e43955e  # v3.1.0
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: |
+            -Dsonar.pullrequest.base=${{ github.base_ref }}
+            -Dsonar.pullrequest.branch=${{ github.head_ref }}
+            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
+      - name: SonarCloud scan for Push
+        uses: sonarsource/sonarqube-scan-action@13990a695682794b53148ff9f6a8b6e22e43955e  # v3.1.0
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: |
+            -Dsonar.branch.name=${{ github.head_ref }}
+      - name: Docker Hadolint
+        uses: hadolint/hadolint-action@d292784f8f3eacda47060b259a580467b0ba410c
+        with:
+          format: tty
+  release-please:
+    needs: verify-with-tox
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      - id: release
         if: github.event_name != 'pull_request' && github.ref_name == 'main'
-        uses: googleapis/release-please-action@7987652d64b4581673a76e33ad5e98e3dd56832f  # v4
+        uses: googleapis/release-please-action@7987652d64b4581673a76e33ad5e98e3dd56832f  # v4.1.3
         with:
           release-type: simple
           include-v-in-tags: false
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567  # v3
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567  # v3.3.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USERNAME }}
@@ -35,11 +78,11 @@ jobs:
         id: tags
         env:
           # When release-please is skipped, these values will be empty
-          is_release: ${{ steps.rp.outputs.release_created }}
-          version: v${{ steps.rp.outputs.major }}.${{ steps.rp.outputs.minor }}.${{ steps.rp.outputs.patch }}
+          release_created: ${{ steps.release.outputs.release_created }}
+          version: ${{ steps.release.outputs.version }}
         run: |
           tags=""
-          if [[ "$is_release" = 'true' ]]; then
+          if [[ "$release_created" = 'true' ]]; then
             tags="type=semver,pattern={{version}},value=$version
           type=semver,pattern={{major}},value=$version
           type=semver,pattern={{major}}.{{minor}},value=$version"
@@ -54,16 +97,16 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96  # v5
+        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96  # v5.6.1
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: ${{ steps.tags.outputs.tags }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf  # v3
+        uses: docker/setup-qemu-action@53851d14592bedcffcf25ea515637cff71ef929a  # v3.3.0
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5  # v3
+        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5  # v3.8.0
       - name: Build and push
-        uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355  # v6
+        uses: docker/build-push-action@67a2d409c0a876cbe6b11854e3e25193efe4e62d  # v6.12.0
         with:
           context: .
           provenance: false

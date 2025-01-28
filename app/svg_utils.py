@@ -5,22 +5,23 @@ import os
 import re
 import subprocess
 import tempfile
+from pathlib import Path
 from uuid import uuid4
 
-IMAGE_PNG = 'image/png'
-IMAGE_SVG = 'image/svg+xml'
+IMAGE_PNG = "image/png"
+IMAGE_SVG = "image/svg+xml"
 
-NON_SVG_CONTENT_TYPES = ('image/jpeg', 'image/png', 'image/gif')
+NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
 
 
 # Process img tags, replacing base64 SVG images with PNGs
-def process_svg(html):
+def process_svg(html: str) -> str:
     pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]*?);base64,\s?(?P<base64>[^">]*?)"')
     return re.sub(pattern, replace_img_base64, html)
 
 
 # Decode and validate if the provided content is SVG.
-def get_svg_content(content_type, content_base64):
+def get_svg_content(content_type: str, content_base64: str) -> str | None:
     # We do not require to have 'image/svg+xml' content type coz not all systems will properly set it
 
     if content_type in NON_SVG_CONTENT_TYPES:
@@ -28,13 +29,13 @@ def get_svg_content(content_type, content_base64):
 
     try:
         decoded_content = base64.b64decode(content_base64)
-        if b'\0' in decoded_content:
+        if b"\0" in decoded_content:
             return None  # Skip processing if decoded content is binary (not text)
 
-        svg_content = decoded_content.decode('utf-8')
+        svg_content = decoded_content.decode("utf-8")
 
         # Fast check that this is a svg
-        if '</svg>' not in svg_content:
+        if "</svg>" not in svg_content:
             return None
 
         return svg_content
@@ -44,10 +45,10 @@ def get_svg_content(content_type, content_base64):
 
 
 # Replace base64 SVG images with PNG equivalents in the HTML img tag.
-def replace_img_base64(match):
+def replace_img_base64(match: re.Match[str]) -> str:
     entry = match.group(0)
-    content_type = match.group('type')
-    content_base64 = match.group('base64')
+    content_type = match.group("type")
+    content_base64 = match.group("base64")
 
     svg_content = get_svg_content(content_type, content_base64)
     if not svg_content:
@@ -62,7 +63,7 @@ def replace_img_base64(match):
 
 
 # Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chromium
-def replace_svg_with_png(svg_content):
+def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
     width, height = extract_svg_dimensions_as_px(svg_content)
     if not width or not height:
         return IMAGE_SVG, svg_content
@@ -82,32 +83,32 @@ def replace_svg_with_png(svg_content):
 
 
 # Extract the width and height from the SVG tag (and convert it to px)
-def extract_svg_dimensions_as_px(svg_content):
+def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | None]:
     width_match = re.search(r'<svg[^>]+?width="(?P<width>[\d.]+)(?P<unit>\w+)?', svg_content)
     height_match = re.search(r'<svg[^>]+?height="(?P<height>[\d.]+)(?P<unit>\w+)?', svg_content)
 
-    width = width_match.group('width') if width_match else None
-    height = height_match.group('height') if height_match else None
+    width = width_match.group("width") if width_match else None
+    height = height_match.group("height") if height_match else None
 
     if not width or not height:
         logging.error(f"Cannot find SVG dimensions. Width: {width}, Height: {height}")
 
-    width_unit = width_match.group('unit') if width_match else None
-    height_unit = height_match.group('unit') if height_match else None
+    width_unit = width_match.group("unit") if width_match else None
+    height_unit = height_match.group("unit") if height_match else None
 
     return convert_to_px(width, width_unit), convert_to_px(height, height_unit)
 
 
 # Save the SVG content to a temporary file and return the file paths for the SVG and PNG.
-def prepare_temp_files(svg_content):
+def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
     try:
         temp_folder = tempfile.gettempdir()
         uuid = str(uuid4())
 
-        svg_filepath = os.path.join(temp_folder, f'{uuid}.svg')
-        png_filepath = os.path.join(temp_folder, f'{uuid}.png')
+        svg_filepath = Path(temp_folder, f"{uuid}.svg")
+        png_filepath = Path(temp_folder, f"{uuid}.png")
 
-        with open(svg_filepath, 'w', encoding='utf-8') as f:
+        with svg_filepath.open("w", encoding="utf-8") as f:
             f.write(svg_content)
 
         return svg_filepath, png_filepath
@@ -117,13 +118,13 @@ def prepare_temp_files(svg_content):
 
 
 # Convert the SVG file to PNG using Chromium and return success status
-def convert_svg_to_png(width, height, png_filepath, svg_filepath):
+def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath: Path) -> bool:
     command = create_chromium_command(width, height, png_filepath, svg_filepath)
     if not command:
         return False
 
     try:
-        result = subprocess.run(command)
+        result = subprocess.run(command, check=False)  # noqa: S603
         if result.returncode != 0:
             logging.error(f"Error converting SVG to PNG, return code = {result.returncode}")
             return False
@@ -134,12 +135,12 @@ def convert_svg_to_png(width, height, png_filepath, svg_filepath):
 
 
 # Read the PNG file and clean up the temporary file
-def read_and_cleanup_png(png_filepath):
+def read_and_cleanup_png(png_filepath: Path) -> bytes | None:
     try:
-        with open(png_filepath, 'rb') as img_file:
+        with png_filepath.open("rb") as img_file:
             img_data = img_file.read()
 
-        os.remove(png_filepath)
+        png_filepath.unlink()
         return img_data
     except Exception as e:
         logging.error(f"Failed to read or clean up PNG file: {e}")
@@ -147,56 +148,48 @@ def read_and_cleanup_png(png_filepath):
 
 
 # Create the Chromium command for converting SVG to PNG
-def create_chromium_command(width, height, png_filepath, svg_filepath):
-    chromium_executable = os.environ.get('CHROMIUM_EXECUTABLE_PATH')
+def create_chromium_command(width: int, height: int, png_filepath: Path, svg_filepath: Path) -> list[str] | None:
+    chromium_executable = os.environ.get("CHROMIUM_EXECUTABLE_PATH")
     if not chromium_executable:
-        logging.error('CHROMIUM_EXECUTABLE_PATH is not set.')
+        logging.error("CHROMIUM_EXECUTABLE_PATH is not set.")
         return None
 
     command = [
         chromium_executable,
-        '--headless=old',
-        '--no-sandbox',
-        '--disable-gpu',
-        '--disable-software-rasterizer',
-        '--disable-dev-shm-usage',
-        '--default-background-color=00000000',
-        '--hide-scrollbars',
-        '--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb',
-        f'--screenshot={png_filepath}',
-        f'--window-size={width},{height}',
-        svg_filepath,
+        "--headless=old",
+        "--no-sandbox",
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+        "--disable-dev-shm-usage",
+        "--default-background-color=00000000",
+        "--hide-scrollbars",
+        "--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb",
+        f"--screenshot={png_filepath}",
+        f"--window-size={width},{height}",
+        str(svg_filepath),
     ]
 
     return command
 
 
 # Encode string or byte array to base64
-def to_base64(content):
+def to_base64(content: str | bytes) -> str:
     if isinstance(content, str):
-        content = content.encode('utf-8')  # encode the string to bytes
-    return base64.b64encode(content).decode('utf-8')
+        content = content.encode("utf-8")  # encode the string to bytes
+    return base64.b64encode(content).decode("utf-8")
 
 
 # Conversion to px
-def convert_to_px(value, unit):
+def convert_to_px(value: str | None, unit: str | None) -> int | None:
     try:
-        value = float(value)
+        if value is None:
+            raise ValueError()
+        value_f64 = float(value)
+        return math.ceil(value_f64 * get_px_conversion_ratio(unit))
     except ValueError:
         logging.error(f"Invalid value for conversion: {value}")
         return None
 
-    if unit == 'px':
-        return math.ceil(value)
-    elif unit == 'pt':
-        return math.ceil(value * 4 / 3)
-    elif unit == 'in':
-        return math.ceil(value * 96)
-    elif unit == 'cm':
-        return math.ceil(value * 96 / 2.54)
-    elif unit == 'mm':
-        return math.ceil(value * 96 / 2.54 * 10)
-    elif unit == 'pc':
-        return math.ceil(value * 16)
-    else:
-        return math.ceil(value) # Unknown unit, assume px
+
+def get_px_conversion_ratio(unit: str | None) -> float:
+    return {"px": 1, "pt": 4 / 3, "in": 96, "cm": 96 / 2.54, "mm": 96 / 2.54 * 10, "pc": 16}.get(unit, 1) if unit else 1

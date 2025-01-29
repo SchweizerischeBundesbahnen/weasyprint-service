@@ -5,7 +5,15 @@ LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
 ARG APP_IMAGE_VERSION=0.0.0-dev
 
 RUN apt-get update && \
-    apt-get --yes --no-install-recommends install chromium dbus fonts-dejavu fonts-liberation libpango-1.0-0 libpangoft2-1.0-0 python3-brotli python3-cffi vim && \
+    apt-get --yes --no-install-recommends install \
+    chromium dbus \
+    fonts-dejavu \
+    fonts-liberation \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    python3-brotli \
+    python3-cffi \
+    vim && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*

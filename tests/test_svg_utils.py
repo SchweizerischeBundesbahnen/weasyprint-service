@@ -1,8 +1,23 @@
+import base64
 import os
 from collections.abc import Callable
 from pathlib import Path
 
-from app.svg_utils import *
+from app.svg_utils import (
+    IMAGE_PNG,
+    IMAGE_SVG,
+    convert_svg_to_png,
+    convert_to_px,
+    create_chromium_command,
+    extract_svg_dimensions_as_px,
+    get_px_conversion_ratio,
+    get_svg_content,
+    prepare_temp_files,
+    process_svg,
+    read_and_cleanup_png,
+    replace_svg_with_png,
+    to_base64,
+)
 
 test_script_path = "./tests/test.sh"
 
@@ -54,11 +69,6 @@ def test_get_svg_content():
 
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc¨")
     assert content is None
-
-
-@setup_env_variables
-def test_replace_img_base64():
-    pass
 
 
 @setup_env_variables

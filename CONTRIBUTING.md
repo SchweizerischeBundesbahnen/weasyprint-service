@@ -79,11 +79,11 @@ Before you submit your Pull Request (PR) consider the following guidelines:
   is necessary because release notes are automatically generated from these messages.
 
      ```shell
-     git commit -a -S
+     git commit -a --gpg-sign
      ```
   Note: The optional commit `-a` command line option will automatically "add" and "rm" edited files.
 
-  Note: The command line option `-S` generates a signed commit, which is required to make a contribution (See [Developer Certificate of Origin](./LICENSES/DCO.txt))
+  Note: The command line option `-S/--gpg-sign` generates a signed commit, which is required to make a contribution (See [Developer Certificate of Origin](./LICENSES/DCO.txt))
 
 * Push your branch to GitHub:
 

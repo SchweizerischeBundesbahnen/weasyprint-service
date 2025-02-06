@@ -192,4 +192,4 @@ def convert_to_px(value: str | None, unit: str | None) -> int | None:
 
 
 def get_px_conversion_ratio(unit: str | None) -> float:
-    return {"px": 1, "pt": 4 / 3, "in": 96, "cm": 96 / 2.54, "mm": 96 / 2.54 * 10, "pc": 16}.get(unit, 1) if unit else 1
+    return {"px": 1.0, "pt": 4 / 3, "in": 96.0, "cm": 96 / 2.54, "mm": 96 / 2.54 * 10, "pc": 16.0}.get(unit, 1.0) if unit else 1.0

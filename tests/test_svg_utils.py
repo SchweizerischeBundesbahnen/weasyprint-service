@@ -37,14 +37,17 @@ def setup_env_variables(f: Callable[[], None]) -> Callable[[], None]:
 
 @setup_env_variables
 def test_process_svg():
+    # Invalid utf-8 string 123ABC==, return same content
     html = '<img src="data:image/svg+xml;base64,123ABC=="/>"'
     content = process_svg(html)
     assert content == html
 
+    # image/png is not extracted, return the same value
     html = '<img src="data:image/png;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+"/>"'
     content = process_svg(html)
     assert content == html
 
+    # svg image type extracted and converted using test script
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["SET_WRITE_OUTPUT"] = "true"
     html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+"/>"'
@@ -55,37 +58,46 @@ def test_process_svg():
 
 @setup_env_variables
 def test_get_svg_content():
+    # image/png not svg image type, return None
     content = get_svg_content("image/png", "123ABC==")
     assert content is None
 
+    # 0x00 in base64 decoded content (b'<svg height="200px" width="100px"\x00'), return None
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiAA==")
     assert content is None
 
+    # No end tag </svg> (b'<svg height="200px" width="100px"'), return None
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgi")
     assert content is None
 
+    # Valid input (b'<svg height="200px" width="100px"</svg>'), return decoded svg content
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+")
     assert content == r'<svg height="200px" width="100px"</svg>'
 
+    # Invalid base64 string, return None
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc¨")
     assert content is None
 
 
 @setup_env_variables
 def test_replace_svg_with_png():
+    # Invalid svg tag attributes, return same content
     svg_content = r'<svg height=200px" width "100px'
     mime, content = replace_svg_with_png(svg_content)
     assert mime == IMAGE_SVG, content == svg_content
 
+    # Chrome executable not set, return same content
     svg_content = r'<svg height="200px" width="100px"'
     mime, content = replace_svg_with_png(svg_content)
     assert mime == IMAGE_SVG, content == svg_content
 
+    # Chrome executable test script returns empty, return same content
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     svg_content = r'<svg height="200px" width="100px"'
     mime, content = replace_svg_with_png(svg_content)
     assert mime == IMAGE_SVG, content == svg_content
 
+    # Valid input with chrome executable test script set correctly, return script output
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["SET_WRITE_OUTPUT"] = "true"
     svg_content = r'<svg height="200px" width="100px"'
@@ -95,10 +107,12 @@ def test_replace_svg_with_png():
 
 @setup_env_variables
 def test_extract_svg_dimensions_as_px():
+    # Return width and height with valid input
     svg_content = r'<svg height="200px" width="100px">'
     width, height = extract_svg_dimensions_as_px(svg_content)
     assert width == 100 and height == 200
 
+    # Return None values for incorrectly formatted svg tag attributes
     svg_content = r'<svg height=200px" width "100px'
     width, height = extract_svg_dimensions_as_px(svg_content)
     assert width is None and height is None
@@ -136,6 +150,7 @@ def test_read_and_cleanup_png():
     png_file.touch()
     png_file.write_bytes(b"test")
     assert read_and_cleanup_png(png_file) == b"test"
+    # File already cleaned up, return None
     assert read_and_cleanup_png(png_file) is None
 
 

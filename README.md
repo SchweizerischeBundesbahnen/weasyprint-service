@@ -48,9 +48,9 @@ To build the Docker image from the source with a custom version, use:
 
 ```bash
   docker build \
-    --build-arg APP_IMAGE_VERSION=0.0.0-dev \
+    --build-arg APP_IMAGE_VERSION=0.0.0 \
     --file Dockerfile \
-    --tag weasyprint-service:0.0.0-dev .
+    --tag weasyprint-service:0.0.0 .
 ```
 
 Replace 0.0.0 with the desired version number.
@@ -63,7 +63,7 @@ To start the Docker container with your custom-built image:
   docker run --detach \
     --publish 9080:9080 \
     --name weasyprint-service \
-    weasyprint-service:0.0.0-dev
+    weasyprint-service:0.0.0
 ```
 
 ### Stopping the Container
@@ -72,6 +72,13 @@ To stop the running container, execute:
 
 ```bash
   docker container stop weasyprint-service
+```
+
+### Unit Testing Docker Image
+
+```bash
+docker build -t weasyprint-service:local .
+container-structure-test test --image weasyprint-service:local --config .config/container-structure-test.yaml
 ```
 
 ### Access service
@@ -89,9 +96,9 @@ Weasyprint Service provides the following endpoints:
 
 ##### Responses
 
-> | HTTP code | Content-Type       | Response                                                                                                                                           |
-> |-----------|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
-> | `200`     | `application/json` | `{ "chromium": "129.0.6668.58", "python": "3.12.5", "timestamp": "2024-09-23T12:23:09Z", "weasyprint": "62.3", "weasyprintService": "0.0.0-dev" }` |
+> | HTTP code | Content-Type       | Response                                                                                                                                       |
+> |-----------|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+> | `200`     | `application/json` | `{ "chromium": "129.0.6668.58", "python": "3.12.5", "timestamp": "2024-09-23T12:23:09Z", "weasyprint": "62.3", "weasyprintService": "0.0.0" }` |
 
 ##### Example cURL
 

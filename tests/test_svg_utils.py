@@ -19,18 +19,20 @@ from app.svg_utils import (
     to_base64,
 )
 
-test_script_path = "./tests/test.sh"
+test_script_path = "python3.13|./tests/scripts/test_script.py"
 
 
 def setup_env_variables(f: Callable[[], None]) -> Callable[[], None]:
     def inner():
         os.environ["CHROMIUM_EXECUTABLE_PATH"] = ""
         os.environ["SET_TEST_EXIT_ONE"] = ""
-        os.environ["SET_WRITE_OUTPUT"] = ""
+        os.environ["SET_TEST_WRITE_OUTPUT"] = ""
+        os.environ["SET_TEST_FLAG"] = "true"
         f()
         os.environ["CHROMIUM_EXECUTABLE_PATH"] = ""
         os.environ["SET_TEST_EXIT_ONE"] = ""
-        os.environ["SET_WRITE_OUTPUT"] = ""
+        os.environ["SET_TEST_WRITE_OUTPUT"] = ""
+        os.environ["SET_TEST_FLAG"] = ""
 
     return inner
 
@@ -49,7 +51,7 @@ def test_process_svg():
 
     # svg image type extracted and converted using test script
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    os.environ["SET_WRITE_OUTPUT"] = "true"
+    os.environ["SET_TEST_WRITE_OUTPUT"] = "true"
     html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+"/>"'
     expected_output = f'<img src="data:image/png;base64,{base64.b64encode(b"test\n").decode("utf-8")}"/>"'
     content = process_svg(html)
@@ -99,7 +101,7 @@ def test_replace_svg_with_png():
 
     # Valid input with chrome executable test script set correctly, return script output
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    os.environ["SET_WRITE_OUTPUT"] = "true"
+    os.environ["SET_TEST_WRITE_OUTPUT"] = "true"
     svg_content = r'<svg height="200px" width="100px"'
     mime, content = replace_svg_with_png(svg_content)
     assert mime == IMAGE_PNG, content == b"test\n"

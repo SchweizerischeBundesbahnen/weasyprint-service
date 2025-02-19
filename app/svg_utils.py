@@ -155,7 +155,7 @@ def create_chromium_command(width: int, height: int, png_filepath: Path, svg_fil
         return None
 
     command = [
-        chromium_executable,
+        *(chromium_executable.split("|") if os.environ.get("SET_TEST_FLAG") else [chromium_executable]),
         "--headless=old",
         "--no-sandbox",
         "--disable-gpu",

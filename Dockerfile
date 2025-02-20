@@ -26,7 +26,7 @@ RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
 COPY requirements.txt ${WORKING_DIR}/requirements.txt
 
 COPY ./app/*.py ${WORKING_DIR}/app/
-COPY ./pyproject.toml ${WORKINT_DIR}/pyproject.toml
+COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
 COPY ./poetry.lock ${WORKING_DIR}/poetry.lock
 
 RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && poetry install --no-root && poetry env activate

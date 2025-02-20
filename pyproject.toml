@@ -1,14 +1,18 @@
 [project]
 name = "weasyprint-service"
-version = "0.1.0"
-description = ""
+version = "0.0.0"  # the version is controll by the pipeline
+description = "Service for https://github.com/Kozea/WeasyPrint"
 authors = [
-    {name="SBB Polarion Team", email="polarion-opensource@sbb.ch"}
+    {name = "SBB Polarion Team", email = "polarion-opensource@sbb.ch"},
 ]
 license = "Apache License 2.0"
 readme = "README.md"
 requires-python=">=3.13"
-dependencies = ["flask (>=3.1.0,<4.0.0)", "gevent (>=24.11.1,<25.0.0)", "weasyprint (>=64.0,<65)"]
+dependencies = [
+    "flask (>=3.1.0,<4.0.0)",
+    "gevent (>=24.11.1,<25.0.0)",
+    "weasyprint (>=64.0,<65)"
+]
 
 [tool.poetry]
 packages = [{include = "app"}]

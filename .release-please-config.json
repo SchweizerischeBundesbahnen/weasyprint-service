@@ -1,0 +1,12 @@
+{
+  "release-type": "simple",
+  "include-v-in-tags": false,
+  "changelog-sections": {
+    "dependencies": {
+      "title": "Dependencies",
+      "filter": {
+        "packageNames": ["weasyprint"]
+      }
+    }
+  }
+}

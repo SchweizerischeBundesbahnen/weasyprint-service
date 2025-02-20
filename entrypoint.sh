@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 BUILD_TIMESTAMP="$(cat /opt/weasyprint/.build_timestamp)"
 export WEASYPRINT_SERVICE_BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
@@ -15,7 +15,7 @@ if ! pgrep -x 'dbus-daemon' > /dev/null; then
     export DBUS_SESSION_BUS_ADDRESS=${BUS_ADDRESS};
 fi
 
-python app/WeasyprintServiceApplication.py &
+poetry run python -m app.weasyprint_service_application &
 
 wait -n
 

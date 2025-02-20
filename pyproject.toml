@@ -1,0 +1,70 @@
+[project]
+name = "weasyprint-service"
+version = "0.1.0"
+description = ""
+authors = [
+    {name="SBB Polarion Team", email="polarion-opensource@sbb.ch"}
+]
+license = "Apache License 2.0"
+readme = "README.md"
+requires-python=">=3.13"
+dependencies = ["flask (>=3.1.0,<4.0.0)", "gevent (>=24.11.1,<25.0.0)", "weasyprint (>=64.0,<65)"]
+
+[tool.poetry]
+packages = [{include = "app"}]
+requires-poetry = ">=2.0"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.0.0"
+ruff = "^0.9.0"
+mypy = "^1.11.2"
+
+[tool.poetry.group.test.dependencies]
+tox = "^4.18.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 240
+fix = true
+show-fixes = true
+
+[tool.ruff.lint]
+extend-select = [
+    # --- Recommended ---
+    "E", "W", # pycodestyle errors and warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "C4",     # flake8-comprehensions
+    "C90",    # mccabe
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+    "S",      # flake8-bandit
+    "PL",     # Pylint
+    "PTH",    # flake8-pathlib
+    "TCH",    # type-checking imports
+    "SIM",    # flake8-simplify
+    "T20",    # flake8-print
+    "ERA",    # eradicate
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "S101", # No assert rule (bandit)
+    "PLR2004", # No magic values (pylint)
+    "F405", # undefined-local-with-import-star-usage (pyflakes)
+    "F403", # No import * (pyflakes)
+]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+[tool.mypy]
+explicit_package_bases = true
+disallow_untyped_defs = true
+exclude = "tests/.*"

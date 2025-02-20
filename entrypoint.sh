@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 BUILD_TIMESTAMP="$(cat /opt/weasyprint/.build_timestamp)"
 export WEASYPRINT_SERVICE_BUILD_TIMESTAMP=${BUILD_TIMESTAMP}

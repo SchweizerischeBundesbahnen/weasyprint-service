@@ -20,7 +20,7 @@ python = "^3.13"
 [tool.poetry.group.dev.dependencies]
 pre-commit = "4.1.0"
 ruff = "0.9.7"
-mypy = "1.14.1"
+mypy = "1.15.0"
 
 [tool.poetry.group.test.dependencies]
 tox = "^4.18.0"

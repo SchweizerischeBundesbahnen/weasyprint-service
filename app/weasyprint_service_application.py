@@ -1,7 +1,7 @@
 import argparse
 import logging
 
-import weasyprint_controller  # type: ignore
+from app import weasyprint_controller  # type: ignore
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Weasyprint service")
@@ -12,4 +12,4 @@ if __name__ == "__main__":
     logging.info("Weasyprint service listening port: " + str(args.port))
     logging.getLogger().setLevel(logging.WARN)
 
-    app = weasyprint_controller.start_server(args.port)
+    weasyprint_controller.start_server(args.port)

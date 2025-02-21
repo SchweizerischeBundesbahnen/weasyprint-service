@@ -2,5 +2,21 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>SchweizerischeBundesbahnen/casc-renovate-preset-polarion-docker"
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["poetry"],
+      "matchDatasources": ["pypi"],
+      "matchPackagePatterns": ["^weasyprint$"],
+      "semanticCommitType": "feat",
+      "matchUpdateTypes": ["minor"]
+    },
+    {
+      "matchManagers": ["poetry"],
+      "matchDatasources": ["pypi"],
+      "matchPackagePatterns": ["^weasyprint$"],
+      "semanticCommitType": "feat!",
+      "matchUpdateTypes": ["major"]
+    }
   ]
 }

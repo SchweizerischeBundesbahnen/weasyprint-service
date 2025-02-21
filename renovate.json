@@ -5,18 +5,34 @@
   ],
   "packageRules": [
     {
-      "matchManagers": ["poetry"],
-      "matchDatasources": ["pypi"],
-      "matchPackagePatterns": ["^weasyprint$"],
+      "matchManagers": [
+        "poetry"
+      ],
+      "matchDatasources": [
+        "pypi"
+      ],
       "semanticCommitType": "feat",
-      "matchUpdateTypes": ["minor"]
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "matchPackageNames": [
+        "/^weasyprint$/"
+      ]
     },
     {
-      "matchManagers": ["poetry"],
-      "matchDatasources": ["pypi"],
-      "matchPackagePatterns": ["^weasyprint$"],
+      "matchManagers": [
+        "poetry"
+      ],
+      "matchDatasources": [
+        "pypi"
+      ],
       "semanticCommitType": "feat!",
-      "matchUpdateTypes": ["major"]
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchPackageNames": [
+        "/^weasyprint$/"
+      ]
     }
   ]
 }

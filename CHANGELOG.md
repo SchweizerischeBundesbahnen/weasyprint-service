@@ -1,5 +1,22 @@
 # Changelog
 
+## [64.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v63.1.0...v64.1.0) (2025-02-21)
+
+
+### Features
+
+* **deps:** update dependency weasyprint to v64.1 ([691c97a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/691c97a06645da42de754cd336d6ddd3032b5b61))
+
+
+### Bug Fixes
+
+* replace debian base image with alpine one ([#105](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/105)) ([d73f025](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d73f025350a3b4ebf4775effebfd0168d17c0d37))
+
+
+### Miscellaneous Chores
+
+* release 64.1.0 ([#112](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/112)) ([691c97a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/691c97a06645da42de754cd336d6ddd3032b5b61))
+
 ## [63.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.6...v63.1.0) (2025-01-07)
 
 

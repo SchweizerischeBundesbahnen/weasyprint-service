@@ -15,6 +15,12 @@ if ! pgrep -x 'dbus-daemon' > /dev/null; then
     fi
     dbus_session_bus_address_filename="/tmp/dbus_session_bus_address";
     dbus-daemon --system --fork --print-address > ${dbus_session_bus_address_filename};
+
+    if [ $? -ne 0 ]; then
+        echo "Failed to start dbus-daemon, exiting"
+        exit 1
+    fi
+
     BUS_ADDRESS=$(cat ${dbus_session_bus_address_filename});
     export DBUS_SESSION_BUS_ADDRESS=${BUS_ADDRESS};
 fi

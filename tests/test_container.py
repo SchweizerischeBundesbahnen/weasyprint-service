@@ -14,6 +14,3 @@ def test_container():
     container.remove()
 
     assert logs == b"INFO:root:Weasyprint service listening port: 9080\n"
-
-
-test_container()

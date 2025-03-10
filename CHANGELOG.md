@@ -1,5 +1,25 @@
 # Changelog
 
+## [64.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v63.1.0...v64.1.0) (2025-03-10)
+
+
+### Features
+
+* **deps:** update dependency weasyprint to v64.1 ([691c97a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/691c97a06645da42de754cd336d6ddd3032b5b61))
+
+
+### Bug Fixes
+
+* alpine dbus problems ([#114](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/114)) ([4ad1872](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4ad18729ecc17082b8273bfb54c95553b8716830))
+* container restart does not work after migration to alpine ([#115](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/115)) ([7763b8b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7763b8bb0cc0ea7fbabff31c9d91ca772b27f2e6))
+* replace debian base image with alpine one ([#105](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/105)) ([d73f025](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d73f025350a3b4ebf4775effebfd0168d17c0d37))
+
+
+### Miscellaneous Chores
+
+* release 64.1.0 ([b3e38a1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b3e38a1ad843969c45a5c0f465953f4e4f3b2330))
+* release 64.1.0 ([#112](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/112)) ([691c97a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/691c97a06645da42de754cd336d6ddd3032b5b61))
+
 ## [63.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v62.4.6...v63.1.0) (2025-01-07)
 
 

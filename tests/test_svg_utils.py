@@ -163,7 +163,7 @@ def test_create_chromium_command():
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = "/"
     assert create_chromium_command(1, 1, Path("/"), Path("/")) == [
         "/",
-        "--headless=old",
+        "--headless=new",
         "--no-sandbox",
         "--disable-gpu",
         "--disable-software-rasterizer",

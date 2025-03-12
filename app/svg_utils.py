@@ -156,7 +156,7 @@ def create_chromium_command(width: int, height: int, png_filepath: Path, svg_fil
 
     command = [
         chromium_executable,
-        "--headless=old",
+        "--headless=new",
         "--no-sandbox",
         "--disable-gpu",
         "--disable-software-rasterizer",

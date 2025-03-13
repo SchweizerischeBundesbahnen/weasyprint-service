@@ -12,6 +12,7 @@ IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
 
 NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
+CHROMIUM_HEIGHT_ADJUSTMENT = 100
 
 
 # Process img tags, replacing base64 SVG images with PNGs
@@ -119,7 +120,8 @@ def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
 
 # Convert the SVG file to PNG using Chromium and return success status
 def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath: Path) -> bool:
-    command = create_chromium_command(width, height, png_filepath, svg_filepath)
+    adjusted_height = height + CHROMIUM_HEIGHT_ADJUSTMENT  # Add 100 pixels to height to make chromium render the entire svg
+    command = create_chromium_command(width, adjusted_height, png_filepath, svg_filepath)
     if not command:
         return False
 
@@ -128,9 +130,26 @@ def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath
         if result.returncode != 0:
             logging.error(f"Error converting SVG to PNG, return code = {result.returncode}")
             return False
-        return True
+        return crop_png_image_to_canvas_size(width, height, png_filepath)
     except Exception as e:
         logging.error(f"Failed to convert SVG to PNG: {e}")
+        return False
+
+
+# Crop the resulting PNG image to the SVG's canvas size
+def crop_png_image_to_canvas_size(width: int, height: int, png_filepath: Path) -> bool:
+    command = create_image_crop_command(width, height, png_filepath)
+    if not command:
+        return False
+
+    try:
+        result = subprocess.run(command, check=False)  # noqa: S603
+        if result.returncode != 0:
+            logging.error(f"Error cropping PNG image, return code = {result.returncode}")
+            return False
+        return True
+    except Exception as e:
+        logging.error(f"Failed to crop PNG {e}")
         return False
 
 
@@ -168,6 +187,18 @@ def create_chromium_command(width: int, height: int, png_filepath: Path, svg_fil
         f"--window-size={width},{height}",
         str(svg_filepath),
     ]
+
+    return command
+
+
+# Create the imagemagick PNG crop command
+def create_image_crop_command(width: int, height: int, png_filepath: Path) -> list[str] | None:
+    convert_executable = os.environ.get("CONVERT_EXECUTABLE_PATH")
+    if not convert_executable:
+        logging.error("CONVERT_EXECUTABLE_PATH is not set.")
+        return None
+
+    command = [convert_executable, str(png_filepath), "-crop", f"{width}x{height}+0+0", str(png_filepath)]
 
     return command
 

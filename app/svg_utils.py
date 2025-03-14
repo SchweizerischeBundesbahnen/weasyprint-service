@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from uuid import uuid4
 
+from defusedxml import ElementTree as ET
+
 SPECIAL_UNITS = ("vw", "vh", "%")  # Special units that require viewBox context
 
 IMAGE_PNG = "image/png"
@@ -136,11 +138,7 @@ def parse_viewbox(svg_content: str) -> tuple[float | None, float | None]:
     return None, None
 
 
-def calculate_dimension(
-    value: str | None,
-    unit: str | None,
-    vb_dimension: float | None,
-) -> int | None:
+def calculate_dimension(value: str | None, unit: str | None, vb_dimension: float | None) -> int | None:
     if value is None:
         return None
 
@@ -153,29 +151,23 @@ def calculate_dimension(
 
 
 def replace_svg_size_attributes(svg_content: str, width_px: int, height_px: int) -> str:
-    svg_content = re.sub(
-        r'(<svg[^>]*?\bwidth\s*=\s*["\'])[\d.]+(?:\w+|%)?(["\'])',
-        rf"\g<1>{width_px}px\2",
-        svg_content,
-        flags=re.IGNORECASE,
-    )
+    try:
+        root = ET.fromstring(svg_content)
+    except ET.ParseError as e:
+        raise ValueError("Invalid SVG content") from e
 
-    svg_content = re.sub(
-        r'(<svg[^>]*?\bheight\s*=\s*["\'])[\d.]+(?:\w+|%)?(["\'])',
-        rf"\g<1>{height_px}px\2",
-        svg_content,
-        flags=re.IGNORECASE,
-    )
+    # Ensure the root element is <svg>
+    if root.tag != "svg":
+        raise ValueError("The provided content is not an SVG document.")
 
-    # Add width if missing
-    if not re.search(r"\bwidth\s*=", svg_content, flags=re.IGNORECASE):
-        svg_content = svg_content.replace("<svg", f'<svg width="{width_px}px"', 1)
+    # Set or replace width and height attributes
+    root.set("width", f"{width_px}px")
+    root.set("height", f"{height_px}px")
 
-    # Add height if missing
-    if not re.search(r"\bheight\s*=", svg_content, flags=re.IGNORECASE):
-        svg_content = svg_content.replace("<svg", f'<svg height="{height_px}px"', 1)
+    # Convert XML tree back to a string
+    svg_with_attributes = ET.tostring(root, encoding="unicode")
 
-    return svg_content
+    return svg_with_attributes
 
 
 def add_svg_size_attributes(svg_content: str, width_px: int, height_px: int) -> str:

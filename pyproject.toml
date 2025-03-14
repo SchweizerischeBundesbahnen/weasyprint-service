@@ -23,7 +23,7 @@ python = "^3.13"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "4.1.0"
-ruff = "0.10.0"
+ruff = "0.11.0"
 mypy = "1.15.0"
 
 [tool.poetry.group.test.dependencies]

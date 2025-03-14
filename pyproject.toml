@@ -75,3 +75,5 @@ line-ending = "lf"
 explicit_package_bases = true
 disallow_untyped_defs = true
 exclude = "tests/.*"
+install_types = true
+non_interactive = true

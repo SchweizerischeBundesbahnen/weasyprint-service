@@ -156,10 +156,6 @@ def replace_svg_size_attributes(svg_content: str, width_px: int, height_px: int)
     except ET.ParseError as e:
         raise ValueError("Invalid SVG content") from e
 
-    # Ensure the root element is <svg>
-    if root.tag != "svg":
-        raise ValueError("The provided content is not an SVG document.")
-
     # Set or replace width and height attributes
     root.set("width", f"{width_px}px")
     root.set("height", f"{height_px}px")
@@ -168,23 +164,6 @@ def replace_svg_size_attributes(svg_content: str, width_px: int, height_px: int)
     svg_with_attributes = ET.tostring(root, encoding="unicode")
 
     return svg_with_attributes
-
-
-def add_svg_size_attributes(svg_content: str, width_px: int, height_px: int) -> str:
-    """
-    Add width and height attributes to the SVG tag if missing.
-    """
-
-    def add_attrs(match: re.Match[str]) -> str:
-        tag = match.group(0)
-        # If width/height already exist, don't modify
-        if "width=" in tag or "height=" in tag:
-            return tag
-        # Add attributes
-        return tag.rstrip(">") + f' width="{width_px}px" height="{height_px}px">'
-
-    svg_content = re.sub(r"<svg[^>]*?>", add_attrs, svg_content, flags=re.IGNORECASE)
-    return svg_content
 
 
 # Calculates the pixel value for vw, vh, or % units based on viewBox dimensions

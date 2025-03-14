@@ -170,6 +170,7 @@ def test_create_chromium_command():
         "--disable-dev-shm-usage",
         "--default-background-color=00000000",
         "--hide-scrollbars",
+        "--force-device-scale-factor=1",
         "--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb",
         "--screenshot=/",
         f"--window-size={1},{1}",

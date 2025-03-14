@@ -110,15 +110,104 @@ def test_replace_svg_with_png():
 
 @setup_env_variables
 def test_extract_svg_dimensions_as_px():
-    # Return width and height with valid input
+    # Valid width and height with absolute units
     svg_content = r'<svg height="200px" width="100px">'
-    width, height = extract_svg_dimensions_as_px(svg_content)
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
     assert width == 100 and height == 200
+    assert 'width="100px"' in updated_svg
+    assert 'height="200px"' in updated_svg
 
-    # Return None values for incorrectly formatted svg tag attributes
+    # Invalid width and height attribute formatting → None
     svg_content = r'<svg height=200px" width "100px'
-    width, height = extract_svg_dimensions_as_px(svg_content)
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
     assert width is None and height is None
+    assert updated_svg == svg_content
+
+    # Valid viewBox fallback when width and height are missing
+    svg_content = r'<svg viewBox="0 0 300 150">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width == 300 and height == 150
+    assert 'width="300px"' in updated_svg
+    assert 'height="150px"' in updated_svg
+
+    # viewBox with incorrect format → None
+    svg_content = r'<svg viewBox="0 0 300">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width is None and height is None
+    assert updated_svg == svg_content
+
+    # Missing everything → None, None
+    svg_content = r"<svg>"
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width is None and height is None
+    assert updated_svg == svg_content
+
+    # Partial attributes: width only, no height, but with valid viewBox
+    svg_content = r'<svg width="100px" viewBox="0 0 400 200">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width == 100 and height == 200
+    assert 'width="100px"' in updated_svg
+    assert 'height="200px"' in updated_svg
+
+    # Partial attributes: height only, no width, but with valid viewBox
+    svg_content = r'<svg height="50px" viewBox="0 0 400 200">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width == 400 and height == 50
+    assert 'width="400px"' in updated_svg
+    assert 'height="50px"' in updated_svg
+
+    # Non-numeric width and height → None
+    svg_content = r'<svg width="abc" height="xyz">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width is None and height is None
+    assert updated_svg == svg_content
+
+
+@setup_env_variables
+def test_extract_svg_dimensions_as_px_relative():
+    # width/height in vw/vh without viewBox → raise ValueError
+    svg_content = r'<svg width="100vw" height="100vh">'
+    try:
+        extract_svg_dimensions_as_px(svg_content)
+        raise AssertionError("Expected ValueError due to missing viewBox for vw/vh units")
+    except ValueError as e:
+        assert "vw units require a viewBox to be defined" in str(e)
+
+    # width/height in % without viewBox → raise ValueError
+    svg_content = r'<svg width="100%" height="100%">'
+    try:
+        extract_svg_dimensions_as_px(svg_content)
+        raise AssertionError("Expected ValueError due to missing viewBox for vw/vh units")
+    except ValueError as e:
+        assert "% units require a viewBox to be defined" in str(e)
+
+    # width/height in vw/vh with valid viewBox
+    svg_content = r'<svg width="100vw" height="100vh" viewBox="0 0 800 600">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width == 800 and height == 600
+    assert 'width="800px"' in updated_svg
+    assert 'height="600px"' in updated_svg
+
+    # width/height in vw/vh with valid viewBox
+    svg_content = r'<svg width="50vw" height="50vh" viewBox="0 0 800 600">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width == 400 and height == 300
+    assert 'width="400px"' in updated_svg
+    assert 'height="300px"' in updated_svg
+
+    # 100% / 100% with viewBox = 800x600
+    svg_content = r'<svg width="100%" height="100%" viewBox="0 0 800 600">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width == 800 and height == 600
+    assert 'width="800px"' in updated_svg
+    assert 'height="600px"' in updated_svg
+
+    # 50% / 25% with viewBox = 800x600
+    svg_content = r'<svg width="50%" height="25%" viewBox="0 0 800 600">'
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    assert width == 400 and height == 150
+    assert 'width="400px"' in updated_svg
+    assert 'height="150px"' in updated_svg
 
 
 @setup_env_variables

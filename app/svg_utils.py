@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from uuid import uuid4
 
+SPECIAL_UNITS = ("vw", "vh", "%")  # Special units that require viewBox context
+
 IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
 
@@ -64,11 +66,11 @@ def replace_img_base64(match: re.Match[str]) -> str:
 
 # Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chromium
 def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
-    width, height = extract_svg_dimensions_as_px(svg_content)
+    width, height, updated_svg_content = extract_svg_dimensions_as_px(svg_content)
     if not width or not height:
         return IMAGE_SVG, svg_content
 
-    svg_filepath, png_filepath = prepare_temp_files(svg_content)
+    svg_filepath, png_filepath = prepare_temp_files(updated_svg_content)
     if not svg_filepath or not png_filepath:
         return IMAGE_SVG, svg_content
 
@@ -82,21 +84,130 @@ def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
     return IMAGE_PNG, png_content
 
 
-# Extract the width and height from the SVG tag (and convert it to px)
-def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | None]:
-    width_match = re.search(r'<svg[^>]+?width="(?P<width>[\d.]+)(?P<unit>\w+)?', svg_content)
-    height_match = re.search(r'<svg[^>]+?height="(?P<height>[\d.]+)(?P<unit>\w+)?', svg_content)
+def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | None, str]:
+    """
+    Extract width and height from the SVG tag and convert them to px.
+    If units are vw/vh/% and viewBox exists, compute their pixel equivalents.
+    Returns updated SVG content with replaced width/height if necessary.
+    """
+    width, width_unit = parse_svg_dimension(svg_content, "width")
+    height, height_unit = parse_svg_dimension(svg_content, "height")
+    vb_width, vb_height = parse_viewbox(svg_content)
 
-    width = width_match.group("width") if width_match else None
-    height = height_match.group("height") if height_match else None
+    width_px = calculate_dimension(width, width_unit, vb_width, "width")
+    height_px = calculate_dimension(height, height_unit, vb_height, "height")
 
-    if not width or not height:
-        logging.error(f"Cannot find SVG dimensions. Width: {width}, Height: {height}")
+    if vb_width is not None and vb_height is not None:
+        if width_px is None:
+            width_px = math.ceil(vb_width)
+        if height_px is None:
+            height_px = math.ceil(vb_height)
+        svg_content = replace_svg_size_attributes(svg_content, width_px, height_px)
 
-    width_unit = width_match.group("unit") if width_match else None
-    height_unit = height_match.group("unit") if height_match else None
+    if width_px is None or height_px is None:
+        return None, None, svg_content
 
-    return convert_to_px(width, width_unit), convert_to_px(height, height_unit)
+    return width_px, height_px, svg_content
+
+
+def parse_svg_dimension(svg_content: str, dimension: str) -> tuple[str | None, str | None]:
+    match = re.search(
+        rf'<svg[^>]*?\b{dimension}\s*=\s*["\'](?P<value>[\d.]+)(?P<unit>\w+|%)?["\']',
+        svg_content,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group("value"), match.group("unit")
+    return None, None
+
+
+def parse_viewbox(svg_content: str) -> tuple[float | None, float | None]:
+    match = re.search(
+        r'<svg[^>]*?\bviewBox\s*=\s*["\']'
+        r"[\d.\-]+\s+[\d.\-]+\s+"
+        r"(?P<vb_width>[\d.\-]+)\s+"
+        r"(?P<vb_height>[\d.\-]+)"
+        r'["\']',
+        svg_content,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return float(match.group("vb_width")), float(match.group("vb_height"))
+    return None, None
+
+
+def calculate_dimension(
+    value: str | None,
+    unit: str | None,
+    vb_dimension: float | None,
+    dimension_name: str,
+) -> int | None:
+    if value is None:
+        return None
+
+    if unit in SPECIAL_UNITS:
+        if vb_dimension is None:
+            raise ValueError(f"{unit} units require a viewBox to be defined")
+        return calculate_special_unit(value, unit, vb_dimension)
+
+    return convert_to_px(value, unit)
+
+
+def replace_svg_size_attributes(svg_content: str, width_px: int, height_px: int) -> str:
+    svg_content = re.sub(
+        r'(<svg[^>]*?\bwidth\s*=\s*["\'])[\d.]+(?:\w+|%)?(["\'])',
+        rf"\g<1>{width_px}px\2",
+        svg_content,
+        flags=re.IGNORECASE,
+    )
+
+    svg_content = re.sub(
+        r'(<svg[^>]*?\bheight\s*=\s*["\'])[\d.]+(?:\w+|%)?(["\'])',
+        rf"\g<1>{height_px}px\2",
+        svg_content,
+        flags=re.IGNORECASE,
+    )
+
+    # Add width if missing
+    if not re.search(r"\bwidth\s*=", svg_content, flags=re.IGNORECASE):
+        svg_content = svg_content.replace("<svg", f'<svg width="{width_px}px"', 1)
+
+    # Add height if missing
+    if not re.search(r"\bheight\s*=", svg_content, flags=re.IGNORECASE):
+        svg_content = svg_content.replace("<svg", f'<svg height="{height_px}px"', 1)
+
+    return svg_content
+
+
+def add_svg_size_attributes(svg_content: str, width_px: int, height_px: int) -> str:
+    """
+    Add width and height attributes to the SVG tag if missing.
+    """
+
+    def add_attrs(match: re.Match[str]) -> str:
+        tag = match.group(0)
+        # If width/height already exist, don't modify
+        if "width=" in tag or "height=" in tag:
+            return tag
+        # Add attributes
+        return tag.rstrip(">") + f' width="{width_px}px" height="{height_px}px">'
+
+    svg_content = re.sub(r"<svg[^>]*?>", add_attrs, svg_content, flags=re.IGNORECASE)
+    return svg_content
+
+
+# Calculates the pixel value for vw, vh, or % units based on viewBox dimensions
+def calculate_special_unit(value: str, unit: str | None, viewbox_dimension: float) -> int:
+    val = float(value)
+
+    if unit in SPECIAL_UNITS:
+        return math.ceil((val / 100) * viewbox_dimension)
+
+    fallback = convert_to_px(value, unit)
+    if fallback is None:
+        raise ValueError(f"Cannot convert unit '{unit}' to px")
+
+    return fallback
 
 
 # Save the SVG content to a temporary file and return the file paths for the SVG and PNG.
@@ -185,6 +296,10 @@ def convert_to_px(value: str | None, unit: str | None) -> int | None:
         if value is None:
             raise ValueError()
         value_f64 = float(value)
+
+        if unit in SPECIAL_UNITS:
+            return None
+
         return math.ceil(value_f64 * get_px_conversion_ratio(unit))
     except ValueError:
         logging.error(f"Invalid value for conversion: {value}")

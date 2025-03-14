@@ -15,7 +15,6 @@ RUN apt-get update && \
     libpangoft2-1.0-0 \
     python3-brotli \
     python3-cffi \
-    imagemagick \
     vim && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
@@ -23,7 +22,6 @@ RUN apt-get update && \
 
 ENV WORKING_DIR="/opt/weasyprint"
 ENV CHROMIUM_EXECUTABLE_PATH="/usr/bin/chromium"
-ENV CONVERT_EXECUTABLE_PATH="/usr/bin/convert"
 ENV WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION}
 
 WORKDIR ${WORKING_DIR}

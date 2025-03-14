@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from uuid import uuid4
 
+from PIL import Image
+
 IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
 
@@ -73,14 +75,28 @@ def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
     if not svg_filepath or not png_filepath:
         return IMAGE_SVG, svg_content
 
-    if not convert_svg_to_png(width, height, png_filepath, svg_filepath):
+    if not convert_svg_to_png(width, height + CHROMIUM_HEIGHT_ADJUSTMENT, png_filepath, svg_filepath):  # Add 100 pixels to height to make chromium render the entire svg
         return IMAGE_SVG, svg_content
+
+    crop_png(png_filepath, CHROMIUM_HEIGHT_ADJUSTMENT)
 
     png_content = read_and_cleanup_png(png_filepath)
     if not png_content:
         return IMAGE_SVG, svg_content
 
     return IMAGE_PNG, png_content
+
+
+# Remove added bottom pixels from PNG after conversion
+def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> None:
+    with Image.open(file_path) as img:
+        img_width, img_height = img.size
+
+        if bottom_pixels_to_crop >= img_height:
+            raise ValueError("Not possible to crop more than the height of the picture")
+
+        cropped = img.crop((0, 0, img_width, img_height - bottom_pixels_to_crop))
+        cropped.save(file_path)
 
 
 # Extract the width and height from the SVG tag (and convert it to px)
@@ -120,8 +136,7 @@ def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
 
 # Convert the SVG file to PNG using Chromium and return success status
 def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath: Path) -> bool:
-    adjusted_height = height + CHROMIUM_HEIGHT_ADJUSTMENT  # Add 100 pixels to height to make chromium render the entire svg
-    command = create_chromium_command(width, adjusted_height, png_filepath, svg_filepath)
+    command = create_chromium_command(width, height, png_filepath, svg_filepath)
     if not command:
         return False
 
@@ -130,26 +145,9 @@ def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath
         if result.returncode != 0:
             logging.error(f"Error converting SVG to PNG, return code = {result.returncode}")
             return False
-        return crop_png_image_to_canvas_size(width, height, png_filepath)
-    except Exception as e:
-        logging.error(f"Failed to convert SVG to PNG: {e}")
-        return False
-
-
-# Crop the resulting PNG image to the SVG's canvas size
-def crop_png_image_to_canvas_size(width: int, height: int, png_filepath: Path) -> bool:
-    command = create_image_crop_command(width, height, png_filepath)
-    if not command:
-        return False
-
-    try:
-        result = subprocess.run(command, check=False)  # noqa: S603
-        if result.returncode != 0:
-            logging.error(f"Error cropping PNG image, return code = {result.returncode}")
-            return False
         return True
     except Exception as e:
-        logging.error(f"Failed to crop PNG {e}")
+        logging.error(f"Failed to convert SVG to PNG: {e}")
         return False
 
 
@@ -182,23 +180,12 @@ def create_chromium_command(width: int, height: int, png_filepath: Path, svg_fil
         "--disable-dev-shm-usage",
         "--default-background-color=00000000",
         "--hide-scrollbars",
+        "--force-device-scale-factor=1",
         "--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb",
         f"--screenshot={png_filepath}",
         f"--window-size={width},{height}",
         str(svg_filepath),
     ]
-
-    return command
-
-
-# Create the imagemagick PNG crop command
-def create_image_crop_command(width: int, height: int, png_filepath: Path) -> list[str] | None:
-    convert_executable = os.environ.get("CONVERT_EXECUTABLE_PATH")
-    if not convert_executable:
-        logging.error("CONVERT_EXECUTABLE_PATH is not set.")
-        return None
-
-    command = [convert_executable, str(png_filepath), "-crop", f"{width}x{height}+0+0", str(png_filepath)]
 
     return command
 

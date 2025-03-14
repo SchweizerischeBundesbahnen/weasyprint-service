@@ -94,8 +94,8 @@ def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | No
     height, height_unit = parse_svg_dimension(svg_content, "height")
     vb_width, vb_height = parse_viewbox(svg_content)
 
-    width_px = calculate_dimension(width, width_unit, vb_width, "width")
-    height_px = calculate_dimension(height, height_unit, vb_height, "height")
+    width_px = calculate_dimension(width, width_unit, vb_width)
+    height_px = calculate_dimension(height, height_unit, vb_height)
 
     if vb_width is not None and vb_height is not None:
         if width_px is None:
@@ -140,7 +140,6 @@ def calculate_dimension(
     value: str | None,
     unit: str | None,
     vb_dimension: float | None,
-    dimension_name: str,
 ) -> int | None:
     if value is None:
         return None

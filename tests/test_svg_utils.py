@@ -278,6 +278,9 @@ def test_convert_to_px():
     assert convert_to_px("1", "mm") == 378
     assert convert_to_px(None, "px") is None
     assert convert_to_px("abc", "px") is None
+    assert convert_to_px("100", "vh") is None
+    assert convert_to_px("100", "vw") is None
+    assert convert_to_px("100", "%") is None
 
 
 @setup_env_variables

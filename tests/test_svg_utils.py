@@ -20,6 +20,7 @@ from app.svg_utils import (
 )
 
 test_script_path = "./tests/scripts/test_script.sh"
+cropped_test_script_output = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xf6\x178U\x00\x00\x00\x00IEND\xaeB`\x82"
 
 EXIT_ONE = "WEASYPRINT_SERVICE_TEST_EXIT_ONE"
 WRITE_OUTPUT = "WEASYPRINT_SERVICE_TEST_WRITE_OUTPUT"
@@ -54,7 +55,7 @@ def test_process_svg():
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[WRITE_OUTPUT] = "true"
     html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+"/>"'
-    expected_output = f'<img src="data:image/png;base64,{base64.b64encode(b"test\n").decode("utf-8")}"/>"'
+    expected_output = f'<img src="data:image/png;base64,{base64.b64encode(cropped_test_script_output).decode("utf-8")}"/>"'
     content = process_svg(html)
     assert content == expected_output
 
@@ -103,9 +104,10 @@ def test_replace_svg_with_png():
     # Valid input with chrome executable test script set correctly, return script output
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[WRITE_OUTPUT] = "true"
-    svg_content = r'<svg height="200px" width="100px"'
+    svg_content = r'<svg height="1px" width="1px"'
     mime, content = replace_svg_with_png(svg_content)
-    assert mime == IMAGE_PNG, content == b"test\n"
+    assert mime == IMAGE_PNG
+    assert content == cropped_test_script_output
 
 
 @setup_env_variables
@@ -252,13 +254,14 @@ def test_create_chromium_command():
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = "/"
     assert create_chromium_command(1, 1, Path("/"), Path("/")) == [
         "/",
-        "--headless=old",
+        "--headless=new",
         "--no-sandbox",
         "--disable-gpu",
         "--disable-software-rasterizer",
         "--disable-dev-shm-usage",
         "--default-background-color=00000000",
         "--hide-scrollbars",
+        "--force-device-scale-factor=1",
         "--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb",
         "--screenshot=/",
         f"--window-size={1},{1}",

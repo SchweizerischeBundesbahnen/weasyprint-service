@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from defusedxml import ElementTree as ET
+from PIL import Image
 
 SPECIAL_UNITS = ("vw", "vh", "%")  # Special units that require viewBox context
 
@@ -16,11 +17,12 @@ IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
 
 NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
+CHROMIUM_HEIGHT_ADJUSTMENT = 100
 
 
 # Process img tags, replacing base64 SVG images with PNGs
 def process_svg(html: str) -> str:
-    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,(?P<base64>[^"]+)?"')
+    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')
     return re.sub(pattern, replace_img_base64, html)
 
 
@@ -76,7 +78,10 @@ def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
     if not svg_filepath or not png_filepath:
         return IMAGE_SVG, svg_content
 
-    if not convert_svg_to_png(width, height, png_filepath, svg_filepath):
+    if not convert_svg_to_png(width, height + CHROMIUM_HEIGHT_ADJUSTMENT, png_filepath, svg_filepath):  # Add 100 pixels to height to make chromium render the entire svg
+        return IMAGE_SVG, svg_content
+
+    if not crop_png(png_filepath, CHROMIUM_HEIGHT_ADJUSTMENT):
         return IMAGE_SVG, svg_content
 
     png_content = read_and_cleanup_png(png_filepath)
@@ -86,6 +91,24 @@ def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
     return IMAGE_PNG, png_content
 
 
+# Remove added bottom pixels from PNG after conversion
+def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> bool:
+    try:
+        with Image.open(file_path) as img:
+            img_width, img_height = img.size
+
+            if bottom_pixels_to_crop >= img_height:
+                raise ValueError("Not possible to crop more than the height of the picture")
+
+            cropped = img.crop((0, 0, img_width, img_height - bottom_pixels_to_crop))
+            cropped.save(file_path)
+            return True
+    except Exception as e:
+        logging.error(f"PNG file to crop not found: {e}")
+        return False
+
+
+# Extract the width and height from the SVG tag (and convert it to px)
 def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | None, str]:
     """
     Extract width and height from the SVG tag and convert them to px.
@@ -237,13 +260,14 @@ def create_chromium_command(width: int, height: int, png_filepath: Path, svg_fil
 
     command = [
         chromium_executable,
-        "--headless=old",
+        "--headless=new",
         "--no-sandbox",
         "--disable-gpu",
         "--disable-software-rasterizer",
         "--disable-dev-shm-usage",
         "--default-background-color=00000000",
         "--hide-scrollbars",
+        "--force-device-scale-factor=1",
         "--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb",
         f"--screenshot={png_filepath}",
         f"--window-size={width},{height}",

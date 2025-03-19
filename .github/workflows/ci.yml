@@ -33,6 +33,11 @@ jobs:
         run: poetry install --all-extras
       - name: 🧪 Run tests
         run: poetry run tox
+      - name: Debug PR info
+        run: |
+          echo "Base Ref: ${{ github.base_ref }}"
+          echo "Head Ref: ${{ github.head_ref }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
       - name: SonarCloud scan for PR
         uses: sonarsource/sonarqube-scan-action@0303d6b62e310685c0e34d0b9cde218036885c4d  # v5.0.0
         if: github.event_name == 'pull_request'

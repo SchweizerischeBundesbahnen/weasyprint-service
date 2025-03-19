@@ -78,7 +78,8 @@ def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
     if not convert_svg_to_png(width, height + CHROMIUM_HEIGHT_ADJUSTMENT, png_filepath, svg_filepath):  # Add 100 pixels to height to make chromium render the entire svg
         return IMAGE_SVG, svg_content
 
-    crop_png(png_filepath, CHROMIUM_HEIGHT_ADJUSTMENT)
+    if not crop_png(png_filepath, CHROMIUM_HEIGHT_ADJUSTMENT):
+        return IMAGE_SVG, svg_content
 
     png_content = read_and_cleanup_png(png_filepath)
     if not png_content:
@@ -88,15 +89,20 @@ def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
 
 
 # Remove added bottom pixels from PNG after conversion
-def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> None:
-    with Image.open(file_path) as img:
-        img_width, img_height = img.size
+def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> bool:
+    try:
+        with Image.open(file_path) as img:
+            img_width, img_height = img.size
 
-        if bottom_pixels_to_crop >= img_height:
-            raise ValueError("Not possible to crop more than the height of the picture")
+            if bottom_pixels_to_crop >= img_height:
+                raise ValueError("Not possible to crop more than the height of the picture")
 
-        cropped = img.crop((0, 0, img_width, img_height - bottom_pixels_to_crop))
-        cropped.save(file_path)
+            cropped = img.crop((0, 0, img_width, img_height - bottom_pixels_to_crop))
+            cropped.save(file_path)
+            return True
+    except Exception as e:
+        logging.error(f"PNG file to crop not found: {e}")
+        return False
 
 
 # Extract the width and height from the SVG tag (and convert it to px)

@@ -1,3 +1,13 @@
+"""SVG processing utilities for WeasyPrint service.
+
+This module provides functionality for processing SVG images, including:
+- Converting SVG dimensions to absolute pixel values
+- Handling relative units (vw, vh, %)
+- Converting SVG to PNG using Chromium
+- Processing base64-encoded SVG images in HTML
+
+"""
+
 import base64
 import logging
 import math
@@ -11,42 +21,74 @@ from uuid import uuid4
 from defusedxml import ElementTree as ET
 from PIL import Image
 
+# Constants
 SPECIAL_UNITS = ("vw", "vh", "%")  # Special units that require viewBox context
-
 IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
-
 NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
 CHROMIUM_HEIGHT_ADJUSTMENT = 100
+MAX_SVG_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Default viewport dimensions (1920x1080 is a common screen resolution)
+DEFAULT_VIEWPORT_WIDTH = 1920
+DEFAULT_VIEWPORT_HEIGHT = 1080
+
+# Logging setup
+logger = logging.getLogger(__name__)
 
 
-# Process img tags, replacing base64 SVG images with PNGs
 def process_svg(html: str) -> str:
+    """Process img tags, replacing base64 SVG images with PNGs.
+
+    Args:
+        html: HTML content containing SVG images
+
+    Returns:
+        Processed HTML with SVG images converted to PNG where appropriate
+
+    Performance:
+        - Time complexity: O(n) where n is the number of SVG images
+        - Memory complexity: O(m) where m is the size of the largest SVG
+    """
     pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')
     return re.sub(pattern, replace_img_base64, html)
 
 
-# Decode and validate if the provided content is SVG.
 def get_svg_content(content_type: str, content_base64: str) -> str | None:
-    # We do not require to have 'image/svg+xml' content type coz not all systems will properly set it
+    """Decode and validate if the provided content is SVG.
+
+    Args:
+        content_type: MIME type of the content
+        content_base64: Base64 encoded content
+
+    Returns:
+        Decoded SVG content if valid, None otherwise
+
+    Note:
+        We do not require 'image/svg+xml' content type as not all systems set it correctly
+    """
+    if len(content_base64) > MAX_SVG_SIZE:
+        logger.error(f"SVG content too large: {len(content_base64)} bytes")
+        return None
 
     if content_type in NON_SVG_CONTENT_TYPES:
-        return None  # Skip processing if content type set explicitly as not svg
+        logger.debug(f"Skipping non-SVG content type: {content_type}")
+        return None
 
     try:
         decoded_content = base64.b64decode(content_base64)
         if b"\0" in decoded_content:
-            return None  # Skip processing if decoded content is binary (not text)
+            logger.debug("Skipping binary content (contains null bytes)")
+            return None
 
         svg_content = decoded_content.decode("utf-8")
-
-        # Fast check that this is a svg
         if "</svg>" not in svg_content:
+            logger.debug("Content is not SVG (missing </svg> tag)")
             return None
 
         return svg_content
     except Exception as e:
-        logging.error(f"Failed to decode base64 content: {e}")
+        logger.error(f"Failed to decode base64 content: {e}")
         return None
 
 
@@ -104,7 +146,7 @@ def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> bool:
             cropped.save(file_path)
             return True
     except Exception as e:
-        logging.error(f"PNG file to crop not found: {e}")
+        logger.error(f"PNG file to crop not found: {e}")
         return False
 
 
@@ -217,7 +259,7 @@ def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
 
         return svg_filepath, png_filepath
     except Exception as e:
-        logging.error(f"Failed to save SVG to temp file: {e}")
+        logger.error(f"Failed to save SVG to temp file: {e}")
         return None, None
 
 
@@ -230,11 +272,11 @@ def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath
     try:
         result = subprocess.run(command, check=False)  # noqa: S603
         if result.returncode != 0:
-            logging.error(f"Error converting SVG to PNG, return code = {result.returncode}")
+            logger.error(f"Error converting SVG to PNG, return code = {result.returncode}")
             return False
         return True
     except Exception as e:
-        logging.error(f"Failed to convert SVG to PNG: {e}")
+        logger.error(f"Failed to convert SVG to PNG: {e}")
         return False
 
 
@@ -247,7 +289,7 @@ def read_and_cleanup_png(png_filepath: Path) -> bytes | None:
         png_filepath.unlink()
         return img_data
     except Exception as e:
-        logging.error(f"Failed to read or clean up PNG file: {e}")
+        logger.error(f"Failed to read or clean up PNG file: {e}")
         return None
 
 
@@ -255,7 +297,7 @@ def read_and_cleanup_png(png_filepath: Path) -> bytes | None:
 def create_chromium_command(width: int, height: int, png_filepath: Path, svg_filepath: Path) -> list[str] | None:
     chromium_executable = os.environ.get("CHROMIUM_EXECUTABLE_PATH")
     if not chromium_executable:
-        logging.error("CHROMIUM_EXECUTABLE_PATH is not set.")
+        logger.error("CHROMIUM_EXECUTABLE_PATH is not set.")
         return None
 
     command = [
@@ -296,7 +338,7 @@ def convert_to_px(value: str | None, unit: str | None) -> int | None:
 
         return math.ceil(value_f64 * get_px_conversion_ratio(unit))
     except ValueError:
-        logging.error(f"Invalid value for conversion: {value}")
+        logger.error(f"Invalid value for conversion: {value}")
         return None
 
 

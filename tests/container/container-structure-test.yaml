@@ -20,4 +20,4 @@ commandTests:
   - name: Chromium version is correct
     command: chromium
     args: [--version]
-    expectedOutput: [Chromium 132.*.*.* Alpine Linux]
+    expectedOutput: [Chromium 134.*.*.*]

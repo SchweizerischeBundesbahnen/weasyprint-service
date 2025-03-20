@@ -6,6 +6,7 @@ from pathlib import Path
 from app.svg_utils import (
     IMAGE_PNG,
     IMAGE_SVG,
+    MAX_SVG_SIZE,
     convert_svg_to_png,
     convert_to_px,
     create_chromium_command,
@@ -296,3 +297,31 @@ def test_px_conversion_ratio():
     assert get_px_conversion_ratio("pc") == 16
     assert get_px_conversion_ratio("abcde") == 1
     assert get_px_conversion_ratio(None) == 1
+
+
+@setup_env_variables
+def test_large_svg_handling():
+    # Test SVG larger than MAX_SVG_SIZE
+    large_svg = "<svg>" + "x" * (MAX_SVG_SIZE + 1) + "</svg>"
+    encoded = base64.b64encode(large_svg.encode()).decode()
+    content = get_svg_content("image/svg+xml", encoded)
+    assert content is None
+
+
+def test_svg_viewport_units():
+    cases = [
+        # Test vh with fixed pixels
+        ('<svg width="100px" height="50vh" viewBox="0 0 1000 800"></svg>', 100, 400),
+        # Test percentage with viewBox
+        ('<svg width="50%" height="50%" viewBox="0 0 200 100">', 100, 50),
+        # Test mixed units
+        ('<svg width="50vw" height="50%" viewBox="0 0 200 100">', 100, 50),
+        # Test vw units with viewBox
+        ('<svg width="50vw" height="100" viewBox="0 0 200 100">', 100, 100),
+        # Test vh units with viewBox
+        ('<svg width="100" height="50vh" viewBox="0 0 200 100">', 100, 50),
+    ]
+    for svg, expected_width, expected_height in cases:
+        width, height, _ = extract_svg_dimensions_as_px(svg)
+        assert width == expected_width
+        assert height == expected_height

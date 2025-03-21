@@ -27,11 +27,6 @@ IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
 NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
 CHROMIUM_HEIGHT_ADJUSTMENT = 100
-MAX_SVG_SIZE = 10 * 1024 * 1024  # 10MB
-
-# Default viewport dimensions (1920x1080 is a common screen resolution)
-DEFAULT_VIEWPORT_WIDTH = 1920
-DEFAULT_VIEWPORT_HEIGHT = 1080
 
 # Logging setup
 logger = logging.getLogger(__name__)
@@ -67,10 +62,6 @@ def get_svg_content(content_type: str, content_base64: str) -> str | None:
     Note:
         We do not require 'image/svg+xml' content type as not all systems set it correctly
     """
-    if len(content_base64) > MAX_SVG_SIZE:
-        logger.error(f"SVG content too large: {len(content_base64)} bytes")
-        return None
-
     if content_type in NON_SVG_CONTENT_TYPES:
         logger.debug(f"Skipping non-SVG content type: {content_type}")
         return None

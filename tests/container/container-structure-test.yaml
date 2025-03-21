@@ -21,3 +21,13 @@ commandTests:
     command: chromium
     args: [--version]
     expectedOutput: [Chromium 134.*.*.*]
+  - name: Tox should not be installed
+    command: poetry
+    args: [run, tox, --version]
+    exitCode: 1
+    expectedError: ['Command not found: tox']
+  - name: Pytest should not be installed
+    command: poetry
+    args: [run, pytest, --version]
+    exitCode: 1
+    expectedError: ['Command not found: pytest']

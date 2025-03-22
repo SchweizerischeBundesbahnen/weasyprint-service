@@ -78,7 +78,7 @@ To stop the running container, execute:
 
 ```bash
 docker build -t weasyprint-service:local .
-container-structure-test test --image weasyprint-service:local --config .config/container-structure-test.yaml
+container-structure-test test --image weasyprint-service:local --config ./tests/container/container-structure-test.yaml
 ```
 
 ### Access service

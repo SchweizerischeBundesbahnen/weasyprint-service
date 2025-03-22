@@ -1,3 +1,13 @@
+"""SVG processing utilities for WeasyPrint service.
+
+This module provides functionality for processing SVG images, including:
+- Converting SVG dimensions to absolute pixel values
+- Handling relative units (vw, vh, %)
+- Converting SVG to PNG using Chromium
+- Processing base64-encoded SVG images in HTML
+
+"""
+
 import base64
 import logging
 import math
@@ -8,42 +18,68 @@ import tempfile
 from pathlib import Path
 from uuid import uuid4
 
+from defusedxml import ElementTree as ET
 from PIL import Image
 
+# Constants
+SPECIAL_UNITS = ("vw", "vh", "%")  # Special units that require viewBox context
 IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
-
 NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
 CHROMIUM_HEIGHT_ADJUSTMENT = 100
 
+# Logging setup
+logger = logging.getLogger(__name__)
 
-# Process img tags, replacing base64 SVG images with PNGs
+
 def process_svg(html: str) -> str:
+    """Process img tags, replacing base64 SVG images with PNGs.
+
+    Args:
+        html: HTML content containing SVG images
+
+    Returns:
+        Processed HTML with SVG images converted to PNG where appropriate
+
+    Performance:
+        - Time complexity: O(n) where n is the number of SVG images
+        - Memory complexity: O(m) where m is the size of the largest SVG
+    """
     pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')
     return re.sub(pattern, replace_img_base64, html)
 
 
-# Decode and validate if the provided content is SVG.
 def get_svg_content(content_type: str, content_base64: str) -> str | None:
-    # We do not require to have 'image/svg+xml' content type coz not all systems will properly set it
+    """Decode and validate if the provided content is SVG.
 
+    Args:
+        content_type: MIME type of the content
+        content_base64: Base64 encoded content
+
+    Returns:
+        Decoded SVG content if valid, None otherwise
+
+    Note:
+        We do not require 'image/svg+xml' content type as not all systems set it correctly
+    """
     if content_type in NON_SVG_CONTENT_TYPES:
-        return None  # Skip processing if content type set explicitly as not svg
+        logger.debug(f"Skipping non-SVG content type: {content_type}")
+        return None
 
     try:
         decoded_content = base64.b64decode(content_base64)
         if b"\0" in decoded_content:
-            return None  # Skip processing if decoded content is binary (not text)
+            logger.debug("Skipping binary content (contains null bytes)")
+            return None
 
         svg_content = decoded_content.decode("utf-8")
-
-        # Fast check that this is a svg
         if "</svg>" not in svg_content:
+            logger.debug("Content is not SVG (missing </svg> tag)")
             return None
 
         return svg_content
     except Exception as e:
-        logging.error(f"Failed to decode base64 content: {e}")
+        logger.error(f"Failed to decode base64 content: {e}")
         return None
 
 
@@ -67,11 +103,11 @@ def replace_img_base64(match: re.Match[str]) -> str:
 
 # Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chromium
 def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
-    width, height = extract_svg_dimensions_as_px(svg_content)
+    width, height, updated_svg_content = extract_svg_dimensions_as_px(svg_content)
     if not width or not height:
         return IMAGE_SVG, svg_content
 
-    svg_filepath, png_filepath = prepare_temp_files(svg_content)
+    svg_filepath, png_filepath = prepare_temp_files(updated_svg_content)
     if not svg_filepath or not png_filepath:
         return IMAGE_SVG, svg_content
 
@@ -101,25 +137,103 @@ def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> bool:
             cropped.save(file_path)
             return True
     except Exception as e:
-        logging.error(f"PNG file to crop not found: {e}")
+        logger.error(f"PNG file to crop not found: {e}")
         return False
 
 
 # Extract the width and height from the SVG tag (and convert it to px)
-def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | None]:
-    width_match = re.search(r'<svg[^>]+?width="(?P<width>[\d.]+)(?P<unit>\w+)?', svg_content)
-    height_match = re.search(r'<svg[^>]+?height="(?P<height>[\d.]+)(?P<unit>\w+)?', svg_content)
+def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | None, str]:
+    """
+    Extract width and height from the SVG tag and convert them to px.
+    If units are vw/vh/% and viewBox exists, compute their pixel equivalents.
+    Returns updated SVG content with replaced width/height if necessary.
+    """
+    width, width_unit = parse_svg_dimension(svg_content, "width")
+    height, height_unit = parse_svg_dimension(svg_content, "height")
+    vb_width, vb_height = parse_viewbox(svg_content)
 
-    width = width_match.group("width") if width_match else None
-    height = height_match.group("height") if height_match else None
+    width_px = calculate_dimension(width, width_unit, vb_width)
+    height_px = calculate_dimension(height, height_unit, vb_height)
 
-    if not width or not height:
-        logging.error(f"Cannot find SVG dimensions. Width: {width}, Height: {height}")
+    if vb_width is not None and vb_height is not None:
+        if width_px is None:
+            width_px = math.ceil(vb_width)
+        if height_px is None:
+            height_px = math.ceil(vb_height)
+        svg_content = replace_svg_size_attributes(svg_content, width_px, height_px)
 
-    width_unit = width_match.group("unit") if width_match else None
-    height_unit = height_match.group("unit") if height_match else None
+    if width_px is None or height_px is None:
+        return None, None, svg_content
 
-    return convert_to_px(width, width_unit), convert_to_px(height, height_unit)
+    return width_px, height_px, svg_content
+
+
+def parse_svg_dimension(svg_content: str, dimension: str) -> tuple[str | None, str | None]:
+    match = re.search(
+        rf'<svg[^>]*?\b{dimension}\s*=\s*["\'](?P<value>[\d.]+)(?P<unit>\w+|%)?["\']',
+        svg_content,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group("value"), match.group("unit")
+    return None, None
+
+
+def parse_viewbox(svg_content: str) -> tuple[float | None, float | None]:
+    match = re.search(
+        r'<svg[^>]*?\bviewBox\s*=\s*["\']'
+        r"[\d.\-]+\s+[\d.\-]+\s+"
+        r"(?P<vb_width>[\d.\-]+)\s+"
+        r"(?P<vb_height>[\d.\-]+)"
+        r'["\']',
+        svg_content,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return float(match.group("vb_width")), float(match.group("vb_height"))
+    return None, None
+
+
+def calculate_dimension(value: str | None, unit: str | None, vb_dimension: float | None) -> int | None:
+    if value is None:
+        return None
+
+    if unit in SPECIAL_UNITS:
+        if vb_dimension is None:
+            raise ValueError(f"{unit} units require a viewBox to be defined")
+        return calculate_special_unit(value, unit, vb_dimension)
+
+    return convert_to_px(value, unit)
+
+
+def replace_svg_size_attributes(svg_content: str, width_px: int, height_px: int) -> str:
+    try:
+        root = ET.fromstring(svg_content)
+    except ET.ParseError as e:
+        raise ValueError("Invalid SVG content") from e
+
+    # Set or replace width and height attributes
+    root.set("width", f"{width_px}px")
+    root.set("height", f"{height_px}px")
+
+    # Convert XML tree back to a string
+    svg_with_attributes = ET.tostring(root, encoding="unicode")
+
+    return svg_with_attributes
+
+
+# Calculates the pixel value for vw, vh, or % units based on viewBox dimensions
+def calculate_special_unit(value: str, unit: str | None, viewbox_dimension: float) -> int:
+    val = float(value)
+
+    if unit in SPECIAL_UNITS:
+        return math.ceil((val / 100) * viewbox_dimension)
+
+    fallback = convert_to_px(value, unit)
+    if fallback is None:
+        raise ValueError(f"Cannot convert unit '{unit}' to px")
+
+    return fallback
 
 
 # Save the SVG content to a temporary file and return the file paths for the SVG and PNG.
@@ -136,7 +250,7 @@ def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
 
         return svg_filepath, png_filepath
     except Exception as e:
-        logging.error(f"Failed to save SVG to temp file: {e}")
+        logger.error(f"Failed to save SVG to temp file: {e}")
         return None, None
 
 
@@ -149,11 +263,11 @@ def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath
     try:
         result = subprocess.run(command, check=False)  # noqa: S603
         if result.returncode != 0:
-            logging.error(f"Error converting SVG to PNG, return code = {result.returncode}")
+            logger.error(f"Error converting SVG to PNG, return code = {result.returncode}")
             return False
         return True
     except Exception as e:
-        logging.error(f"Failed to convert SVG to PNG: {e}")
+        logger.error(f"Failed to convert SVG to PNG: {e}")
         return False
 
 
@@ -166,7 +280,7 @@ def read_and_cleanup_png(png_filepath: Path) -> bytes | None:
         png_filepath.unlink()
         return img_data
     except Exception as e:
-        logging.error(f"Failed to read or clean up PNG file: {e}")
+        logger.error(f"Failed to read or clean up PNG file: {e}")
         return None
 
 
@@ -174,7 +288,7 @@ def read_and_cleanup_png(png_filepath: Path) -> bytes | None:
 def create_chromium_command(width: int, height: int, png_filepath: Path, svg_filepath: Path) -> list[str] | None:
     chromium_executable = os.environ.get("CHROMIUM_EXECUTABLE_PATH")
     if not chromium_executable:
-        logging.error("CHROMIUM_EXECUTABLE_PATH is not set.")
+        logger.error("CHROMIUM_EXECUTABLE_PATH is not set.")
         return None
 
     command = [
@@ -209,9 +323,13 @@ def convert_to_px(value: str | None, unit: str | None) -> int | None:
         if value is None:
             raise ValueError()
         value_f64 = float(value)
+
+        if unit in SPECIAL_UNITS:
+            return None
+
         return math.ceil(value_f64 * get_px_conversion_ratio(unit))
     except ValueError:
-        logging.error(f"Invalid value for conversion: {value}")
+        logger.error(f"Invalid value for conversion: {value}")
         return None
 
 

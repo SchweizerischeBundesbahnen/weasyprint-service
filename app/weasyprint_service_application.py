@@ -3,7 +3,8 @@ import logging
 
 from app import weasyprint_controller  # type: ignore
 
-if __name__ == "__main__":
+
+def main() -> None:
     parser = argparse.ArgumentParser(description="Weasyprint service")
     parser.add_argument("--port", default=9080, type=int, required=False, help="Service port")
     args = parser.parse_args()
@@ -13,3 +14,7 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(logging.WARN)
 
     weasyprint_controller.start_server(args.port)
+
+
+if __name__ == "__main__":
+    main()

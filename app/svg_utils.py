@@ -33,13 +33,13 @@ logger = logging.getLogger(__name__)
 
 
 def process_svg(html: str) -> str:
-    """Process img tags, replacing base64 SVG images with PNGs.
+    """Process img tags in HTML, replacing base64 SVG images with PNGs.
 
     Args:
-        html: HTML content containing SVG images
+        html: HTML content containing SVG images.
 
     Returns:
-        Processed HTML with SVG images converted to PNG where appropriate
+        str: Modified HTML with SVG images converted to PNG where appropriate.
 
     Performance:
         - Time complexity: O(n) where n is the number of SVG images
@@ -50,17 +50,17 @@ def process_svg(html: str) -> str:
 
 
 def get_svg_content(content_type: str, content_base64: str) -> str | None:
-    """Decode and validate if the provided content is SVG.
+    """Decode and validate base64 content as SVG.
 
     Args:
-        content_type: MIME type of the content
-        content_base64: Base64 encoded content
+        content_type: MIME type of the content.
+        content_base64: Base64 encoded content.
 
     Returns:
-        Decoded SVG content if valid, None otherwise
+        str | None: Decoded SVG content if valid, None if content is invalid or not SVG.
 
     Note:
-        We do not require 'image/svg+xml' content type as not all systems set it correctly
+        We do not require 'image/svg+xml' content type as not all systems set it correctly.
     """
     if content_type in NON_SVG_CONTENT_TYPES:
         logger.debug(f"Skipping non-SVG content type: {content_type}")
@@ -83,8 +83,16 @@ def get_svg_content(content_type: str, content_base64: str) -> str | None:
         return None
 
 
-# Replace base64 SVG images with PNG equivalents in the HTML img tag.
 def replace_img_base64(match: re.Match[str]) -> str:
+    """Replace base64 SVG images with PNG equivalents in HTML img tags.
+
+    Args:
+        match: Regular expression match object containing the img tag components.
+
+    Returns:
+        str: Modified img tag with SVG replaced by PNG if conversion successful,
+             otherwise returns original tag.
+    """
     entry = match.group(0)
     content_type = match.group("type")
     content_base64 = match.group("base64")
@@ -101,8 +109,17 @@ def replace_img_base64(match: re.Match[str]) -> str:
     return f'<img{match.group("intermediate")}{image_type};base64,{replaced_content_base64}"'
 
 
-# Checks that base64 encoded content is a svg image and replaces it with the png screenshot made by chromium
 def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
+    """Convert SVG content to PNG format.
+
+    Args:
+        svg_content: SVG content as string.
+
+    Returns:
+        tuple[str, str | bytes]: Tuple containing:
+            - MIME type of the result ('image/svg+xml' or 'image/png')
+            - Content as either SVG string or PNG bytes
+    """
     width, height, updated_svg_content = extract_svg_dimensions_as_px(svg_content)
     if not width or not height:
         return IMAGE_SVG, svg_content
@@ -124,8 +141,19 @@ def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
     return IMAGE_PNG, png_content
 
 
-# Remove added bottom pixels from PNG after conversion
 def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> bool:
+    """Remove specified number of pixels from bottom of PNG image.
+
+    Args:
+        file_path: Path to the PNG file.
+        bottom_pixels_to_crop: Number of pixels to remove from bottom.
+
+    Returns:
+        bool: True if cropping successful, False otherwise.
+
+    Raises:
+        ValueError: If attempting to crop more pixels than image height.
+    """
     try:
         with Image.open(file_path) as img:
             img_width, img_height = img.size
@@ -141,12 +169,20 @@ def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> bool:
         return False
 
 
-# Extract the width and height from the SVG tag (and convert it to px)
 def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | None, str]:
-    """
-    Extract width and height from the SVG tag and convert them to px.
-    If units are vw/vh/% and viewBox exists, compute their pixel equivalents.
-    Returns updated SVG content with replaced width/height if necessary.
+    """Extract and convert SVG dimensions to pixels.
+
+    Processes width and height from SVG tag, converting to absolute pixel values.
+    For relative units (vw, vh, %) uses viewBox for conversion if available.
+
+    Args:
+        svg_content: SVG content as string.
+
+    Returns:
+        tuple[int | None, int | None, str]: Tuple containing:
+            - Width in pixels or None if not determinable
+            - Height in pixels or None if not determinable
+            - Updated SVG content with explicit pixel dimensions if viewBox used
     """
     width, width_unit = parse_svg_dimension(svg_content, "width")
     height, height_unit = parse_svg_dimension(svg_content, "height")
@@ -169,6 +205,17 @@ def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | No
 
 
 def parse_svg_dimension(svg_content: str, dimension: str) -> tuple[str | None, str | None]:
+    """Extract dimension value and unit from SVG tag.
+
+    Args:
+        svg_content: SVG content as string.
+        dimension: Name of dimension attribute to parse ('width' or 'height').
+
+    Returns:
+        tuple[str | None, str | None]: Tuple containing:
+            - Dimension value as string or None if not found
+            - Unit as string or None if not specified
+    """
     match = re.search(
         rf'<svg[^>]*?\b{dimension}\s*=\s*["\'](?P<value>[\d.]+)(?P<unit>\w+|%)?["\']',
         svg_content,
@@ -180,6 +227,16 @@ def parse_svg_dimension(svg_content: str, dimension: str) -> tuple[str | None, s
 
 
 def parse_viewbox(svg_content: str) -> tuple[float | None, float | None]:
+    """Extract width and height from SVG viewBox attribute.
+
+    Args:
+        svg_content: SVG content as string.
+
+    Returns:
+        tuple[float | None, float | None]: Tuple containing:
+            - ViewBox width as float or None if not found
+            - ViewBox height as float or None if not found
+    """
     match = re.search(
         r'<svg[^>]*?\bviewBox\s*=\s*["\']'
         r"[\d.\-]+\s+[\d.\-]+\s+"
@@ -195,6 +252,19 @@ def parse_viewbox(svg_content: str) -> tuple[float | None, float | None]:
 
 
 def calculate_dimension(value: str | None, unit: str | None, vb_dimension: float | None) -> int | None:
+    """Calculate absolute pixel value from dimension with unit.
+
+    Args:
+        value: Numeric value as string.
+        unit: Unit of measurement (px, pt, in, cm, mm, pc, vw, vh, %).
+        vb_dimension: ViewBox dimension for relative unit conversion.
+
+    Returns:
+        int | None: Dimension in pixels or None if conversion not possible.
+
+    Raises:
+        ValueError: If relative unit used without viewBox being defined.
+    """
     if value is None:
         return None
 
@@ -207,6 +277,19 @@ def calculate_dimension(value: str | None, unit: str | None, vb_dimension: float
 
 
 def replace_svg_size_attributes(svg_content: str, width_px: int, height_px: int) -> str:
+    """Update SVG width and height attributes with pixel values.
+
+    Args:
+        svg_content: SVG content as string.
+        width_px: Width in pixels.
+        height_px: Height in pixels.
+
+    Returns:
+        str: Updated SVG content with explicit pixel dimensions.
+
+    Raises:
+        ValueError: If SVG content is invalid and cannot be parsed.
+    """
     try:
         root = ET.fromstring(svg_content)
     except ET.ParseError as e:
@@ -217,13 +300,23 @@ def replace_svg_size_attributes(svg_content: str, width_px: int, height_px: int)
     root.set("height", f"{height_px}px")
 
     # Convert XML tree back to a string
-    svg_with_attributes = ET.tostring(root, encoding="unicode")
-
-    return svg_with_attributes
+    return ET.tostring(root, encoding="unicode")
 
 
-# Calculates the pixel value for vw, vh, or % units based on viewBox dimensions
 def calculate_special_unit(value: str, unit: str | None, viewbox_dimension: float) -> int:
+    """Calculate pixel value for relative units (vw, vh, %).
+
+    Args:
+        value: Numeric value as string.
+        unit: Unit of measurement (vw, vh, % or others).
+        viewbox_dimension: ViewBox dimension for relative unit conversion.
+
+    Returns:
+        int: Calculated pixel value.
+
+    Raises:
+        ValueError: If unit conversion fails.
+    """
     val = float(value)
 
     if unit in SPECIAL_UNITS:
@@ -236,8 +329,17 @@ def calculate_special_unit(value: str, unit: str | None, viewbox_dimension: floa
     return fallback
 
 
-# Save the SVG content to a temporary file and return the file paths for the SVG and PNG.
 def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
+    """Create temporary files for SVG to PNG conversion.
+
+    Args:
+        svg_content: SVG content to write to temporary file.
+
+    Returns:
+        tuple[Path | None, Path | None]: Tuple containing:
+            - Path to temporary SVG file or None if creation failed
+            - Path to temporary PNG file or None if creation failed
+    """
     try:
         temp_folder = tempfile.gettempdir()
         uuid = str(uuid4())
@@ -254,8 +356,18 @@ def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
         return None, None
 
 
-# Convert the SVG file to PNG using Chromium and return success status
 def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath: Path) -> bool:
+    """Convert SVG file to PNG using Chromium headless browser.
+
+    Args:
+        width: Desired width of PNG in pixels.
+        height: Desired height of PNG in pixels.
+        png_filepath: Path where PNG should be saved.
+        svg_filepath: Path to source SVG file.
+
+    Returns:
+        bool: True if conversion successful, False otherwise.
+    """
     command = create_chromium_command(width, height, png_filepath, svg_filepath)
     if not command:
         return False
@@ -271,8 +383,15 @@ def convert_svg_to_png(width: int, height: int, png_filepath: Path, svg_filepath
         return False
 
 
-# Read the PNG file and clean up the temporary file
 def read_and_cleanup_png(png_filepath: Path) -> bytes | None:
+    """Read PNG file contents and delete the file.
+
+    Args:
+        png_filepath: Path to PNG file.
+
+    Returns:
+        bytes | None: PNG file contents as bytes, or None if read failed.
+    """
     try:
         with png_filepath.open("rb") as img_file:
             img_data = img_file.read()
@@ -284,8 +403,18 @@ def read_and_cleanup_png(png_filepath: Path) -> bytes | None:
         return None
 
 
-# Create the Chromium command for converting SVG to PNG
 def create_chromium_command(width: int, height: int, png_filepath: Path, svg_filepath: Path) -> list[str] | None:
+    """Create Chromium command for headless SVG to PNG conversion.
+
+    Args:
+        width: Desired width of PNG in pixels.
+        height: Desired height of PNG in pixels.
+        png_filepath: Path where PNG should be saved.
+        svg_filepath: Path to source SVG file.
+
+    Returns:
+        list[str] | None: Command as list of strings, or None if Chromium path not found.
+    """
     chromium_executable = os.environ.get("CHROMIUM_EXECUTABLE_PATH")
     if not chromium_executable:
         logger.error("CHROMIUM_EXECUTABLE_PATH is not set.")
@@ -310,15 +439,30 @@ def create_chromium_command(width: int, height: int, png_filepath: Path, svg_fil
     return command
 
 
-# Encode string or byte array to base64
 def to_base64(content: str | bytes) -> str:
+    """Convert string or bytes to base64 encoded string.
+
+    Args:
+        content: Content to encode, either as string or bytes.
+
+    Returns:
+        str: Base64 encoded string.
+    """
     if isinstance(content, str):
         content = content.encode("utf-8")  # encode the string to bytes
     return base64.b64encode(content).decode("utf-8")
 
 
-# Conversion to px
 def convert_to_px(value: str | None, unit: str | None) -> int | None:
+    """Convert value with unit to pixels.
+
+    Args:
+        value: Numeric value as string.
+        unit: Unit of measurement (px, pt, in, cm, mm, pc).
+
+    Returns:
+        int | None: Value in pixels, or None if conversion not possible.
+    """
     try:
         if value is None:
             raise ValueError()
@@ -334,4 +478,12 @@ def convert_to_px(value: str | None, unit: str | None) -> int | None:
 
 
 def get_px_conversion_ratio(unit: str | None) -> float:
+    """Get conversion ratio from unit to pixels.
+
+    Args:
+        unit: Unit of measurement (px, pt, in, cm, mm, pc).
+
+    Returns:
+        float: Conversion ratio to multiply by to get pixels.
+    """
     return {"px": 1.0, "pt": 4 / 3, "in": 96.0, "cm": 96 / 2.54, "mm": 96 / 2.54 * 10, "pc": 16.0}.get(unit, 1.0) if unit else 1.0

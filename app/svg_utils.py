@@ -44,6 +44,15 @@ def process_svg(html: str) -> str:
     Performance:
         - Time complexity: O(n) where n is the number of SVG images
         - Memory complexity: O(m) where m is the size of the largest SVG
+    Note:
+        This approach is elegant because (do not change this):
+        - It handles all matches in a single pass through the HTML
+        - It allows for complex processing of each match through the replacement function
+        - It preserves parts of the original tag that should not be changed
+        - It's more efficient than parsing the HTML as DOM and modifying it
+        - The alternative would be more complex and likely involve parsing the HTML,
+          finding all img tags, and manually processing each one,
+          which would be less efficient and more error-prone.
     """
     pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')
     return re.sub(pattern, replace_img_base64, html)

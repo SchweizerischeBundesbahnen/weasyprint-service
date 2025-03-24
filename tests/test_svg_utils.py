@@ -286,9 +286,13 @@ def test_get_svg_content():
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgi")
     assert content is None
 
-    # Valid input (b'<svg height="200px" width="100px"</svg>'), return decoded svg content
+    # Missing closing ">" (b'<svg height="200px" width="100px"</svg>'), return None
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+")
-    assert content == r'<svg height="200px" width="100px"</svg>'
+    assert content is None
+
+    # Valid input (b'<svg height="200px" width="100px"></svg>'), return decoded svg content
+    content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPjwvc3ZnPg==")
+    assert content == '<svg height="200px" width="100px"></svg>'
 
     # Invalid base64 string, return None
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc¨")

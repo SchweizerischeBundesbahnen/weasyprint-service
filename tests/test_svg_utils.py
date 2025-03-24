@@ -4,6 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from defusedxml import ElementTree as DET
 from PIL import Image
 
 from app.svg_utils import (
@@ -17,14 +18,15 @@ from app.svg_utils import (
     crop_png,
     extract_svg_dimensions_as_px,
     get_px_conversion_ratio,
-    get_svg_content,
-    parse_svg_dimension,
+    get_svg,
+    get_svg_dimension,
     parse_viewbox,
     prepare_temp_files,
     process_svg,
     read_and_cleanup_png,
     replace_svg_size_attributes,
     replace_svg_with_png,
+    svg_to_string,
     to_base64,
 )
 
@@ -137,16 +139,15 @@ def test_process_svg_valid_conversion():
 @pytest.mark.parametrize(
     "svg_content,dimension,expected",
     [
-        ('<svg width="100px">', "width", ("100", "px")),  # Basic pixel units
-        ('<svg height="50">', "height", ("50", None)),  # No units specified
-        ("<svg>", "width", (None, None)),  # No dimensions
-        ("<svg width=100px>", "width", (None, None)),  # Invalid format (no quotes)
+        ('<svg width="100px"></svg>', "width", ("100", "px")),  # Basic pixel units
+        ('<svg height="50"></svg>', "height", ("50", None)),  # No units specified
+        ("<svg></svg>", "width", (None, None)),  # No dimensions
         # Additional unit tests
-        ('<svg width="10em">', "width", ("10", "em")),  # Em units
-        ('<svg width="15ex">', "width", ("15", "ex")),  # Ex units
-        ('<svg width="5Q">', "width", ("5", "Q")),  # Q units
+        ('<svg width="10em"></svg>', "width", ("10", "em")),  # Em units
+        ('<svg width="15ex"></svg>', "width", ("15", "ex")),  # Ex units
+        ('<svg width="5Q"></svg>', "width", ("5", "Q")),  # Q units
         # Test with XML namespace
-        ('<svg xmlns="http://www.w3.org/2000/svg" width="100px">', "width", ("100", "px")),
+        ('<svg xmlns="http://www.w3.org/2000/svg" width="100px"></svg>', "width", ("100", "px")),
     ],
 )
 @setup_env_variables
@@ -156,7 +157,8 @@ def test_parse_svg_dimension(svg_content: str, dimension: str, expected: tuple[s
     Tests extraction of numeric values and units from SVG width/height attributes.
     Verifies handling of different unit types and invalid formats.
     """
-    value, unit = parse_svg_dimension(svg_content, dimension)
+    svg = DET.fromstring(svg_content)
+    value, unit = get_svg_dimension(svg, dimension)
     assert (value, unit) == expected
 
 
@@ -164,10 +166,10 @@ def test_parse_svg_dimension(svg_content: str, dimension: str, expected: tuple[s
 @pytest.mark.parametrize(
     "svg_content,expected",
     [
-        ('<svg viewBox="0 0 800 600">', (800.0, 600.0)),  # Valid viewBox
-        ("<svg>", (None, None)),  # No viewBox
-        ('<svg viewBox="0 0 800">', (None, None)),  # Invalid viewBox (missing height)
-        ('<svg viewBox="0 0 800.5 600.5">', (800.5, 600.5)),  # Decimal values
+        ('<svg viewBox="0 0 800 600"></svg>', (800.0, 600.0)),  # Valid viewBox
+        ("<svg></svg>", (None, None)),  # No viewBox
+        ('<svg viewBox="0 0 800"></svg>', (None, None)),  # Invalid viewBox (missing height)
+        ('<svg viewBox="0 0 800.5 600.5"></svg>', (800.5, 600.5)),  # Decimal values
     ],
 )
 @setup_env_variables
@@ -177,7 +179,8 @@ def test_parse_viewbox(svg_content: str, expected: tuple[float | None, float | N
     Tests extraction of width and height from viewBox attribute.
     Verifies handling of decimal values and invalid formats.
     """
-    width, height = parse_viewbox(svg_content)
+    content = DET.fromstring(svg_content)
+    width, height = parse_viewbox(content)
     assert (width, height) == expected
 
 
@@ -189,8 +192,6 @@ def test_parse_viewbox(svg_content: str, expected: tuple[float | None, float | N
         ('<svg height="200px" width="100px"></svg>', 100, 200),
         # ViewBox only
         ('<svg viewBox="0 0 300 150"></svg>', 300, 150),
-        # Invalid format
-        ('<svg height=200px" width "100px></svg>', None, None),
         # Missing dimensions
         ("<svg></svg>", None, None),
         # Mixed: width with viewBox
@@ -210,14 +211,11 @@ def test_extract_svg_dimensions(svg_content: str, expected_width: int | None, ex
     - Explicit pixel dimensions
     - ViewBox dimensions
     - Mixed explicit/viewBox dimensions
-    - Invalid formats
     """
-    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    svg = DET.fromstring(svg_content)
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg)
     assert width == expected_width
     assert height == expected_height
-    if width and height:
-        assert f'width="{width}px"' in updated_svg
-        assert f'height="{height}px"' in updated_svg
 
 
 # Test error handling for relative units without viewBox
@@ -236,7 +234,7 @@ def test_extract_svg_dimensions_relative_units_error(svg_content: str, expected_
     without a viewBox to reference.
     """
     with pytest.raises(ValueError, match=expected_error):
-        extract_svg_dimensions_as_px(svg_content)
+        extract_svg_dimensions_as_px(DET.fromstring(svg_content))
 
 
 # Test handling of relative units with viewBox
@@ -256,11 +254,12 @@ def test_extract_svg_dimensions_relative_units(svg_content: str, expected_width:
     Tests conversion of relative units (vw, vh, %) to absolute pixel values
     when a viewBox is present to provide reference dimensions.
     """
-    width, height, updated_svg = extract_svg_dimensions_as_px(svg_content)
+    width, height, updated_svg = extract_svg_dimensions_as_px(DET.fromstring(svg_content))
     assert width == expected_width
     assert height == expected_height
-    assert f'width="{width}px"' in updated_svg
-    assert f'height="{height}px"' in updated_svg
+    updated_svg_content = svg_to_string(updated_svg)
+    assert f'width="{width}px"' in updated_svg_content
+    assert f'height="{height}px"' in updated_svg_content
 
 
 @pytest.mark.parametrize(
@@ -275,7 +274,7 @@ def test_extract_svg_dimensions_relative_units(svg_content: str, expected_width:
         # Test malformed SVG content
         ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+", None),
         # Test valid SVG content
-        ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPjwvc3ZnPg==", '<svg height="200px" width="100px"></svg>'),
+        ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPjwvc3ZnPg==", '<svg height="200px" width="100px" />'),
         # Test invalid base64 string
         ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc¨", None),
     ],
@@ -297,8 +296,11 @@ def test_get_svg_content(content_type: str, content_base64: str, expected_conten
         content_base64: Base64 encoded content
         expected_content: Expected decoded SVG content or None if invalid
     """
-    content = get_svg_content(content_type, content_base64)
-    assert content == expected_content
+    svg = get_svg(content_type, content_base64)
+    if expected_content is None:
+        assert svg is None
+    else:
+        assert svg_to_string(svg) == expected_content
 
 
 @setup_env_variables
@@ -306,32 +308,26 @@ def test_replace_svg_with_png():
     """Test SVG to PNG conversion functionality.
 
     Tests various scenarios for SVG to PNG conversion:
-    - Invalid SVG attributes
     - Missing Chrome executable
     - Chrome execution failures
     - Successful conversion
     """
-    # Test invalid SVG attributes, return same content
-    svg_content = r'<svg height=200px" width "100px'
-    mime, content = replace_svg_with_png(svg_content)
-    assert mime == IMAGE_SVG, content == svg_content
-
     # Chrome executable not set, return same content
-    svg_content = r'<svg height="200px" width="100px"'
-    mime, content = replace_svg_with_png(svg_content)
-    assert mime == IMAGE_SVG, content == svg_content
+    svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
+    mime, content = replace_svg_with_png(svg)
+    assert mime == IMAGE_SVG, content == svg
 
     # Chrome executable test script returns empty, return same content
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    svg_content = r'<svg height="200px" width="100px"'
-    mime, content = replace_svg_with_png(svg_content)
-    assert mime == IMAGE_SVG, content == svg_content
+    svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
+    mime, content = replace_svg_with_png(svg)
+    assert mime == IMAGE_SVG, content == svg
 
     # Valid input with chrome executable test script set correctly, return script output
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[WRITE_OUTPUT] = "true"
-    svg_content = r'<svg height="1px" width="1px"></svg>'
-    mime, content = replace_svg_with_png(svg_content)
+    svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
+    mime, content = replace_svg_with_png(svg)
     assert mime == IMAGE_PNG
     assert content == cropped_test_script_output
 
@@ -541,17 +537,11 @@ def test_replace_svg_size_attributes():
     Tests updating width/height attributes in SVG content.
     """
     # Test valid SVG
-    svg = '<svg width="100" height="100"></svg>'
-    result = replace_svg_size_attributes(svg, 200, 300)
+    svg = DET.fromstring('<svg width="100" height="100"></svg>')
+    updated_svg = replace_svg_size_attributes(svg, 200, 300)
+    result = svg_to_string(updated_svg)
     assert 'width="200px"' in result
     assert 'height="300px"' in result
-
-    # Test invalid SVG
-    try:
-        replace_svg_size_attributes("<invalid>", 100, 100)
-        raise AssertionError("Should raise ValueError")
-    except ValueError as e:
-        assert "Invalid SVG content" in str(e)
 
 
 @setup_env_variables
@@ -623,9 +613,12 @@ def test_get_svg_content_with_namespace():
     Tests processing of SVG content with XML namespaces and nested elements.
     """
     # Test with namespace
-    content = get_svg_content("image/svg+xml", to_base64('<svg xmlns="http://www.w3.org/2000/svg" height="10" width="10"></svg>'))
-    assert 'xmlns="http://www.w3.org/2000/svg"' in content
+    svg_content_with_namespace = '<svg xmlns="http://www.w3.org/2000/svg" height="100" width="100"><circle r="45" cx="50" cy="50" fill="red"/></svg>'
+    svg = get_svg("image/svg+xml", to_base64(svg_content_with_namespace))
+    content = svg_to_string(svg)
+    assert content == '<svg xmlns="http://www.w3.org/2000/svg" height="100" width="100"><circle r="45" cx="50" cy="50" fill="red" /></svg>'
 
     # Test nested SVG
-    content = get_svg_content("image/svg+xml", to_base64('<svg xmlns="http://www.w3.org/2000/svg"><svg x="10" y="10"></svg></svg>'))
-    assert content is not None
+    svg = get_svg("image/svg+xml", to_base64('<svg xmlns="http://www.w3.org/2000/svg"><svg x="100" y="100"></svg></svg>'))
+    content = svg_to_string(svg)
+    assert content == '<svg xmlns="http://www.w3.org/2000/svg"><svg x="100" y="100" /></svg>'

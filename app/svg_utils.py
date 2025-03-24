@@ -15,10 +15,12 @@ import os
 import re
 import subprocess
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from uuid import uuid4
+from xml.etree.ElementTree import Element
 
-from defusedxml import ElementTree as ET
+from defusedxml import ElementTree as DET
 from PIL import Image
 
 # Constants
@@ -58,43 +60,6 @@ def process_svg(html: str) -> str:
     return re.sub(pattern, replace_img_base64, html)
 
 
-def get_svg_content(content_type: str, content_base64: str) -> str | None:
-    """Decode and validate base64 content as SVG.
-
-    Args:
-        content_type: MIME type of the content.
-        content_base64: Base64 encoded content.
-
-    Returns:
-        str | None: Decoded SVG content if valid, None if content is invalid or not SVG.
-
-    Note:
-        We do not require 'image/svg+xml' content type as not all systems set it correctly.
-    """
-    if content_type in NON_SVG_CONTENT_TYPES:
-        logger.debug(f"Skipping non-SVG content type: {content_type}")
-        return None
-
-    try:
-        decoded_content = base64.b64decode(content_base64)
-        if b"\0" in decoded_content:
-            logger.debug("Skipping binary content (contains null bytes)")
-            return None
-
-        svg_content = decoded_content.decode("utf-8")
-
-        try:
-            ET.fromstring(svg_content)
-        except ET.ParseError:
-            logger.debug("Invalid SVG content")
-            return None
-
-        return svg_content
-    except Exception as e:
-        logger.error(f"Failed to decode base64 content: {e}")
-        return None
-
-
 def replace_img_base64(match: re.Match[str]) -> str:
     """Replace base64 SVG images with PNG equivalents in HTML img tags.
 
@@ -109,48 +74,115 @@ def replace_img_base64(match: re.Match[str]) -> str:
     content_type = match.group("type")
     content_base64 = match.group("base64")
 
-    svg_content = get_svg_content(content_type, content_base64)
-    if not svg_content:
+    svg = get_svg(content_type, content_base64)
+    if svg is None:
         return entry
 
-    image_type, content = replace_svg_with_png(svg_content)
-    replaced_content_base64 = to_base64(content)
+    image_type, image_content = replace_svg_with_png(svg)
+    replaced_content_base64 = to_base64(image_content)
     if replaced_content_base64 == content_base64:
         return entry  # For some reason content wasn't replaced
 
     return f'<img{match.group("intermediate")}{image_type};base64,{replaced_content_base64}"'
 
 
-def replace_svg_with_png(svg_content: str) -> tuple[str, str | bytes]:
+def get_svg(content_type: str, content_base64: str) -> Element | None:
+    """Decode and validate base64 content as SVG.
+
+    Args:
+        content_type: MIME type of the content.
+        content_base64: Base64 encoded content.
+
+    Returns:
+        Element | None: parsed SVG content if valid, None if content is invalid/malformed or not SVG.
+
+    Note:
+        We do not require 'image/svg+xml' content type as not all systems set it correctly.
+    """
+    if content_type in NON_SVG_CONTENT_TYPES:
+        logger.debug(f"Skipping non-SVG content type: {content_type}")
+        return None
+
+    try:
+        decoded_content = base64.b64decode(content_base64)
+        if b"\0" in decoded_content:
+            logger.debug("Skipping binary content (contains null bytes)")
+            return None
+
+        possible_svg_content = decoded_content.decode("utf-8")
+
+        return svg_from_string(possible_svg_content)
+    except Exception as e:
+        logger.error(f"Failed to decode base64 content: {e}")
+        return None
+
+
+def replace_svg_with_png(svg: Element) -> tuple[str, str | bytes]:
     """Convert SVG content to PNG format.
 
     Args:
-        svg_content: SVG content as string.
+        svg: SVG content as string.
 
     Returns:
         tuple[str, str | bytes]: Tuple containing:
             - MIME type of the result ('image/svg+xml' or 'image/png')
             - Content as either SVG string or PNG bytes
     """
-    width, height, updated_svg_content = extract_svg_dimensions_as_px(svg_content)
+    width, height, updated_svg = extract_svg_dimensions_as_px(svg)
     if not width or not height:
-        return IMAGE_SVG, svg_content
+        return without_changes(svg)
 
-    svg_filepath, png_filepath = prepare_temp_files(updated_svg_content)
+    svg_content = svg_to_string(updated_svg)
+    svg_filepath, png_filepath = prepare_temp_files(svg_content)
     if not svg_filepath or not png_filepath:
-        return IMAGE_SVG, svg_content
+        return without_changes(svg)
 
-    if not convert_svg_to_png(width, height + CHROMIUM_HEIGHT_ADJUSTMENT, png_filepath, svg_filepath):  # Add 100 pixels to height to make chromium render the entire svg
-        return IMAGE_SVG, svg_content
+    # Add 100 pixels to height to make chromium render the entire svg
+    if not convert_svg_to_png(width, height + CHROMIUM_HEIGHT_ADJUSTMENT, png_filepath, svg_filepath):
+        return without_changes(svg)
 
     if not crop_png(png_filepath, CHROMIUM_HEIGHT_ADJUSTMENT):
-        return IMAGE_SVG, svg_content
+        return without_changes(svg)
 
     png_content = read_and_cleanup_png(png_filepath)
     if not png_content:
-        return IMAGE_SVG, svg_content
+        return without_changes(svg)
 
     return IMAGE_PNG, png_content
+
+
+def without_changes(svg: Element) -> tuple[str, str | bytes]:
+    svg_content = svg_to_string(svg)
+    return IMAGE_SVG, svg_content
+
+
+def svg_from_string(content: str) -> Element | None:
+    """Parse SVG content from string.
+
+    Args:
+        content: SVG content as string.
+
+    Returns:
+        Element | None: SVG content as Element, or None if parsing failed.
+    """
+    try:
+        return DET.fromstring(content)
+    except DET.ParseError as e:
+        logger.error(f"Failed to parse SVG content: {e}")
+        return None
+
+
+def svg_to_string(svg: Element) -> str:
+    """Convert SVG content to string.
+
+    Args:
+        svg: SVG content as Element.
+
+    Returns:
+        str: SVG content as string.
+    """
+    ET.register_namespace("", "http://www.w3.org/2000/svg")
+    return ET.tostring(svg, encoding="unicode")
 
 
 def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> bool:
@@ -181,14 +213,14 @@ def crop_png(file_path: Path, bottom_pixels_to_crop: int) -> bool:
         return False
 
 
-def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | None, str]:
+def extract_svg_dimensions_as_px(svg: Element) -> tuple[int | None, int | None, Element]:
     """Extract and convert SVG dimensions to pixels.
 
     Processes width and height from SVG tag, converting to absolute pixel values.
     For relative units (vw, vh, %) uses viewBox for conversion if available.
 
     Args:
-        svg_content: SVG content as string.
+        svg: SVG content as Element.
 
     Returns:
         tuple[int | None, int | None, str]: Tuple containing:
@@ -196,9 +228,9 @@ def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | No
             - Height in pixels or None if not determinable
             - Updated SVG content with explicit pixel dimensions if viewBox used
     """
-    width, width_unit = parse_svg_dimension(svg_content, "width")
-    height, height_unit = parse_svg_dimension(svg_content, "height")
-    vb_width, vb_height = parse_viewbox(svg_content)
+    width, width_unit = get_svg_dimension(svg, "width")
+    height, height_unit = get_svg_dimension(svg, "height")
+    vb_width, vb_height = parse_viewbox(svg)
 
     width_px = calculate_dimension(width, width_unit, vb_width)
     height_px = calculate_dimension(height, height_unit, vb_height)
@@ -208,19 +240,19 @@ def extract_svg_dimensions_as_px(svg_content: str) -> tuple[int | None, int | No
             width_px = math.ceil(vb_width)
         if height_px is None:
             height_px = math.ceil(vb_height)
-        svg_content = replace_svg_size_attributes(svg_content, width_px, height_px)
+        svg = replace_svg_size_attributes(svg, width_px, height_px)
 
     if width_px is None or height_px is None:
-        return None, None, svg_content
+        return None, None, svg
 
-    return width_px, height_px, svg_content
+    return width_px, height_px, svg
 
 
-def parse_svg_dimension(svg_content: str, dimension: str) -> tuple[str | None, str | None]:
+def get_svg_dimension(svg: Element, dimension: str) -> tuple[str | None, str | None]:
     """Extract dimension value and unit from SVG tag.
 
     Args:
-        svg_content: SVG content as string.
+        svg: SVG content as Element.
         dimension: Name of dimension attribute to parse ('width' or 'height').
 
     Returns:
@@ -228,34 +260,41 @@ def parse_svg_dimension(svg_content: str, dimension: str) -> tuple[str | None, s
             - Dimension value as string or None if not found
             - Unit as string or None if not specified
     """
+    value = svg.attrib.get(dimension)
+    if value is None:
+        return None, None
+
     match = re.search(
-        rf'<svg[^>]*?\b{dimension}\s*=\s*["\'](?P<value>[\d.]+)(?P<unit>\w+|%)?["\']',
-        svg_content,
+        r"^(?P<value>-?\d+(?:\.\d+)?)(?P<unit>[a-zA-Z%]+)?$",
+        value,
         flags=re.IGNORECASE,
     )
     if match:
         return match.group("value"), match.group("unit")
+
     return None, None
 
 
-def parse_viewbox(svg_content: str) -> tuple[float | None, float | None]:
+def parse_viewbox(svg: Element) -> tuple[float | None, float | None]:
     """Extract width and height from SVG viewBox attribute.
 
     Args:
-        svg_content: SVG content as string.
+        svg: SVG content as Element.
 
     Returns:
         tuple[float | None, float | None]: Tuple containing:
             - ViewBox width as float or None if not found
             - ViewBox height as float or None if not found
     """
+    viewbox = svg.attrib.get("viewBox")
+    if viewbox is None:
+        return None, None
+
     match = re.search(
-        r'<svg[^>]*?\bviewBox\s*=\s*["\']'
         r"[\d.\-]+\s+[\d.\-]+\s+"
         r"(?P<vb_width>[\d.\-]+)\s+"
-        r"(?P<vb_height>[\d.\-]+)"
-        r'["\']',
-        svg_content,
+        r"(?P<vb_height>[\d.\-]+)",
+        viewbox,
         flags=re.IGNORECASE,
     )
     if match:
@@ -288,31 +327,26 @@ def calculate_dimension(value: str | None, unit: str | None, vb_dimension: float
     return convert_to_px(value, unit)
 
 
-def replace_svg_size_attributes(svg_content: str, width_px: int, height_px: int) -> str:
+def replace_svg_size_attributes(svg: Element, width_px: int, height_px: int) -> Element:
     """Update SVG width and height attributes with pixel values.
 
     Args:
-        svg_content: SVG content as string.
+        svg: SVG content as Element.
         width_px: Width in pixels.
         height_px: Height in pixels.
 
     Returns:
-        str: Updated SVG content with explicit pixel dimensions.
+        Element: Updated SVG content with explicit pixel dimensions.
 
     Raises:
         ValueError: If SVG content is invalid and cannot be parsed.
     """
-    try:
-        root = ET.fromstring(svg_content)
-    except ET.ParseError as e:
-        raise ValueError("Invalid SVG content") from e
 
     # Set or replace width and height attributes
-    root.set("width", f"{width_px}px")
-    root.set("height", f"{height_px}px")
+    svg.set("width", f"{width_px}px")
+    svg.set("height", f"{height_px}px")
 
-    # Convert XML tree back to a string
-    return ET.tostring(root, encoding="unicode")
+    return svg
 
 
 def calculate_special_unit(value: str, unit: str | None, viewbox_dimension: float) -> int:
@@ -344,11 +378,11 @@ def calculate_special_unit(value: str, unit: str | None, viewbox_dimension: floa
     return fallback
 
 
-def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
+def prepare_temp_files(content: str) -> tuple[Path | None, Path | None]:
     """Create temporary files for SVG to PNG conversion.
 
     Args:
-        svg_content: SVG content to write to temporary file.
+        content: SVG content to write to temporary file.
 
     Returns:
         tuple[Path | None, Path | None]: Tuple containing:
@@ -363,7 +397,7 @@ def prepare_temp_files(svg_content: str) -> tuple[Path | None, Path | None]:
         png_filepath = Path(temp_folder, f"{uuid}.png")
 
         with svg_filepath.open("w", encoding="utf-8") as f:
-            f.write(svg_content)
+            f.write(content)
 
         return svg_filepath, png_filepath
     except Exception as e:

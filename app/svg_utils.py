@@ -73,8 +73,11 @@ def get_svg_content(content_type: str, content_base64: str) -> str | None:
             return None
 
         svg_content = decoded_content.decode("utf-8")
-        if "</svg>" not in svg_content:
-            logger.debug("Content is not SVG (missing </svg> tag)")
+
+        try:
+            ET.fromstring(svg_content)
+        except ET.ParseError:
+            logger.debug("Invalid SVG content")
             return None
 
         return svg_content

@@ -271,6 +271,7 @@ def test_get_svg_content():
     - Non-SVG content types
     - Invalid/corrupted content
     - Missing SVG tags
+    - Malformed SVG content
     - Valid SVG content
     - Invalid base64 encoding
     """
@@ -286,9 +287,13 @@ def test_get_svg_content():
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgi")
     assert content is None
 
-    # Valid input (b'<svg height="200px" width="100px"</svg>'), return decoded svg content
+    # Malformed SVG content (b'<svg height="200px" width="100px"</svg>'), no closing bracket, return None
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+")
-    assert content == r'<svg height="200px" width="100px"</svg>'
+    assert content is None
+
+    # Valid input (b'<svg height="200px" width="100px"></svg>'), return decoded svg content
+    content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPjwvc3ZnPg==")
+    assert content == r'<svg height="200px" width="100px"></svg>'
 
     # Invalid base64 string, return None
     content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc¨")
@@ -305,7 +310,7 @@ def test_replace_svg_with_png():
     - Chrome execution failures
     - Successful conversion
     """
-    # Test invalid SVG attributes
+    # Test invalid SVG attributes, return same content
     svg_content = r'<svg height=200px" width "100px'
     mime, content = replace_svg_with_png(svg_content)
     assert mime == IMAGE_SVG, content == svg_content
@@ -324,7 +329,7 @@ def test_replace_svg_with_png():
     # Valid input with chrome executable test script set correctly, return script output
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[WRITE_OUTPUT] = "true"
-    svg_content = r'<svg height="1px" width="1px"'
+    svg_content = r'<svg height="1px" width="1px"></svg>'
     mime, content = replace_svg_with_png(svg_content)
     assert mime == IMAGE_PNG
     assert content == cropped_test_script_output

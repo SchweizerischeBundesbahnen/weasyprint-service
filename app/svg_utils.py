@@ -181,7 +181,7 @@ def svg_to_string(svg: Element) -> str:
     Returns:
         str: SVG content as string.
     """
-    ET.register_namespace("", "http://www.w3.org/2000/svg")
+    ET.register_namespace("", "http://www.w3.org/2000/svg")  # pylint: disable=invalid-url
     return ET.tostring(svg, encoding="unicode")
 
 

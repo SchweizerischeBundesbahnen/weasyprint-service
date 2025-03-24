@@ -181,8 +181,7 @@ def svg_to_string(svg: Element) -> str:
     Returns:
         str: SVG content as string.
     """
-    # sonarcloud:ignore S5332
-    ET.register_namespace("", "http://www.w3.org/2000/svg")
+    ET.register_namespace("", "http://www.w3.org/2000/svg")  # NOSONAR
     return ET.tostring(svg, encoding="unicode")
 
 

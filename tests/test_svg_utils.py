@@ -606,19 +606,25 @@ def test_process_svg_comprehensive():
     assert result.count("image/png") == 2
 
 
+@pytest.mark.parametrize(
+    "svg_content, expected_output",
+    [
+        (
+            '<svg xmlns="http://www.w3.org/2000/svg" height="100" width="100"><circle r="45" cx="50" cy="50" fill="red"/></svg>',
+            '<svg xmlns="http://www.w3.org/2000/svg" height="100" width="100"><circle r="45" cx="50" cy="50" fill="red" /></svg>',
+        ),
+        (
+            '<svg xmlns="http://www.w3.org/2000/svg"><svg x="100" y="100"></svg></svg>',
+            '<svg xmlns="http://www.w3.org/2000/svg"><svg x="100" y="100" /></svg>',
+        ),
+    ],
+)
 @setup_env_variables
-def test_get_svg_content_with_namespace():
+def test_get_svg_content_with_namespace(svg_content, expected_output):
     """Test SVG content handling with XML namespaces.
 
     Tests processing of SVG content with XML namespaces and nested elements.
     """
-    # Test with namespace
-    svg_content_with_namespace = '<svg xmlns="http://www.w3.org/2000/svg" height="100" width="100"><circle r="45" cx="50" cy="50" fill="red"/></svg>'
-    svg = get_svg("image/svg+xml", to_base64(svg_content_with_namespace))
+    svg = get_svg("image/svg+xml", to_base64(svg_content))
     content = svg_to_string(svg)
-    assert content == '<svg xmlns="http://www.w3.org/2000/svg" height="100" width="100"><circle r="45" cx="50" cy="50" fill="red" /></svg>'
-
-    # Test nested SVG
-    svg = get_svg("image/svg+xml", to_base64('<svg xmlns="http://www.w3.org/2000/svg"><svg x="100" y="100"></svg></svg>'))
-    content = svg_to_string(svg)
-    assert content == '<svg xmlns="http://www.w3.org/2000/svg"><svg x="100" y="100" /></svg>'
+    assert content == expected_output

@@ -317,7 +317,10 @@ def calculate_special_unit(value: str, unit: str | None, viewbox_dimension: floa
     Raises:
         ValueError: If unit conversion fails.
     """
-    val = float(value)
+    try:
+        val = float(value)
+    except (ValueError, TypeError) as err:
+        raise ValueError(f"could not convert string to float: '{value}'") from err
 
     if unit in SPECIAL_UNITS:
         return math.ceil((val / 100) * viewbox_dimension)

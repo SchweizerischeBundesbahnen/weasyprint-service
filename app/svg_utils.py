@@ -265,7 +265,7 @@ def get_svg_dimension(svg: Element, dimension: str) -> tuple[str | None, str | N
         return None, None
 
     match = re.search(
-        r"^(?P<value>-?\d+(?:\.\d+)?)(?P<unit>[a-zA-Z%]+)?$",
+        r"^(?P<value>-?\d+(?:\.\d+)?)(?P<unit>[a-z%]+)?$",
         value,
         flags=re.IGNORECASE,
     )

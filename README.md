@@ -32,6 +32,32 @@ To start the WeasyPrint service container, execute:
 
 The service will be accessible on port 9080.
 
+### Logging Configuration
+
+The service includes a robust logging system with the following features:
+- Log files are stored in `/opt/weasyprint/logs` directory
+- Log level can be configured via `LOG_LEVEL` environment variable (default: INFO)
+- Log format: `timestamp - logger name - log level - message`
+- Each service start creates a new timestamped log file
+
+To customize logging when running the container:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env LOG_LEVEL=DEBUG \
+  --volume /path/to/local/logs:/opt/weasyprint/logs \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+Available log levels:
+- DEBUG: Detailed information for debugging
+- INFO: General operational information (default)
+- WARNING: Warning messages for potential issues
+- ERROR: Error messages for failed operations
+- CRITICAL: Critical issues that require immediate attention
+
 ### Using as a Base Image
 
 To extend or customize the service, use it as a base image in the Dockerfile:
@@ -74,11 +100,31 @@ To stop the running container, execute:
   docker container stop weasyprint-service
 ```
 
-### Unit Testing Docker Image
+### Testing
 
+#### container-structure-test
 ```bash
 docker build -t weasyprint-service:local .
+```
+```bash
 container-structure-test test --image weasyprint-service:local --config ./tests/container/container-structure-test.yaml
+```
+#### tox
+```bash
+poetry run tox
+```
+#### pytest (for debugging)
+```bash
+# all tests
+poetry run pytest
+```
+```bash
+# a specific test
+poetry run pytest tests/test_svg_utils.py -v
+```
+#### pre-commit
+```bash
+poetry run pre-commit run --all
 ```
 
 ### Access service

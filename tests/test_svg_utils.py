@@ -263,8 +263,25 @@ def test_extract_svg_dimensions_relative_units(svg_content: str, expected_width:
     assert f'height="{height}px"' in updated_svg
 
 
+@pytest.mark.parametrize(
+    "content_type,content_base64,expected_content",
+    [
+        # Test non-SVG content type
+        ("image/png", "123ABC==", None),
+        # Test 0x00 in base64 decoded content
+        ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiAA==", None),
+        # Test no end tag </svg>
+        ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgi", None),
+        # Test malformed SVG content
+        ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+", None),
+        # Test valid SVG content
+        ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPjwvc3ZnPg==", '<svg height="200px" width="100px"></svg>'),
+        # Test invalid base64 string
+        ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc¨", None),
+    ],
+)
 @setup_env_variables
-def test_get_svg_content():
+def test_get_svg_content(content_type: str, content_base64: str, expected_content: str | None):
     """Test SVG content validation and decoding.
 
     Tests various scenarios for SVG content validation:
@@ -274,30 +291,14 @@ def test_get_svg_content():
     - Malformed SVG content
     - Valid SVG content
     - Invalid base64 encoding
+
+    Args:
+        content_type: MIME type of the content
+        content_base64: Base64 encoded content
+        expected_content: Expected decoded SVG content or None if invalid
     """
-    # Test non-SVG content type
-    content = get_svg_content("image/png", "123ABC==")
-    assert content is None
-
-    # 0x00 in base64 decoded content (b'<svg height="200px" width="100px"\x00'), return None
-    content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiAA==")
-    assert content is None
-
-    # No end tag </svg> (b'<svg height="200px" width="100px"'), return None
-    content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgi")
-    assert content is None
-
-    # Malformed SVG content (b'<svg height="200px" width="100px"</svg>'), no closing bracket, return None
-    content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+")
-    assert content is None
-
-    # Valid input (b'<svg height="200px" width="100px"></svg>'), return decoded svg content
-    content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPjwvc3ZnPg==")
-    assert content == '<svg height="200px" width="100px"></svg>'
-
-    # Invalid base64 string, return None
-    content = get_svg_content("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc¨")
-    assert content is None
+    content = get_svg_content(content_type, content_base64)
+    assert content == expected_content
 
 
 @setup_env_variables

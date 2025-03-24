@@ -9,26 +9,27 @@ license = "Apache License 2.0"
 readme = "README.md"
 requires-python=">=3.13"
 dependencies = [
-    "flask (>=3.1.0,<4.0.0)",
-    "gevent (>=24.11.1,<25.0.0)",
-    "weasyprint (>=64.0,<65)",
+    "flask>=3.1.0,<4.0.0",
+    "gevent>=24.11.1,<25.0.0",
+    "weasyprint>=64.0,<65",
+    "defusedxml>=0.7.1,<0.8.0"
 ]
 
 [tool.poetry]
 packages = [{include = "app"}]
-requires-poetry = ">=2.0"
-
-[tool.poetry.dependencies]
-python = "^3.13"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "4.2.0"
 ruff = "0.11.2"
 mypy = "1.15.0"
+types-defusedxml = "^0.7.0.20240218"
 
 [tool.poetry.group.test.dependencies]
 tox = "^4.18.0"
 docker = "^7.1.0"
+# for debug source code for pytest
+pytest = "^8.3.5"
+
 
 [build-system]
 requires = ["poetry-core"]
@@ -73,3 +74,5 @@ line-ending = "lf"
 explicit_package_bases = true
 disallow_untyped_defs = true
 exclude = "tests/.*"
+install_types = true
+non_interactive = true

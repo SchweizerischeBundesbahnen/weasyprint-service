@@ -5,9 +5,88 @@
     "version": "1.0.0"
   },
   "paths": {
-    "/api/docs/dist/{filename}": {},
-    "/api/docs/{path}": {},
-    "/convert/html": {},
+    "/convert/html": {
+      "post": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "encoding",
+            "schema": {
+              "default": "utf-8",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "media_type",
+            "schema": {
+              "default": "print",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "file_name",
+            "schema": {
+              "default": "converted-document.pdf",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pdf_variant",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "presentational_hints",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "base_url",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/html": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "PDF successfully generated"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "summary": "Convert HTML to PDF"
+      }
+    },
     "/static/openapi.json": {},
     "/version": {
       "get": {

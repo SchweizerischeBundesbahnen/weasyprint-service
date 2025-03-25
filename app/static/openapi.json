@@ -5,31 +5,49 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/version": {
+      "get": {
+        "summary": "Get version info",
+        "responses": {
+          "200": {
+            "description": "Version data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/convert/html": {
       "post": {
+        "summary": "Convert HTML to PDF",
         "parameters": [
           {
             "in": "query",
             "name": "encoding",
             "schema": {
-              "default": "utf-8",
-              "type": "string"
+              "type": "string",
+              "default": "utf-8"
             }
           },
           {
             "in": "query",
             "name": "media_type",
             "schema": {
-              "default": "print",
-              "type": "string"
+              "type": "string",
+              "default": "print"
             }
           },
           {
             "in": "query",
             "name": "file_name",
             "schema": {
-              "default": "converted-document.pdf",
-              "type": "string"
+              "type": "string",
+              "default": "converted-document.pdf"
             }
           },
           {
@@ -43,8 +61,8 @@
             "in": "query",
             "name": "presentational_hints",
             "schema": {
-              "default": false,
-              "type": "boolean"
+              "type": "boolean",
+              "default": false
             }
           },
           {
@@ -56,26 +74,26 @@
           }
         ],
         "requestBody": {
+          "required": true,
           "content": {
             "text/html": {
               "schema": {
                 "type": "string"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
+            "description": "PDF successfully generated",
             "content": {
               "application/pdf": {
                 "schema": {
-                  "format": "binary",
-                  "type": "string"
+                  "type": "string",
+                  "format": "binary"
                 }
               }
-            },
-            "description": "PDF successfully generated"
+            }
           },
           "400": {
             "description": "Invalid input"
@@ -83,59 +101,40 @@
           "500": {
             "description": "Internal server error"
           }
-        },
-        "summary": "Convert HTML to PDF"
-      }
-    },
-    "/static/openapi.json": {},
-    "/version": {
-      "get": {
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VersionSchema"
-                }
-              }
-            },
-            "description": "Version data"
-          }
-        },
-        "summary": "Get version info"
+        }
       }
     }
   },
   "components": {
     "schemas": {
       "VersionSchema": {
+        "type": "object",
         "properties": {
-          "chromium": {
-            "description": "Chromium version",
-            "type": "string"
-          },
           "python": {
-            "description": "Python version",
-            "type": "string"
-          },
-          "timestamp": {
-            "description": "Build timestamp",
-            "type": "string"
+            "type": "string",
+            "description": "Python version"
           },
           "weasyprint": {
-            "description": "WeasyPrint version",
-            "type": "string"
+            "type": "string",
+            "description": "WeasyPrint version"
           },
           "weasyprintService": {
-            "description": "Service version",
-            "type": "string"
+            "type": "string",
+            "description": "Service version"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Build timestamp"
+          },
+          "chromium": {
+            "type": "string",
+            "description": "Chromium version"
           }
         },
         "required": [
           "python",
           "weasyprint"
-        ],
-        "type": "object"
+        ]
       }
     }
   }

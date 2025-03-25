@@ -27,9 +27,6 @@ repos:
       - id: no-commit-to-branch
       - id: mixed-line-ending
       - id: end-of-file-fixer
-      - id: pretty-format-json
-        args: [--autofix, --no-ensure-ascii, '--top-keys=openapi,info,servers,paths,components']
-        files: app/static/openapi.json
   - repo: local
     hooks:
       - id: sensitive-data-leak-urls

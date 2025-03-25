@@ -7,6 +7,9 @@
   "paths": {
     "/version": {
       "get": {
+        "tags": [
+          "Service Info"
+        ],
         "summary": "Get version info",
         "responses": {
           "200": {
@@ -24,6 +27,9 @@
     },
     "/convert/html": {
       "post": {
+        "tags": [
+          "Conversion"
+        ],
         "summary": "Convert HTML to PDF",
         "parameters": [
           {

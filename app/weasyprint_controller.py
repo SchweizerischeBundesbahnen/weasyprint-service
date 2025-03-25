@@ -32,6 +32,8 @@ def version() -> dict[str, str | None]:
     Get version information
     ---
     get:
+      tags:
+        - Service Info
       summary: Get version info
       responses:
         200:
@@ -55,6 +57,8 @@ def convert_html() -> Response:
     Convert HTML to PDF
     ---
     post:
+      tags:
+        - Conversion
       summary: Convert HTML to PDF
       parameters:
         - in: query

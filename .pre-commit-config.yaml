@@ -73,3 +73,10 @@ repos:
   #   rev: v1.2.2
   #   hooks:
   #     - id: zizmor
+  - repo: local
+    hooks:
+      - id: generate-openapi
+        name: Generate OpenAPI spec
+        entry: poetry run python scripts/generate_openapi.py
+        language: system
+        types: [python]

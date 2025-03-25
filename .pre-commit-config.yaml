@@ -1,6 +1,13 @@
 ---
 default_install_hook_types: [pre-commit, commit-msg]
 repos:
+  - repo: local
+    hooks:
+      - id: generate-openapi
+        name: Generate OpenAPI spec
+        entry: poetry run python scripts/generate_openapi.py
+        language: system
+        types: [python]
   - repo: https://github.com/lyz-code/yamlfix
     rev: 1.17.0
     hooks:
@@ -20,6 +27,9 @@ repos:
       - id: no-commit-to-branch
       - id: mixed-line-ending
       - id: end-of-file-fixer
+      - id: pretty-format-json
+        args: [--autofix, --no-ensure-ascii, '--top-keys=openapi,info,servers,paths,components']
+        files: app/static/openapi.json
   - repo: local
     hooks:
       - id: sensitive-data-leak-urls
@@ -73,10 +83,3 @@ repos:
   #   rev: v1.2.2
   #   hooks:
   #     - id: zizmor
-  - repo: local
-    hooks:
-      - id: generate-openapi
-        name: Generate OpenAPI spec
-        entry: poetry run python scripts/generate_openapi.py
-        language: system
-        types: [python]

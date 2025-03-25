@@ -14,8 +14,8 @@ commandTests:
     args: [--version]
     expectedOutput: [version 2.*.*]
   - name: Weasyprint version is correct
-    command: weasyprint
-    args: [--version]
+    command: poetry
+    args: [run, weasyprint, --version]
     expectedOutput: [64.*]
   - name: Chromium version is correct
     command: chromium
@@ -31,3 +31,22 @@ commandTests:
     args: [run, pytest, --version]
     exitCode: 1
     expectedError: ['Command not found: pytest']
+  - name: Log directory exists
+    command: test
+    args: [-d, /opt/weasyprint/logs]
+    exitCode: 0
+  - name: Log directory is writable
+    command: touch
+    args: [/opt/weasyprint/logs/test.log]
+    exitCode: 0
+  - name: Python logging module is available
+    command: python
+    args: [-c, import logging; logging.basicConfig(); logging.info('test')]
+    exitCode: 0
+fileExistenceTests:
+  - name: Log directory
+    path: /opt/weasyprint/logs
+    shouldExist: true
+    permissions: drwxrwxrwx
+    uid: 0
+    gid: 0

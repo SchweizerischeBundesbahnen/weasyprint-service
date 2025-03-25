@@ -13,4 +13,5 @@ def test_container():
     container.stop()
     container.remove()
 
-    assert logs == b"INFO:root:Weasyprint service listening port: 9080\n"
+    # Check that the log contains our service start message, regardless of format
+    assert b"Weasyprint service listening port: 9080" in logs

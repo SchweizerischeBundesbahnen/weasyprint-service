@@ -1,15 +1,29 @@
 import logging
 import os
 import platform
+from pathlib import Path
 from urllib.parse import unquote
 
 import weasyprint  # type: ignore
-from flask import Flask, Response, request
+from flask import Flask, Response, request, send_from_directory
+from flask_swagger_ui import get_swaggerui_blueprint  # type: ignore
 from gevent.pywsgi import WSGIServer  # type: ignore
 
 from app import svg_utils  # type: ignore
 
 app = Flask(__name__)
+SWAGGER_URL = "/api/docs"
+API_URL = "/static/openapi.json"
+
+swaggerui_blueprint = get_swaggerui_blueprint(SWAGGER_URL, API_URL, config={"app_name": "WeasyPrint Service API"})
+
+app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+
+
+@app.route("/static/openapi.json")
+def send_swagger() -> Response:
+    directory = Path(app.root_path) / "static"
+    return send_from_directory(str(directory), "openapi.json")
 
 
 @app.route("/version", methods=["GET"])

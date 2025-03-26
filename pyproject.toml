@@ -12,7 +12,9 @@ dependencies = [
     "flask>=3.1.0,<4.0.0",
     "gevent>=24.11.1,<25.0.0",
     "weasyprint>=65,<66",
-    "defusedxml>=0.7.1,<0.8.0"
+    "defusedxml>=0.7.1,<0.8.0",
+    "pymupdf (>=1.25.4,<2.0.0)",
+    "pypdf (>=5.4.0,<6.0.0)",
 ]
 
 [tool.poetry]

@@ -13,6 +13,10 @@ dependencies = [
     "gevent>=24.11.1,<25.0.0",
     "weasyprint>=65,<66",
     "defusedxml>=0.7.1,<0.8.0",
+    "flask-swagger-ui>=4.11.1,<5.0.0",
+    "apispec (>=6.8.1,<7.0.0)",
+    "apispec-webframeworks (>=1.2.0,<2.0.0)",
+    "marshmallow (>=3.26.1,<4.0.0)"
 ]
 
 [tool.poetry]
@@ -23,6 +27,10 @@ pre-commit = "4.2.0"
 ruff = "0.11.2"
 mypy = "1.15.0"
 types-defusedxml = "^0.7.0.20240218"
+flask = "^3.1.0"
+apispec = "^6.3"
+apispec-webframeworks = "^1.2.0"
+marshmallow = "^3.20"
 
 [tool.poetry.group.test.dependencies]
 tox = "^4.18.0"

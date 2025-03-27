@@ -32,6 +32,32 @@ To start the WeasyPrint service container, execute:
 
 The service will be accessible on port 9080.
 
+### Logging Configuration
+
+The service includes a robust logging system with the following features:
+- Log files are stored in `/opt/weasyprint/logs` directory
+- Log level can be configured via `LOG_LEVEL` environment variable (default: INFO)
+- Log format: `timestamp - logger name - log level - message`
+- Each service start creates a new timestamped log file
+
+To customize logging when running the container:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env LOG_LEVEL=DEBUG \
+  --volume /path/to/local/logs:/opt/weasyprint/logs \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+Available log levels:
+- DEBUG: Detailed information for debugging
+- INFO: General operational information (default)
+- WARNING: Warning messages for potential issues
+- ERROR: Error messages for failed operations
+- CRITICAL: Critical issues that require immediate attention
+
 ### Using as a Base Image
 
 To extend or customize the service, use it as a base image in the Dockerfile:
@@ -74,72 +100,33 @@ To stop the running container, execute:
   docker container stop weasyprint-service
 ```
 
-### Unit Testing Docker Image
+### Testing
 
+#### container-structure-test
 ```bash
 docker build -t weasyprint-service:local .
-container-structure-test test --image weasyprint-service:local --config .config/container-structure-test.yaml
+```
+```bash
+container-structure-test test --image weasyprint-service:local --config ./tests/container/container-structure-test.yaml
+```
+#### tox
+```bash
+poetry run tox
+```
+#### pytest (for debugging)
+```bash
+# all tests
+poetry run pytest
+```
+```bash
+# a specific test
+poetry run pytest tests/test_svg_utils.py -v
+```
+#### pre-commit
+```bash
+poetry run pre-commit run --all
 ```
 
-### Access service
+### REST API
 
-Weasyprint Service provides the following endpoints:
-
-------------------------------------------------------------------------------------------
-
-#### Getting version info
-
-<details>
-  <summary>
-    <code>GET</code> <code>/version</code>
-  </summary>
-
-##### Responses
-
-> | HTTP code | Content-Type       | Response                                                                                                                                       |
-> |-----------|--------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-> | `200`     | `application/json` | `{ "chromium": "129.0.6668.58", "python": "3.12.5", "timestamp": "2024-09-23T12:23:09Z", "weasyprint": "62.3", "weasyprintService": "0.0.0" }` |
-
-##### Example cURL
-
-> ```bash
->  curl -X GET -H "Content-Type: application/json" http://localhost:9080/version
-> ```
-
-</details>
-
-
-------------------------------------------------------------------------------------------
-
-#### Convert HTML to PDF
-
-<details>
-  <summary>
-    <code>POST</code> <code>/convert/html</code>
-  </summary>
-
-##### Parameters
-
-> | Parameter name       | Type     | Data type | Description                                                          |
-> |----------------------|----------|-----------|----------------------------------------------------------------------|
-> | encoding             | optional | string    | Encoding of provided HTML (default: utf-8)                           |
-> | media_type           | optional | string    | WeasyPrint media type (default: print)                               |
-> | file_name            | optional | string    | Output filename (default: converted-document.pdf)                    |
-> | presentational_hints | optional | string    | WeasyPrint option: Follow HTML presentational hints (default: False) |
-> | base_url             | optional | string    | Base URL to resolve relative resources (default: None)               |
-
-##### Responses
-
-> | HTTP code | Content-Type      | Response                      |
-> |-----------|-------------------|-------------------------------|
-> | `200`     | `application/pdf` | PDF document (binary data)    |
-> | `400`     | `plain/text`      | Error message with exception  |
-> | `500`     | `plain/text`      | Error message with exception  |
-
-##### Example cURL
-
-> ```bash
-> curl -X POST -H "Content-Type: application/html" --data @input_html http://localhost:9080/convert/html --output output.pdf
-> ```
-
-</details>
+This service provides REST API. OpenAPI Specification can be obtained [here](app/static/openapi.json).

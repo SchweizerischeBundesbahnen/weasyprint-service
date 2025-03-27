@@ -1,0 +1,147 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "WeasyPrint Service API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/version": {
+      "get": {
+        "tags": [
+          "Service Info"
+        ],
+        "summary": "Get version info",
+        "responses": {
+          "200": {
+            "description": "Version data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/convert/html": {
+      "post": {
+        "tags": [
+          "Conversion"
+        ],
+        "summary": "Convert HTML to PDF",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "encoding",
+            "schema": {
+              "type": "string",
+              "default": "utf-8"
+            }
+          },
+          {
+            "in": "query",
+            "name": "media_type",
+            "schema": {
+              "type": "string",
+              "default": "print"
+            }
+          },
+          {
+            "in": "query",
+            "name": "file_name",
+            "schema": {
+              "type": "string",
+              "default": "converted-document.pdf"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pdf_variant",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "presentational_hints",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "in": "query",
+            "name": "base_url",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "text/html": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PDF successfully generated",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "VersionSchema": {
+        "type": "object",
+        "properties": {
+          "python": {
+            "type": "string",
+            "description": "Python version"
+          },
+          "weasyprint": {
+            "type": "string",
+            "description": "WeasyPrint version"
+          },
+          "weasyprintService": {
+            "type": "string",
+            "description": "Service version"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Build timestamp"
+          },
+          "chromium": {
+            "type": "string",
+            "description": "Chromium version"
+          }
+        },
+        "required": [
+          "python",
+          "weasyprint"
+        ]
+      }
+    }
+  }
+}

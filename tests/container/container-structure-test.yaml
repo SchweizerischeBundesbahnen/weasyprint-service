@@ -1,0 +1,52 @@
+---
+schemaVersion: 2.0.0
+commandTests:
+  - name: Python installation - check that the python binary is in the correct location
+    command: which
+    args: [python]
+    expectedOutput: [/usr/local/bin/python]
+  - name: Python version is correct
+    command: python
+    args: [--version]
+    expectedOutput: [Python 3.13.*]
+  - name: Poetry version is correct
+    command: poetry
+    args: [--version]
+    expectedOutput: [version 2.*.*]
+  - name: Weasyprint version is correct
+    command: poetry
+    args: [run, weasyprint, --version]
+    expectedOutput: [64.*]
+  - name: Chromium version is correct
+    command: chromium
+    args: [--version]
+    expectedOutput: [Chromium 134.*.*.*]
+  - name: Tox should not be installed
+    command: poetry
+    args: [run, tox, --version]
+    exitCode: 1
+    expectedError: ['Command not found: tox']
+  - name: Pytest should not be installed
+    command: poetry
+    args: [run, pytest, --version]
+    exitCode: 1
+    expectedError: ['Command not found: pytest']
+  - name: Log directory exists
+    command: test
+    args: [-d, /opt/weasyprint/logs]
+    exitCode: 0
+  - name: Log directory is writable
+    command: touch
+    args: [/opt/weasyprint/logs/test.log]
+    exitCode: 0
+  - name: Python logging module is available
+    command: python
+    args: [-c, import logging; logging.basicConfig(); logging.info('test')]
+    exitCode: 0
+fileExistenceTests:
+  - name: Log directory
+    path: /opt/weasyprint/logs
+    shouldExist: true
+    permissions: drwxrwxrwx
+    uid: 0
+    gid: 0

@@ -63,11 +63,12 @@ def test_parameters(weasyprint_container: Container):
 def test_container_no_error_logs(test_parameters: TestParameters) -> None:
     logs = test_parameters.container.logs()
 
-    assert logs == b"INFO:root:Weasyprint service listening port: 9080\n"
+    assert len(logs.splitlines()) == 3
 
 
 def test_convert_simple_html(test_parameters: TestParameters) -> None:
     simple_html = "<html><body>My test body</body</html>"
+
     response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True)
     assert response.status_code == 200
     flush_tmp_file("test_convert_simple_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)

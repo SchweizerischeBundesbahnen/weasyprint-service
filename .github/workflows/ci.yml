@@ -39,7 +39,7 @@ jobs:
           echo "Head Ref: ${{ github.head_ref }}"
           echo "PR Number: ${{ github.event.pull_request.number }}"
       - name: SonarCloud scan for PR
-        uses: sonarsource/sonarqube-scan-action@0303d6b62e310685c0e34d0b9cde218036885c4d  # v5.0.0
+        uses: sonarsource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97  # v5.1.0
         if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
@@ -48,7 +48,7 @@ jobs:
           args: |
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
       - name: SonarCloud scan for Push
-        uses: sonarsource/sonarqube-scan-action@0303d6b62e310685c0e34d0b9cde218036885c4d  # v5.0.0
+        uses: sonarsource/sonarqube-scan-action@aa494459d7c39c106cc77b166de8b4250a32bb97  # v5.1.0
         if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information

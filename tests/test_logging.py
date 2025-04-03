@@ -96,7 +96,13 @@ def test_log_message_format(log_dir):
 def test_multiple_log_messages(log_dir):
     """Test that multiple log messages are written correctly."""
     log_file = setup_logging()
-    messages = [(logging.DEBUG, "Debug message"), (logging.INFO, "Info message"), (logging.WARNING, "Warning message"), (logging.ERROR, "Error message"), (logging.CRITICAL, "Critical message")]
+    messages = [
+        (logging.DEBUG, "Debug message"),
+        (logging.INFO, "Info message"),
+        (logging.WARNING, "Warning message"),
+        (logging.ERROR, "Error message"),
+        (logging.CRITICAL, "Critical message"),
+    ]
 
     # Write messages
     for level, msg in messages:

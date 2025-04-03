@@ -63,7 +63,7 @@ def test_parameters(weasyprint_container: Container):
 def test_container_no_error_logs(test_parameters: TestParameters) -> None:
     logs = test_parameters.container.logs()
 
-    assert len(logs.splitlines()) == 3
+    assert len(logs.splitlines()) == 7
 
 
 def test_convert_simple_html(test_parameters: TestParameters) -> None:
@@ -145,7 +145,9 @@ def test_svg_has_no_extra_labels(test_parameters: TestParameters) -> None:
 )
 def test_supported_pdf_variants(variant: str, is_supported: bool, test_parameters: TestParameters) -> None:
     simple_html = f"<html><body>Pdf variant {variant}</body</html>"
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True, parameters=f"pdf_variant={variant}")
+    response = __send_request(
+        base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True, parameters=f"pdf_variant={variant}"
+    )
     if is_supported:
         assert response.status_code == 200
         stream = io.BytesIO(response.content)

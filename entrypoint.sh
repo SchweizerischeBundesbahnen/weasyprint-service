@@ -5,10 +5,6 @@ export WEASYPRINT_SERVICE_BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 CHROMIUM_VERSION="$(${CHROMIUM_EXECUTABLE_PATH} --version | awk '{print $2}')"
 export WEASYPRINT_SERVICE_CHROMIUM_VERSION=${CHROMIUM_VERSION}
 
-if [ ! -d /var/run/dbus ]; then
-    mkdir -p /var/run/dbus
-fi
-
 if ! pgrep -x 'dbus-daemon' > /dev/null; then
     if [ -f /run/dbus/dbus.pid ]; then
         rm /run/dbus/dbus.pid

@@ -1,5 +1,12 @@
 # Changelog
 
+## [65.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v65.0.0...v65.0.1) (2025-04-03)
+
+
+### Bug Fixes
+
+* revert changes in entrypoint.sh due to DBus Debian config ([#132](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/132)) ([95dd8c3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/95dd8c30f9107263c9f15da37104b1dc6942af24))
+
 ## [65.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v63.1.0...v65.0.0) (2025-03-27)
 
 

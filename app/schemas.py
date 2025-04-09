@@ -1,11 +1,11 @@
-from marshmallow import Schema, fields
+from pydantic import BaseModel, Field
 
 
-class VersionSchema(Schema):
+class VersionSchema(BaseModel):
     """Schema for response /version"""
 
-    python = fields.String(required=True, description="Python version")
-    weasyprint = fields.String(required=True, description="WeasyPrint version")
-    weasyprintService = fields.String(required=False, description="Service version")
-    timestamp = fields.String(required=False, description="Build timestamp")
-    chromium = fields.String(required=False, description="Chromium version")
+    python: str = Field(description="Python version")
+    weasyprint: str = Field(description="WeasyPrint version")
+    weasyprintService: str = Field(description="Service version")
+    timestamp: str = Field(description="Build timestamp")
+    chromium: str = Field(description="Chromium version")

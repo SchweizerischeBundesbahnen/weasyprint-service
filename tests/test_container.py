@@ -63,7 +63,7 @@ def test_parameters(weasyprint_container: Container):
 def test_container_no_error_logs(test_parameters: TestParameters) -> None:
     logs = test_parameters.container.logs()
 
-    assert len(logs.splitlines()) == 3
+    assert len(logs.splitlines()) == 7
 
 
 def test_convert_simple_html(test_parameters: TestParameters) -> None:

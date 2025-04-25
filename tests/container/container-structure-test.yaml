@@ -16,11 +16,11 @@ commandTests:
   - name: Weasyprint version is correct
     command: poetry
     args: [run, weasyprint, --version]
-    expectedOutput: [65.*]
+    expectedOutput: [65.0]
   - name: Chromium version is correct
     command: chromium
     args: [--version]
-    expectedOutput: [Chromium 134.*.*.*]
+    expectedOutput: [Chromium 135.*.*.*]
   - name: Tox should not be installed
     command: poetry
     args: [run, tox, --version]

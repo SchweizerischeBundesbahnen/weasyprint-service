@@ -16,7 +16,7 @@ commandTests:
   - name: Weasyprint version is correct
     command: poetry
     args: [run, weasyprint, --version]
-    expectedOutput: [65.0]
+    expectedOutput: [65.1]
   - name: Chromium version is correct
     command: chromium
     args: [--version]

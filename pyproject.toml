@@ -9,7 +9,7 @@ license = "Apache License 2.0"
 readme = "README.md"
 requires-python=">=3.13"
 dependencies = [
-    "weasyprint==65.0",
+    "weasyprint==65.1",
     "defusedxml==0.7.1",
     "fastapi==0.115.12",
     "uvicorn==0.34.2"

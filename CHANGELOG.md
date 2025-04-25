@@ -1,5 +1,13 @@
 # Changelog
 
+## [65.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v65.0.1...v65.1.0) (2025-04-25)
+
+
+### Features
+
+* **deps:** update dependency weasyprint to v65.1 ([#142](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/142)) ([de48bee](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/de48beee44e7e20d709b6231f68050f89b9a1ade))
+* use fastapi instead of flask ([#134](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/134)) ([c30471d](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/c30471ddab556cc4f312f5c506d32f528c055dbd))
+
 ## [65.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v65.0.0...v65.0.1) (2025-04-03)
 
 

@@ -1,6 +1,6 @@
 [project]
 name = "weasyprint-service"
-version = "0.0.0"  # the version is controll by the pipeline
+version = "0.0.0"  # the version is controlled by the pipeline
 description = "Service for https://github.com/Kozea/WeasyPrint"
 authors = [
     {name = "SBB Polarion Team", email = "polarion-opensource@sbb.ch"},

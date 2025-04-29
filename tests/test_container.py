@@ -32,7 +32,13 @@ def weasyprint_container():
     """
     client = docker.from_env()
     image, _ = client.images.build(path=".", tag="weasyprint_service", buildargs={"APP_IMAGE_VERSION": "1.0.0"})
-    container = client.containers.run(image=image, detach=True, name="weasyprint_service", ports={"9080": 9080})
+    container = client.containers.run(
+        image=image,
+        detach=True,
+        name="weasyprint_service",
+        ports={"9080": 9080},
+        init=True,  # Enable Docker's init process (equivalent to tini)
+    )
     time.sleep(5)
 
     yield container

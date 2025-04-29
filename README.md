@@ -38,6 +38,7 @@ The service will be accessible on port 9080.
 ### Logging Configuration
 
 The service includes a robust logging system with the following features:
+
 - Log files are stored in `/opt/weasyprint/logs` directory
 - Log level can be configured via `LOG_LEVEL` environment variable (default: INFO)
 - Log format: `timestamp - logger name - log level - message`
@@ -118,17 +119,37 @@ To stop the running container, execute:
 
 #### container-structure-test
 
+The container-structure-test tool is used to verify that the Docker image meets expected standards and specifications. It validates the container structure, ensuring proper file paths, permissions, and commands are available, which helps maintain consistency and reliability of the containerized application.
+
+Before running the following command, ensure that the `container-structure-test` tool is installed. You can find installation instructions in the [official documentation](https://github.com/GoogleContainerTools/container-structure-test).
+
 ```bash
 container-structure-test test --image weasyprint-service:0.0.0 --config ./tests/container/container-structure-test.yaml
 ```
 
+#### grype
+
+Grype is used for vulnerability scanning of the Docker image. This tool helps identify known security vulnerabilities in the dependencies and packages included in the container, ensuring the deployed application meets security standards and doesn't contain known exploitable components.
+
+To scan the Docker image for vulnerabilities, you can use Grype. First, ensure that Grype is installed by following the [installation instructions](https://github.com/anchore/grype#installation).
+
+Then run the vulnerability scan on your image:
+
+```bash
+grype weasyprint-service:0.0.0
+```
+
 #### tox
+
+Tox automates testing in different Python environments, ensuring that the application works correctly across various Python versions and configurations. It helps maintain compatibility and provides a standardized way to run test suites, formatting checks, and other quality assurance processes.
 
 ```bash
 poetry run tox
 ```
 
 #### pytest (for debugging)
+
+Pytest is used for unit and integration testing of the application code. These tests verify that individual components and the entire application function correctly according to specifications. Running pytest during development helps catch bugs early and ensures code quality.
 
 ```bash
 # all tests
@@ -141,6 +162,8 @@ poetry run pytest tests/test_svg_utils.py -v
 ```
 
 #### pre-commit
+
+Pre-commit hooks run automated checks on code before it's committed to the repository. This ensures consistent code style, formatting, and quality across the project. It helps catch common issues early in the development process, maintaining high code standards and reducing the need for style-related revisions during code reviews.
 
 ```bash
 poetry run pre-commit run --all

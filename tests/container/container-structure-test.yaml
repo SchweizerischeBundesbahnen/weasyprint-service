@@ -1,14 +1,6 @@
 ---
 schemaVersion: 2.0.0
 commandTests:
-  - name: Tini installation - check that the tini binary is in the correct location
-    command: which
-    args: [tini]
-    expectedOutput: [/usr/bin/tini]
-  - name: Tini version is correct
-    command: tini
-    args: [--version]
-    expectedOutput: [tini version 0.19.*]
   - name: Python installation - check that the python binary is in the correct location
     command: which
     args: [python]

@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    init: true  # Enable init process (equivalent to using tini)
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}  # Can be DEBUG, INFO, WARNING, ERROR, CRITICAL
       - PYTHONUNBUFFERED=1  # Ensures Python output is sent straight to container logs

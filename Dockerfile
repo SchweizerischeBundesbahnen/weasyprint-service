@@ -5,6 +5,7 @@ ARG APP_IMAGE_VERSION=0.0.0
 
 # hadolint ignore=DL3008
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
     chromium \
     dbus \

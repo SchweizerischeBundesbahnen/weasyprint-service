@@ -1,6 +1,6 @@
 # WeasyPrint Service
 
-A Dockerized service providing a REST API interface to leverage WeasyPrint's functionality for generating PDF documents
+A dockerized service providing a REST API interface to leverage WeasyPrint's functionality for generating PDF documents
 from HTML and CSS.
 
 ## Features
@@ -25,12 +25,15 @@ To start the WeasyPrint service container, execute:
 
 ```bash
   docker run --detach \
+    --init \
     --publish 9080:9080 \
     --name weasyprint-service \
     ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
 The service will be accessible on port 9080.
+
+> **Important**: The `--init` flag enables Docker's built-in init process which handles signal forwarding and zombie process reaping. This is required for proper operation of the service.
 
 ### Logging Configuration
 
@@ -52,6 +55,7 @@ docker run --detach \
 ```
 
 Available log levels:
+
 - DEBUG: Detailed information for debugging
 - INFO: General operational information (default)
 - WARNING: Warning messages for potential issues
@@ -65,6 +69,16 @@ To extend or customize the service, use it as a base image in the Dockerfile:
 ```Dockerfile
 FROM ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
+
+### Using Docker Compose
+
+To run the service using Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+The Docker Compose configuration includes the `init: true` parameter which enables proper process management for the container.
 
 ## Development
 
@@ -103,26 +117,31 @@ To stop the running container, execute:
 ### Testing
 
 #### container-structure-test
+
 ```bash
-docker build -t weasyprint-service:local .
+container-structure-test test --image weasyprint-service:0.0.0 --config ./tests/container/container-structure-test.yaml
 ```
-```bash
-container-structure-test test --image weasyprint-service:local --config ./tests/container/container-structure-test.yaml
-```
+
 #### tox
+
 ```bash
 poetry run tox
 ```
+
 #### pytest (for debugging)
+
 ```bash
 # all tests
 poetry run pytest
 ```
+
 ```bash
 # a specific test
 poetry run pytest tests/test_svg_utils.py -v
 ```
+
 #### pre-commit
+
 ```bash
 poetry run pre-commit run --all
 ```

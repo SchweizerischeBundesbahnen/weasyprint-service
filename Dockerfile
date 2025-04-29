@@ -7,7 +7,6 @@ ARG APP_IMAGE_VERSION=0.0.0
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
-    tini \
     chromium \
     dbus \
     upower \
@@ -46,4 +45,4 @@ RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && poetry in
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh
 
-ENTRYPOINT [ "/usr/bin/tini", "--", "./entrypoint.sh" ]
+ENTRYPOINT [ "./entrypoint.sh" ]

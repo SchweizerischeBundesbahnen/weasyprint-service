@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Use environment variables with defaults already set in Dockerfile
 BUILD_TIMESTAMP="$(cat /opt/weasyprint/.build_timestamp)"
 export WEASYPRINT_SERVICE_BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 CHROMIUM_VERSION="$(${CHROMIUM_EXECUTABLE_PATH} --version | awk '{print $2}')"
@@ -21,7 +22,13 @@ if ! pgrep -x 'dbus-daemon' > /dev/null; then
     export DBUS_SESSION_BUS_ADDRESS=${BUS_ADDRESS};
 fi
 
-poetry run python -m app.weasyprint_service_application &
+echo "Starting WeasyPrint service on port $PORT with log level $LOG_LEVEL"
+
+# Convert log level to lowercase for uvicorn
+LOG_LEVEL_LOWER=$(echo "$LOG_LEVEL" | tr '[:upper:]' '[:lower:]')
+
+# Execute the service application with uvicorn for FastAPI
+exec uvicorn app.weasyprint_controller:app --host 0.0.0.0 --port $PORT --log-level $LOG_LEVEL_LOWER &
 
 wait -n
 

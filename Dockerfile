@@ -9,14 +9,12 @@ RUN apt-get update && \
     apt-get --yes --no-install-recommends install \
     chromium \
     dbus \
-    upower \
     fonts-dejavu \
     fonts-liberation \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     python3-brotli \
-    python3-cffi \
-    vim && \
+    python3-cffi && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*

@@ -35,6 +35,20 @@ The service will be accessible on port 9080.
 
 > **Important**: The `--init` flag enables Docker's built-in init process which handles signal forwarding and zombie process reaping. This is required for proper operation of the service.
 
+### Device Scaling
+
+Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.
+
+To customize the device scaling when running the container, use:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env DEVICE_SCALE_FACTOR=2.0 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
 ### Logging Configuration
 
 The service includes a robust logging system with the following features:

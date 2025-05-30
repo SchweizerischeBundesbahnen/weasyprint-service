@@ -449,6 +449,7 @@ def test_convert_to_px():
     assert convert_to_px("100", "vh") is None
     assert convert_to_px("100", "vw") is None
     assert convert_to_px("100", "%") is None
+    assert convert_to_px("27.595", "ex") == 221
 
 
 @setup_env_variables
@@ -463,6 +464,7 @@ def test_px_conversion_ratio():
     assert get_px_conversion_ratio("cm") == 96 / 2.54
     assert get_px_conversion_ratio("mm") == 96 / 2.54 * 10
     assert get_px_conversion_ratio("pc") == 16
+    assert get_px_conversion_ratio("ex") == 8
     assert get_px_conversion_ratio("abcde") == 1
     assert get_px_conversion_ratio(None) == 1
 

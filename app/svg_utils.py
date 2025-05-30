@@ -307,7 +307,7 @@ def calculate_dimension(value: str | None, unit: str | None, vb_dimension: float
 
     Args:
         value: Numeric value as string.
-        unit: Unit of measurement (px, pt, in, cm, mm, pc, vw, vh, %).
+        unit: Unit of measurement (px, pt, in, cm, mm, pc, ex, vw, vh, %).
         vb_dimension: ViewBox dimension for relative unit conversion.
 
     Returns:
@@ -507,7 +507,7 @@ def convert_to_px(value: str | None, unit: str | None) -> int | None:
 
     Args:
         value: Numeric value as string.
-        unit: Unit of measurement (px, pt, in, cm, mm, pc).
+        unit: Unit of measurement (px, pt, in, cm, mm, pc, ex).
 
     Returns:
         int | None: Value in pixels, or None if conversion not possible.
@@ -535,4 +535,4 @@ def get_px_conversion_ratio(unit: str | None) -> float:
     Returns:
         float: Conversion ratio to multiply by to get pixels.
     """
-    return {"px": 1.0, "pt": 4 / 3, "in": 96.0, "cm": 96 / 2.54, "mm": 96 / 2.54 * 10, "pc": 16.0}.get(unit, 1.0) if unit else 1.0
+    return {"px": 1.0, "pt": 4 / 3, "in": 96.0, "cm": 96 / 2.54, "mm": 96 / 2.54 * 10, "pc": 16.0, "ex": 8.0}.get(unit, 1.0) if unit else 1.0

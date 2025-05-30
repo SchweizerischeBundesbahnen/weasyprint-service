@@ -28,6 +28,10 @@ SPECIAL_UNITS = ("vw", "vh", "%")  # Special units that require viewBox context
 IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
 NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
+try:
+    DEVICE_SCALE_FACTOR = float(os.getenv("DEVICE_SCALE_FACTOR", "1.0"))
+except ValueError:
+    DEVICE_SCALE_FACTOR = 1.0
 CHROMIUM_HEIGHT_ADJUSTMENT = 100
 
 # Logging setup
@@ -141,7 +145,7 @@ def replace_svg_with_png(svg: Element) -> tuple[str, str | bytes]:
     if not convert_svg_to_png(width, height + CHROMIUM_HEIGHT_ADJUSTMENT, png_filepath, svg_filepath):
         return without_changes(svg)
 
-    if not crop_png(png_filepath, CHROMIUM_HEIGHT_ADJUSTMENT):
+    if not crop_png(png_filepath, int(CHROMIUM_HEIGHT_ADJUSTMENT * DEVICE_SCALE_FACTOR)):
         return without_changes(svg)
 
     png_content = read_and_cleanup_png(png_filepath)
@@ -478,7 +482,7 @@ def create_chromium_command(width: int, height: int, png_filepath: Path, svg_fil
         "--disable-dev-shm-usage",
         "--default-background-color=00000000",
         "--hide-scrollbars",
-        "--force-device-scale-factor=1",
+        f"--force-device-scale-factor={DEVICE_SCALE_FACTOR}",
         "--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb",
         f"--screenshot={png_filepath}",
         f"--window-size={width},{height}",
@@ -535,4 +539,4 @@ def get_px_conversion_ratio(unit: str | None) -> float:
     Returns:
         float: Conversion ratio to multiply by to get pixels.
     """
-    return {"px": 1.0, "pt": 4 / 3, "in": 96.0, "cm": 96 / 2.54, "mm": 96 / 2.54 * 10, "pc": 16.0, "ex": 8.0}.get(unit, 1.0) if unit else 1.0
+    return {"px": 1.0, "pt": 4 / 3, "in": 96.0, "cm": 96 / 2.54, "mm": 96 / 2.54 * 10, "pc": 16.0, "ex": 8.0}.get(unit, 1.0) * DEVICE_SCALE_FACTOR if unit else 1.0

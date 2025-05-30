@@ -29,7 +29,7 @@ IMAGE_PNG = "image/png"
 IMAGE_SVG = "image/svg+xml"
 NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
 try:
-    DEVICE_SCALE_FACTOR = float(os.getenv("DEVICE_SCALE_FACTOR", "1"))
+    DEVICE_SCALE_FACTOR = float(os.getenv("DEVICE_SCALE_FACTOR", "1.0"))
 except ValueError:
     DEVICE_SCALE_FACTOR = 1.0
 CHROMIUM_HEIGHT_ADJUSTMENT = 100

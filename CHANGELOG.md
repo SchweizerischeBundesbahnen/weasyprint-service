@@ -1,5 +1,13 @@
 # Changelog
 
+## [65.1.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v65.1.0...v65.1.1) (2025-05-31)
+
+
+### Bug Fixes
+
+* support 'ex' units ([#153](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/153)) ([dd96fd4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/dd96fd4ba9418f5313ea10ca7dfef47d1523d757)), closes [#152](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/152)
+* support scaling for retina devices ([#155](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/155)) ([b075537](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b0755378fac9592089ae6b7c61ad26a68ad63071)), closes [#151](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/151)
+
 ## [65.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v65.0.1...v65.1.0) (2025-04-25)
 
 

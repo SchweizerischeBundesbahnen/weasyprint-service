@@ -28,7 +28,7 @@ types-defusedxml = "0.7.0.20250516"
 tox = "4.26.0"
 docker = "7.1.0"
 # for debug source code for pytest
-pytest = "8.3.5"
+pytest = "8.4.0"
 pymupdf = "1.26.0"
 pypdf = "5.6.0"
 httpx = "0.28.1"

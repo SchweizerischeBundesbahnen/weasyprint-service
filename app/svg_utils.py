@@ -61,7 +61,10 @@ def process_svg(html: str) -> str:
           which would be less efficient and more error-prone.
     """
     pattern = re.compile(
-         r'<img(?P<intermediate>(?:\s+[a-zA-Z-]+="[^"]*")*?)\s+src="data:(?P<type>image/svg\+xml);base64,(?P<base64>[A-Za-z0-9+/=]+)"'
+        r'<img'
+        r'(?P<intermediate>(?:\s+[a-zA-Z-]+="[^"]*")*?)'
+        r'\s+src="data:(?P<type>image/(?:png|jpeg|svg\+xml));base64,'
+        r'(?P<base64>[A-Za-z0-9+/=]+)"'
     )
     return re.sub(pattern, replace_img_base64, html)
 

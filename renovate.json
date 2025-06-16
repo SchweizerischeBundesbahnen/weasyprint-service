@@ -8,6 +8,9 @@
       "matchManagers": [
         "poetry"
       ],
+      "postUpdateOptions": [
+        "poetry-lock"
+      ],
       "matchDatasources": [
         "pypi"
       ],
@@ -22,6 +25,9 @@
     {
       "matchManagers": [
         "poetry"
+      ],
+      "postUpdateOptions": [
+        "poetry-lock"
       ],
       "matchDatasources": [
         "pypi"

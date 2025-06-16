@@ -1734,8 +1734,4 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13"
-<<<<<<< renovate/uvicorn-0.x
-content-hash = "060b420dfb2e145211563e8978df45a8c92d1b60aef250c537c6056c1de2c1a7"
-=======
-content-hash = "fdc83c15184f436c5556529dbb823e662c41a6db96ae84960e9f717f07a66be5"
->>>>>>> main
+content-hash = "dd8342aa994427fdef35d66d1f27e6d743e83c3adb1a458d9ccecdd54b5661d4"

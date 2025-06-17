@@ -1,11 +1,11 @@
 # WeasyPrint Service
 
-A dockerized service providing a REST API interface to leverage WeasyPrint's functionality for generating PDF documents
+A dockerized service providing a REST API interface to leverage [WeasyPrint](https://github.com/Kozea/WeasyPrint)'s functionality for generating PDF documents
 from HTML and CSS.
 
 ## Features
 
-- Simple REST API to access WeasyPrint
+- Simple REST API to access [WeasyPrint](https://github.com/Kozea/WeasyPrint)
 - Compatible with amd64 and arm64 architectures
 - Easily deployable via Docker
 

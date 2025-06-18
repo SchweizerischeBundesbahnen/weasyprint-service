@@ -1,3 +1,4 @@
+import concurrent.futures
 import logging
 import os
 import time
@@ -123,8 +124,6 @@ def test_multiple_log_messages(log_dir):
 
 def test_concurrent_logging(log_dir):
     """Test that logging works correctly with concurrent writes."""
-    import concurrent.futures
-
     log_file = setup_logging()
     message_count = 100
 

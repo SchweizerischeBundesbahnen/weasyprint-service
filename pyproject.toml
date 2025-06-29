@@ -31,7 +31,7 @@ docker = "7.1.0"
 # for debug source code for pytest
 pytest = "8.4.1"
 pymupdf = "1.26.1"
-pypdf = "5.6.1"
+pypdf = "5.7.0"
 httpx = "0.28.1"
 
 

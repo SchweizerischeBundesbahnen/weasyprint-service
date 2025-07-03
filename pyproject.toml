@@ -27,13 +27,12 @@ types-defusedxml = "0.7.0.20250516"
 
 [tool.poetry.group.test.dependencies]
 tox = "4.27.0"
+# for debug source code for pytest --> see tox.ini section [testenv]
 docker = "7.1.0"
-# for debug source code for pytest
 pytest = "8.4.1"
 pymupdf = "1.26.3"
 pypdf = "5.7.0"
 httpx = "0.28.1"
-
 
 [build-system]
 requires = ["poetry-core"]
@@ -43,6 +42,9 @@ build-backend = "poetry.core.masonry.api"
 line-length = 240
 fix = true
 show-fixes = true
+exclude = [
+    "tests/*"  # Exclude all test files from linting
+]
 
 [tool.ruff.lint]
 extend-select = [

@@ -8,6 +8,7 @@ authors = [
 license = "Apache License 2.0"
 readme = "README.md"
 requires-python = ">=3.13"
+dynamic = ["dependencies"]
 # Dependencies moved back to [tool.poetry.dependencies] for Renovate compatibility
 # See: https://github.com/renovatebot/renovate/issues/33509
 # TODO: Migrate back to [project.dependencies] when Renovate adds Poetry v2 support
@@ -25,6 +26,7 @@ packages = [{include = "app"}]
 # this duplication and legacy format must be kept until Renovate support is added for [project.dependencies] for poetry-lock updates
 # for more information check comments above
 [tool.poetry.dependencies]
+python = ">=3.13"
 weasyprint = "65.1"
 defusedxml = "0.7.1"
 fastapi = "0.115.12"
@@ -45,6 +47,7 @@ pytest = "8.4.1"
 pymupdf = "1.26.3"
 pypdf = "5.7.0"
 httpx = "0.28.1"
+coverage = "7.9.2"
 
 [build-system]
 requires = ["poetry-core"]

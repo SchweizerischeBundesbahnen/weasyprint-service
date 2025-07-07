@@ -30,7 +30,7 @@ python = ">=3.13"
 weasyprint = "65.1"
 defusedxml = "0.7.1"
 fastapi = "0.115.14"
-uvicorn = "0.34.3"
+uvicorn = "0.35.0"
 requests = "2.32.4"
 
 [tool.poetry.group.dev.dependencies]

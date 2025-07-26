@@ -40,7 +40,7 @@ mypy = "1.17.0"
 types-defusedxml = "0.7.0.20250708"
 
 [tool.poetry.group.test.dependencies]
-tox = "4.28.2"
+tox = "4.28.3"
 # for debug source code for pytest --> see tox.ini section [testenv]
 docker = "7.1.0"
 pytest = "8.4.1"

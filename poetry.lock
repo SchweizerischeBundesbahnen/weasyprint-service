@@ -1323,14 +1323,14 @@ files = [
 
 [[package]]
 name = "pypdf"
-version = "5.8.0"
+version = "5.9.0"
 description = "A pure-python PDF library capable of splitting, merging, cropping, and transforming PDF files"
 optional = false
 python-versions = ">=3.8"
 groups = ["test"]
 files = [
-    {file = "pypdf-5.8.0-py3-none-any.whl", hash = "sha256:bfe861285cd2f79cceecefde2d46901e4ee992a9f4b42c56548c4a6e9236a0d1"},
-    {file = "pypdf-5.8.0.tar.gz", hash = "sha256:f8332f80606913e6f0ce65488a870833c9d99ccdb988c17bb6c166f7c8e140cb"},
+    {file = "pypdf-5.9.0-py3-none-any.whl", hash = "sha256:be10a4c54202f46d9daceaa8788be07aa8cd5ea8c25c529c50dd509206382c35"},
+    {file = "pypdf-5.9.0.tar.gz", hash = "sha256:30f67a614d558e495e1fbb157ba58c1de91ffc1718f5e0dfeb82a029233890a1"},
 ]
 
 [package.extras]
@@ -1851,4 +1851,4 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13"
-content-hash = "4f0c8121ad1c9e98614ecd2ee3f83ea117ba12fbb1ff1b3df79de59543d54c84"
+content-hash = "2885b40040686870d3c92b10d424ada617a816c822f3a9d806b6ea38f9942cce"

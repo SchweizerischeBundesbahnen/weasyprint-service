@@ -27,7 +27,7 @@ packages = [{include = "app"}]
 # for more information check comments above
 [tool.poetry.dependencies]
 python = ">=3.13"
-weasyprint = "65.1"
+weasyprint = "66.0"
 defusedxml = "0.7.1"
 fastapi = "0.116.1"
 uvicorn = "0.35.0"

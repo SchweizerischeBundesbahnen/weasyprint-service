@@ -48,7 +48,7 @@ pytest = "8.4.1"
 pymupdf = "1.26.3"
 pypdf = "5.9.0"
 httpx = "0.28.1"
-coverage = "7.10.1"
+coverage = "7.10.2"
 
 [build-system]
 requires = ["poetry-core"]

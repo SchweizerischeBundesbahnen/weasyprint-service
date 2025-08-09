@@ -38,7 +38,7 @@ starlette = "^0.47.2"
 pre-commit = "4.2.0"
 ruff = "0.12.8"
 mypy = "1.17.1"
-types-defusedxml = "0.7.0.20250708"
+types-defusedxml = "0.7.0.20250809"
 
 [tool.poetry.group.test.dependencies]
 tox = "4.28.4"

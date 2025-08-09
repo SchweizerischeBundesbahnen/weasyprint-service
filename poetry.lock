@@ -1637,14 +1637,14 @@ virtualenv = ">=20.31.2"
 
 [[package]]
 name = "types-defusedxml"
-version = "0.7.0.20250708"
+version = "0.7.0.20250809"
 description = "Typing stubs for defusedxml"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "types_defusedxml-0.7.0.20250708-py3-none-any.whl", hash = "sha256:cc426cbc31c61a0f1b1c2ad9b9ef9ef846645f28fd708cd7727a6353b5c52e54"},
-    {file = "types_defusedxml-0.7.0.20250708.tar.gz", hash = "sha256:7b785780cc11c18a1af086308bf94bf53a0907943a1d145dbe00189bef323cb8"},
+    {file = "types_defusedxml-0.7.0.20250809-py3-none-any.whl", hash = "sha256:ce64758390fb2b6fc3ccb594787b278ff361a0ecc18539d363dae1a4f46e7176"},
+    {file = "types_defusedxml-0.7.0.20250809.tar.gz", hash = "sha256:4c6d2eb3a6fe3bee16737c1470f0407f166621214d1cd641e8a25979fe9f14b5"},
 ]
 
 [[package]]
@@ -1857,4 +1857,4 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13"
-content-hash = "7d0c3eb19d5d56a3d73af79744e4d8f207351ff8dd0a3d4447ec2c1cb9e52976"
+content-hash = "cba499f74ec8f8b9ad6ff881f55c3df3983a66a24b3bfb7f731e009d4a482201"

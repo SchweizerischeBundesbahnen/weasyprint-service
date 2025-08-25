@@ -45,7 +45,7 @@ tox = "4.28.4"
 # for debug source code for pytest --> see tox.ini section [testenv]
 docker = "7.1.0"
 pytest = "8.4.1"
-pymupdf = "1.26.3"
+pymupdf = "1.26.4"
 pypdf = "6.0.0"
 httpx = "0.28.1"
 coverage = "7.10.5"

@@ -11,6 +11,9 @@ RUN apt-get update && \
     dbus \
     fonts-dejavu \
     fonts-liberation \
+    fonts-noto-cjk \
+    fonts-noto-cjk-extra \
+    fonts-noto-color-emoji \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     python3-brotli \

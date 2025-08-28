@@ -1,11 +1,13 @@
 import logging
 import os
 import platform
+from typing import Annotated
 from urllib.parse import unquote
 
 import uvicorn
 import weasyprint  # type: ignore
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Query, Request, Response
+from pydantic import BaseModel
 
 from app import svg_utils  # type: ignore
 from app.schemas import VersionSchema
@@ -27,32 +29,75 @@ async def version() -> dict[str, str | None]:
     }
 
 
+class RenderOptions(BaseModel):
+    encoding: str = "utf-8"
+    media_type: str = "print"
+    presentational_hints: bool = False
+    base_url: str | None = None
+
+
+class OutputOptions(BaseModel):
+    file_name: str = "converted-document.pdf"
+    pdf_variant: str | None = None
+    custom_metadata: bool = False
+
+
+def get_render_options(
+    encoding: str = Query("utf-8"),
+    media_type: str = Query("print"),
+    presentational_hints: bool = Query(False),
+    base_url: str | None = Query(None),
+) -> RenderOptions:
+    return RenderOptions(
+        encoding=encoding,
+        media_type=media_type,
+        presentational_hints=presentational_hints,
+        base_url=base_url,
+    )
+
+
+def get_output_options(
+    file_name: str = Query("converted-document.pdf"),
+    pdf_variant: str | None = Query(None),
+    custom_metadata: bool = Query(False),
+) -> OutputOptions:
+    return OutputOptions(
+        file_name=file_name,
+        pdf_variant=pdf_variant,
+        custom_metadata=custom_metadata,
+    )
+
+
 @app.post(
     "/convert/html",
     responses={400: {"content": {"text/plain": {}}, "description": "Invalid Input"}, 500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"}},
 )
 async def convert_html(
     request: Request,
-    encoding: str = "utf-8",
-    media_type: str = "print",
-    file_name: str = "converted-document.pdf",
-    pdf_variant: str | None = None,
-    presentational_hints: bool = False,
-    base_url: str | None = None,
+    render: Annotated[RenderOptions, Depends(get_render_options)],
+    output: Annotated[OutputOptions, Depends(get_output_options)],
 ) -> Response:
     """
     Convert HTML to PDF
     """
     try:
-        if base_url:
-            base_url = unquote(base_url, encoding=encoding)
-        html = (await request.body()).decode(encoding)
+        base_url = unquote(render.base_url, encoding=render.encoding) if render.base_url else None
+        html = (await request.body()).decode(render.encoding)
         html = svg_utils.process_svg(html)
-        weasyprint_html = weasyprint.HTML(string=html, base_url=base_url, media_type=media_type, encoding=encoding)
-        output_pdf = weasyprint_html.write_pdf(pdf_variant=pdf_variant, presentational_hints=presentational_hints)
+        weasyprint_html = weasyprint.HTML(
+            string=html,
+            base_url=base_url,
+            media_type=render.media_type,
+            encoding=render.encoding,
+        )
+        output_pdf = weasyprint_html.write_pdf(
+            pdf_variant=output.pdf_variant,
+            presentational_hints=render.presentational_hints,
+            custom_metadata=output.custom_metadata,
+        )
 
         response = Response(output_pdf, media_type="application/pdf", status_code=200)
-        response.headers.append("Content-Disposition", "attachment; filename=" + file_name)
+        response.headers.append("Content-Disposition", "attachment; filename=" + output.file_name)
         response.headers.append("Python-Version", platform.python_version())
         response.headers.append("Weasyprint-Version", weasyprint.__version__)
         response.headers.append("Weasyprint-Service-Version", os.environ.get("WEASYPRINT_SERVICE_VERSION", ""))

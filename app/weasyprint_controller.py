@@ -30,6 +30,16 @@ async def version() -> dict[str, str | None]:
 
 
 class RenderOptions(BaseModel):
+    """
+    Options controlling how WeasyPrint renders the input HTML/CSS before PDF generation.
+
+    Attributes:
+        encoding: Text encoding used to decode the incoming HTML request body.
+        media_type: CSS media type to apply when rendering ("print" or "screen" are typical).
+        presentational_hints: Whether to honor presentational HTML attributes as CSS hints.
+        base_url: Base URL used to resolve relative links (e.g., stylesheets, images).
+    """
+
     encoding: str = "utf-8"
     media_type: str = "print"
     presentational_hints: bool = False
@@ -37,6 +47,15 @@ class RenderOptions(BaseModel):
 
 
 class OutputOptions(BaseModel):
+    """
+    Options controlling characteristics of the produced PDF file.
+
+    Attributes:
+        file_name: The filename suggested in the Content-Disposition header.
+        pdf_variant: PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b'); None for default.
+        custom_metadata: Whether to include custom metadata in the generated PDF.
+    """
+
     file_name: str = "converted-document.pdf"
     pdf_variant: str | None = None
     custom_metadata: bool = False

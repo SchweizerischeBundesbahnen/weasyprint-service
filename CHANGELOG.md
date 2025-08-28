@@ -1,5 +1,14 @@
 # Changelog
 
+## [66.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.0...v66.0.1) (2025-08-27)
+
+
+### Bug Fixes
+
+* add Noto CJK and emoji fonts to Dockerfile ([#191](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/191)) ([46c6445](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/46c6445913dff58c8e964a791c97467fa5d9185c)), closes [#190](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/190)
+* **deps:** update dependency requests to v2.32.5 ([d69f2c5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d69f2c5b57023eb4b04d60419f0dd93182d7f6ef))
+* **deps:** update dependency starlette to v0.47.3 ([faca98d](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/faca98d6f84a4a452edbbd25cd1c4eb070d3ae60))
+
 ## [66.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v65.1.1...v66.0.0) (2025-07-29)
 
 

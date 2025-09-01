@@ -67,7 +67,7 @@ async def save_uploads_to_tmpdir(files: Sequence[UploadFile] | None, tmpdir: Pat
     for f in files:
         # read content
         content = await f.read()
-        name = Path(f.filename).name if f.filename else "attachment.bin"
+        name = Path(f.filename).name if f.filename and f.filename.strip() else "attachment.bin"
 
         path = tmpdir.joinpath(name)
         i = 1

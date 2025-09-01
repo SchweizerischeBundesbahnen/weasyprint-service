@@ -19,10 +19,23 @@ from app import (
 )
 from app.schemas import VersionSchema
 
-app = FastAPI(openapi_url="/static/openapi.json", docs_url="/api/docs")
+app = FastAPI(
+    title="WeasyPrint Service API",
+    version="1.0.0",
+    openapi_url="/static/openapi.json",
+    docs_url="/api/docs",
+    openapi_version="3.1.0",
+)
 
 
-@app.get("/version", response_model=VersionSchema)
+@app.get(
+    "/version",
+    response_model=VersionSchema,
+    summary="Service version information",
+    description="Returns versions of Python, WeasyPrint, the service itself, build timestamp, and Chromium.",
+    operation_id="getVersion",
+    tags=["meta"],
+)
 async def version() -> dict[str, str | None]:
     """
     Get version information
@@ -69,10 +82,26 @@ class OutputOptions(BaseModel):
 
 
 def get_render_options(
-    encoding: str = Query("utf-8"),
-    media_type: str = Query("print"),
-    presentational_hints: bool = Query(False),
-    base_url: str | None = Query(None),
+    encoding: str = Query(
+        "utf-8",
+        title="Encoding",
+        description="Text encoding used to decode the incoming HTML body (e.g., utf-8).",
+    ),
+    media_type: str = Query(
+        "print",
+        title="CSS Media Type",
+        description="CSS media type to apply when rendering (e.g., 'print' or 'screen').",
+    ),
+    presentational_hints: bool = Query(
+        False,
+        title="Presentational Hints",
+        description="Honor presentational HTML attributes as CSS hints.",
+    ),
+    base_url: str | None = Query(
+        None,
+        title="Base URL",
+        description="Base URL used to resolve relative links (stylesheets, images).",
+    ),
 ) -> RenderOptions:
     return RenderOptions(
         encoding=encoding,
@@ -83,9 +112,21 @@ def get_render_options(
 
 
 def get_output_options(
-    file_name: str = Query("converted-document.pdf"),
-    pdf_variant: str | None = Query(None),
-    custom_metadata: bool = Query(False),
+    file_name: str = Query(
+        "converted-document.pdf",
+        title="Output File Name",
+        description="Filename suggested in the Content-Disposition header.",
+    ),
+    pdf_variant: str | None = Query(
+        None,
+        title="PDF Variant",
+        description="PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b').",
+    ),
+    custom_metadata: bool = Query(
+        False,
+        title="Custom Metadata",
+        description="Include custom metadata in the generated PDF.",
+    ),
 ) -> OutputOptions:
     return OutputOptions(
         file_name=file_name,
@@ -97,6 +138,10 @@ def get_output_options(
 @app.post(
     "/convert/html",
     responses={400: {"content": {"text/plain": {}}, "description": "Invalid Input"}, 500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"}},
+    summary="Convert HTML to PDF",
+    description="Accepts raw HTML in the request body and returns a generated PDF.",
+    operation_id="convert_html_post",
+    tags=["convert"],
 )
 async def convert_html(
     request: Request,
@@ -104,7 +149,7 @@ async def convert_html(
     output: Annotated[OutputOptions, Depends(get_output_options)],
 ) -> Response:
     """
-    Convert HTML to PDF
+    Convert HTML content from the request body to a PDF document.
     """
     raw: bytes = await request.body()
     encoding: str = await __get_encoding(request, render.encoding)
@@ -151,12 +196,16 @@ async def __get_encoding(request: Request, encoding: str | None) -> str:
         400: {"content": {"text/plain": {}}, "description": "Invalid Input"},
         500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"},
     },
+    summary="Convert HTML to PDF with attachments",
+    description="Accepts HTML as a form field and optional files to be embedded as PDF attachments.",
+    operation_id="convert_html_with_attachments_post",
+    tags=["convert"],
 )
 async def convert_html_with_attachments(
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
-    html: str = Form(...),
-    files: Annotated[list[UploadFile] | None, File()] = None,
+    html: str = Form(..., title="HTML", description="HTML content to render to PDF."),
+    files: Annotated[list[UploadFile] | None, File(title="Attachments", description="Files to embed as PDF attachments.")] = None,
 ) -> Response:
     """
     Convert HTML to PDF and embed provided files as PDF attachments.

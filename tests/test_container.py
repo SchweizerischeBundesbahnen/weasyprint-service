@@ -1,8 +1,10 @@
+import contextlib
 import io
 import logging
 import time
+from collections import Counter
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Iterator
 
 import docker
 import pymupdf
@@ -154,31 +156,62 @@ def test_convert_complex_html_with_embedded_attachments(test_parameters: TestPar
     assert "Test Specification" in page
 
     # Validate attachments
-    attachment_names: set[str] = set()
-    # Prefer high-level API if available in pypdf 6
+    # Use high-level API if available in pypdf 6
     names = getattr(pdf_reader, "attachments", None)
-    if isinstance(names, dict):
-        attachment_names = set(names.keys())
-    else:
-        # Fallback to reading from the embedded files name tree
-        try:
-            root = pdf_reader.trailer["/Root"]
-            if "/Names" in root and "/EmbeddedFiles" in root["/Names"]:
-                ef_names = root["/Names"]["/EmbeddedFiles"]["/Names"]
-                # ef_names is an array: [name1, dict1, name2, dict2, ...]
-                for i in range(0, len(ef_names), 2):
-                    name_obj = ef_names[i]
-                    if hasattr(name_obj, "get_object"):
-                        name_obj = name_obj.get_object()
-                    if isinstance(name_obj, (str, bytes)):
-                        name = name_obj.decode("utf-8") if isinstance(name_obj, bytes) else name_obj
-                        attachment_names.add(name)
-        except Exception:
-            # If anything goes wrong, keep set empty to fail assertion below for visibility
-            pass
+    attachment_names = set(names.keys())
 
     assert file1_path.name in attachment_names
     assert file2_path.name in attachment_names
+
+
+def test_convert_html_with_embedded_attachments(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/html-with-attachments.html")
+
+    file1_path = Path("tests/test-data/html-with-attachments/attachment1.pdf")
+    file2_path = Path("tests/test-data/html-with-attachments/attachment2.pdf")
+    file3_path = Path("tests/test-data/html-with-attachments/attachment3.pdf")
+
+    file1_bytes = file1_path.read_bytes()
+    file2_bytes = file2_path.read_bytes()
+    file3_bytes = file3_path.read_bytes()
+
+    files = [
+        ("files", (file1_path.name, file1_bytes, "application/pdf")),
+        ("files", (file2_path.name, file2_bytes, "application/pdf")),
+        ("files", (file3_path.name, file3_bytes, "application/pdf")),
+    ]
+
+    response = __call_convert_html_with_attachments(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        files=files,
+    )
+
+    assert response.status_code == 200
+    flush_tmp_file("test_convert_html_with_embedded_attachments.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+
+    # Basic PDF validation
+    assert len(pdf_reader.pages) == 1
+    page = pdf_reader.pages[0].extract_text()
+    assert "Lorem ipsum dolor sit amet, consectetur adipiscing elit." in page
+
+    # Validate attachments
+    attachments = __extract_all_attachments(pdf_reader)
+
+    expected = [
+        (file1_path.name, 'NamesTree'),
+        (file2_path.name, 'NamesTree'),
+        (file3_path.name, 'NamesTree'),
+        (file1_path.name, 'Annot:p0'),
+        (file2_path.name, 'Annot:p0'),
+        (file1_path.name, 'Annot:p0'),
+    ]
+    assert Counter(attachments) == Counter(expected)
 
 
 def test_convert_svg(test_parameters: TestParameters) -> None:
@@ -295,3 +328,75 @@ def flush_tmp_file(file_name: str, file_bytes: bytes, flush_tmp_file_enabled: bo
     if flush_tmp_file_enabled:
         with Path(file_name).open("wb") as f:
             f.write(file_bytes)
+
+
+def __extract_all_attachments(reader: PyPDF.PdfReader):
+    DictObj = PyPDF.generic.DictionaryObject
+    IndObj  = PyPDF.generic.IndirectObject
+    ArrObj  = PyPDF.generic.ArrayObject
+
+    def _as_obj(x):
+        return x.get_object() if isinstance(x, IndObj) else x
+
+    def _yield_filespec(fs_obj, name_hint: str, source: str) -> Iterator[tuple[str, str]]:
+        fs = _as_obj(fs_obj)
+        if not isinstance(fs, DictObj):
+            return
+        name = fs.get("/UF") or fs.get("/F") or name_hint or "unnamed"
+        yield (str(name), source)
+
+    def _walk_name_tree(node, source: str):
+        node = _as_obj(node)
+        if not isinstance(node, DictObj):
+            return
+        names = node.get("/Names")
+        if isinstance(names, ArrObj):
+            for i in range(0, len(names), 2):
+                name = names[i]
+                fs   = names[i + 1]
+                yield from _yield_filespec(fs, str(name), source)
+        kids = node.get("/Kids")
+        if isinstance(kids, ArrObj):
+            for kid in kids:
+                yield from _walk_name_tree(kid, source)
+
+    def _iter_af(holder, source: str):
+        holder = _as_obj(holder)
+        if not isinstance(holder, DictObj):
+            return
+        af = holder.get("/AF")
+        if af is None:
+            return
+        items = af if isinstance(af, ArrObj) else [af]
+        for item in items:
+            yield from _yield_filespec(item, None, source)
+
+    out: list[tuple[str, str]] = []
+    catalog = reader.trailer["/Root"]
+
+    # 1) NameTree
+    with contextlib.suppress(Exception):
+        names = catalog.get("/Names")
+        if isinstance(names, DictObj):
+            embedded = names.get("/EmbeddedFiles")
+            if embedded is not None:
+                out.extend(_walk_name_tree(embedded, "NamesTree"))
+
+    # 2) AF of catalog
+    out.extend(_iter_af(catalog, "AF:Catalog"))
+
+    # 3) Pages
+    for page_idx, page in enumerate(reader.pages):
+        p = _as_obj(page)
+        annots = p.get("/Annots")
+        if isinstance(annots, ArrObj):
+            for ann in annots:
+                a = _as_obj(ann)
+                if isinstance(a, DictObj) and a.get("/Subtype") == "/FileAttachment":
+                    fs = a.get("/FS")
+                    if fs is not None:
+                        out.extend(_yield_filespec(fs, None, f"Annot:p{page_idx}"))
+                out.extend(_iter_af(a, f"AF:Annot:p{page_idx}"))
+        out.extend(_iter_af(p, f"AF:Page:{page_idx}"))
+
+    return out

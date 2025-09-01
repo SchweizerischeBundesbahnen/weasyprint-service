@@ -75,7 +75,7 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
 def test_convert_simple_html(test_parameters: TestParameters) -> None:
     simple_html = "<html><body>My test body</body</html>"
 
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True)
     assert response.status_code == 200
     flush_tmp_file("test_convert_simple_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
@@ -90,7 +90,7 @@ def test_convert_simple_html(test_parameters: TestParameters) -> None:
 
 def test_convert_complex_html(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/test-specification.html")
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     flush_tmp_file("test_convert_complex_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
@@ -101,9 +101,89 @@ def test_convert_complex_html(test_parameters: TestParameters) -> None:
     assert "Test Specification" in page
 
 
+def test_convert_complex_html_without_embedded_attachments(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/test-specification.html")
+    response = __call_convert_html_with_attachments(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True
+    )
+    assert response.status_code == 200
+    flush_tmp_file("test_convert_complex_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+    total_pages = len(pdf_reader.pages)
+    assert total_pages == 4
+    page = pdf_reader.pages[1].extract_text()
+    assert "Test Specification" in page
+
+
+def test_convert_complex_html_with_embedded_attachments(test_parameters: TestParameters) -> None:
+    # Prepare HTML and two files to embed as attachments
+    html = __load_test_html("tests/test-data/test-specification.html")
+
+    file1_path = Path("tests/test-data/test-svg-ref-image.png")
+    file2_path = Path("tests/test-data/svg-image.html")
+
+    file1_bytes = file1_path.read_bytes()
+    file2_bytes = file2_path.read_bytes()
+
+    files = [
+        ("files", (file1_path.name, file1_bytes, "image/png")),
+        ("files", (file2_path.name, file2_bytes, "text/html")),
+    ]
+
+    response = __call_convert_html_with_attachments(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        files=files,
+    )
+
+    assert response.status_code == 200
+    flush_tmp_file("test_convert_complex_html_with_embedded_attachments.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+
+    # Basic PDF validation
+    assert len(pdf_reader.pages) == 4
+    page = pdf_reader.pages[1].extract_text()
+    assert "Test Specification" in page
+
+    # Validate attachments
+    attachment_names: set[str] = set()
+    # Prefer high-level API if available in pypdf 6
+    names = getattr(pdf_reader, "attachments", None)
+    if isinstance(names, dict):
+        attachment_names = set(names.keys())
+    else:
+        # Fallback to reading from the embedded files name tree
+        try:
+            root = pdf_reader.trailer["/Root"]
+            if "/Names" in root and "/EmbeddedFiles" in root["/Names"]:
+                ef_names = root["/Names"]["/EmbeddedFiles"]["/Names"]
+                # ef_names is an array: [name1, dict1, name2, dict2, ...]
+                for i in range(0, len(ef_names), 2):
+                    name_obj = ef_names[i]
+                    if hasattr(name_obj, "get_object"):
+                        name_obj = name_obj.get_object()
+                    if isinstance(name_obj, (str, bytes)):
+                        name = name_obj.decode("utf-8") if isinstance(name_obj, bytes) else name_obj
+                        attachment_names.add(name)
+        except Exception:
+            # If anything goes wrong, keep set empty to fail assertion below for visibility
+            pass
+
+    assert file1_path.name in attachment_names
+    assert file2_path.name in attachment_names
+
+
 def test_convert_svg(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/svg-image.html")
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     page_png_bytes = pymupdf.open(stream=response.content, filetype="pdf").load_page(0).get_pixmap().tobytes("png")
     flush_tmp_file("test_convert_svg.pdf", response.content, test_parameters.flush_tmp_file_enabled)
@@ -116,13 +196,13 @@ def test_convert_svg(test_parameters: TestParameters) -> None:
 
 def test_convert_incorrect_data(test_parameters: TestParameters) -> None:
     wrong_data = bytes([0xFF])
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=wrong_data, print_error=False)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=wrong_data, print_error=False)
     assert response.status_code == 400
 
 
 def test_svg_has_no_extra_labels(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/test-svg.html")
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     flush_tmp_file("test_svg_has_no_extra_labels.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
@@ -151,7 +231,7 @@ def test_svg_has_no_extra_labels(test_parameters: TestParameters) -> None:
 )
 def test_supported_pdf_variants(variant: str, is_supported: bool, test_parameters: TestParameters) -> None:
     simple_html = f"<html><body>Pdf variant {variant}</body</html>"
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True, parameters=f"pdf_variant={variant}")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True, parameters=f"pdf_variant={variant}")
     if is_supported:
         assert response.status_code == 200
         stream = io.BytesIO(response.content)
@@ -181,8 +261,23 @@ def __load_test_html(file_path: str) -> str:
         html = html_file.read()
         return html
 
+def __call_convert_html_with_attachments(base_url: str, request_session: requests.Session, data, print_error, parameters=None, files: list[tuple[str, tuple[str, bytes, str | None]]] | None = None) -> requests.Response:
+    url = f"{base_url}/convert/html-with-attachments"
+    headers = {"Accept": "*/*"}
+    payload = {"html": data}
+    try:
+        response = request_session.request(method="POST", url=url, headers=headers, data=payload, files=files,
+                                           verify=True, params=parameters)
+        if response.status_code // 100 != 2 and print_error:
+            logging.error(f"Error: Unexpected response: '{response}'")
+            logging.error(f"Error: Response content: '{response.content}'")
+        return response
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error: {e}")
+        raise
 
-def __send_request(base_url: str, request_session: requests.Session, data, print_error, parameters=None) -> requests.Response:
+
+def __call_convert_html(base_url: str, request_session: requests.Session, data, print_error, parameters=None) -> requests.Response:
     url = f"{base_url}/convert/html"
     headers = {"Accept": "*/*", "Content-Type": "text/html"}
     try:

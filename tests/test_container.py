@@ -313,7 +313,7 @@ def test_convert_html_with_custom_metadata(test_parameters: TestParameters) -> N
 
     assert title == "test with custom metadata"
     assert "Jane Doe, John Doe" in author
-    assert "HTML, CSS, PDF, custom, fileds, metadata" in keywords
+    assert "HTML, CSS, PDF, custom, fields, metadata" in keywords
     assert creator == "HTML generator"
     assert producer.startswith("WeasyPrint")
 

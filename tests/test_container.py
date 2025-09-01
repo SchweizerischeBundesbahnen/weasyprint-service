@@ -1,8 +1,10 @@
+import contextlib
 import io
 import logging
 import time
+from collections import Counter
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Iterator
 
 import docker
 import pymupdf
@@ -75,7 +77,7 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
 def test_convert_simple_html(test_parameters: TestParameters) -> None:
     simple_html = "<html><body>My test body</body</html>"
 
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True)
     assert response.status_code == 200
     flush_tmp_file("test_convert_simple_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
@@ -90,7 +92,7 @@ def test_convert_simple_html(test_parameters: TestParameters) -> None:
 
 def test_convert_complex_html(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/test-specification.html")
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     flush_tmp_file("test_convert_complex_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
@@ -101,9 +103,120 @@ def test_convert_complex_html(test_parameters: TestParameters) -> None:
     assert "Test Specification" in page
 
 
+def test_convert_complex_html_without_embedded_attachments(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/test-specification.html")
+    response = __call_convert_html_with_attachments(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True
+    )
+    assert response.status_code == 200
+    flush_tmp_file("test_convert_complex_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+    total_pages = len(pdf_reader.pages)
+    assert total_pages == 4
+    page = pdf_reader.pages[1].extract_text()
+    assert "Test Specification" in page
+
+
+def test_convert_complex_html_with_embedded_attachments(test_parameters: TestParameters) -> None:
+    # Prepare HTML and two files to embed as attachments
+    html = __load_test_html("tests/test-data/test-specification.html")
+
+    file1_path = Path("tests/test-data/test-svg-ref-image.png")
+    file2_path = Path("tests/test-data/svg-image.html")
+
+    file1_bytes = file1_path.read_bytes()
+    file2_bytes = file2_path.read_bytes()
+
+    files = [
+        ("files", (file1_path.name, file1_bytes, "image/png")),
+        ("files", (file2_path.name, file2_bytes, "text/html")),
+    ]
+
+    response = __call_convert_html_with_attachments(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        files=files,
+    )
+
+    assert response.status_code == 200
+    flush_tmp_file("test_convert_complex_html_with_embedded_attachments.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+
+    # Basic PDF validation
+    assert len(pdf_reader.pages) == 4
+    page = pdf_reader.pages[1].extract_text()
+    assert "Test Specification" in page
+
+    # Validate attachments
+    # Use high-level API if available in pypdf 6
+    names = getattr(pdf_reader, "attachments", None)
+    attachment_names = set(names.keys())
+
+    assert file1_path.name in attachment_names
+    assert file2_path.name in attachment_names
+
+
+def test_convert_html_with_embedded_attachments(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/html-with-attachments.html")
+
+    file1_path = Path("tests/test-data/html-with-attachments/attachment1.pdf")
+    file2_path = Path("tests/test-data/html-with-attachments/attachment2.pdf")
+    file3_path = Path("tests/test-data/html-with-attachments/attachment3.pdf")
+
+    file1_bytes = file1_path.read_bytes()
+    file2_bytes = file2_path.read_bytes()
+    file3_bytes = file3_path.read_bytes()
+
+    files = [
+        ("files", (file1_path.name, file1_bytes, "application/pdf")),
+        ("files", (file2_path.name, file2_bytes, "application/pdf")),
+        ("files", (file3_path.name, file3_bytes, "application/pdf")),
+    ]
+
+    response = __call_convert_html_with_attachments(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        files=files,
+    )
+
+    assert response.status_code == 200
+    flush_tmp_file("test_convert_html_with_embedded_attachments.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+
+    # Basic PDF validation
+    assert len(pdf_reader.pages) == 1
+    page = pdf_reader.pages[0].extract_text()
+    assert "Lorem ipsum dolor sit amet, consectetur adipiscing elit." in page
+
+    # Validate attachments
+    attachments = __extract_all_attachments(pdf_reader)
+
+    expected = [
+        (file1_path.name, 'NamesTree'),
+        (file2_path.name, 'NamesTree'),
+        (file3_path.name, 'NamesTree'),
+        (file1_path.name, 'Annot:p0'),
+        (file2_path.name, 'Annot:p0'),
+        (file1_path.name, 'Annot:p0'),
+    ]
+    assert Counter(attachments) == Counter(expected)
+
+
 def test_convert_svg(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/svg-image.html")
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     page_png_bytes = pymupdf.open(stream=response.content, filetype="pdf").load_page(0).get_pixmap().tobytes("png")
     flush_tmp_file("test_convert_svg.pdf", response.content, test_parameters.flush_tmp_file_enabled)
@@ -116,13 +229,13 @@ def test_convert_svg(test_parameters: TestParameters) -> None:
 
 def test_convert_incorrect_data(test_parameters: TestParameters) -> None:
     wrong_data = bytes([0xFF])
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=wrong_data, print_error=False)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=wrong_data, print_error=False)
     assert response.status_code == 400
 
 
 def test_svg_has_no_extra_labels(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/test-svg.html")
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     flush_tmp_file("test_svg_has_no_extra_labels.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
@@ -151,7 +264,7 @@ def test_svg_has_no_extra_labels(test_parameters: TestParameters) -> None:
 )
 def test_supported_pdf_variants(variant: str, is_supported: bool, test_parameters: TestParameters) -> None:
     simple_html = f"<html><body>Pdf variant {variant}</body</html>"
-    response = __send_request(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True, parameters=f"pdf_variant={variant}")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True, parameters=f"pdf_variant={variant}")
     if is_supported:
         assert response.status_code == 200
         stream = io.BytesIO(response.content)
@@ -181,8 +294,23 @@ def __load_test_html(file_path: str) -> str:
         html = html_file.read()
         return html
 
+def __call_convert_html_with_attachments(base_url: str, request_session: requests.Session, data, print_error, parameters=None, files: list[tuple[str, tuple[str, bytes, str | None]]] | None = None) -> requests.Response:
+    url = f"{base_url}/convert/html-with-attachments"
+    headers = {"Accept": "*/*"}
+    payload = {"html": data}
+    try:
+        response = request_session.request(method="POST", url=url, headers=headers, data=payload, files=files,
+                                           verify=True, params=parameters)
+        if response.status_code // 100 != 2 and print_error:
+            logging.error(f"Error: Unexpected response: '{response}'")
+            logging.error(f"Error: Response content: '{response.content}'")
+        return response
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error: {e}")
+        raise
 
-def __send_request(base_url: str, request_session: requests.Session, data, print_error, parameters=None) -> requests.Response:
+
+def __call_convert_html(base_url: str, request_session: requests.Session, data, print_error, parameters=None) -> requests.Response:
     url = f"{base_url}/convert/html"
     headers = {"Accept": "*/*", "Content-Type": "text/html"}
     try:
@@ -200,3 +328,75 @@ def flush_tmp_file(file_name: str, file_bytes: bytes, flush_tmp_file_enabled: bo
     if flush_tmp_file_enabled:
         with Path(file_name).open("wb") as f:
             f.write(file_bytes)
+
+
+def __extract_all_attachments(reader: PyPDF.PdfReader):
+    DictObj = PyPDF.generic.DictionaryObject
+    IndObj  = PyPDF.generic.IndirectObject
+    ArrObj  = PyPDF.generic.ArrayObject
+
+    def _as_obj(x):
+        return x.get_object() if isinstance(x, IndObj) else x
+
+    def _yield_filespec(fs_obj, name_hint: str, source: str) -> Iterator[tuple[str, str]]:
+        fs = _as_obj(fs_obj)
+        if not isinstance(fs, DictObj):
+            return
+        name = fs.get("/UF") or fs.get("/F") or name_hint or "unnamed"
+        yield (str(name), source)
+
+    def _walk_name_tree(node, source: str):
+        node = _as_obj(node)
+        if not isinstance(node, DictObj):
+            return
+        names = node.get("/Names")
+        if isinstance(names, ArrObj):
+            for i in range(0, len(names), 2):
+                name = names[i]
+                fs   = names[i + 1]
+                yield from _yield_filespec(fs, str(name), source)
+        kids = node.get("/Kids")
+        if isinstance(kids, ArrObj):
+            for kid in kids:
+                yield from _walk_name_tree(kid, source)
+
+    def _iter_af(holder, source: str):
+        holder = _as_obj(holder)
+        if not isinstance(holder, DictObj):
+            return
+        af = holder.get("/AF")
+        if af is None:
+            return
+        items = af if isinstance(af, ArrObj) else [af]
+        for item in items:
+            yield from _yield_filespec(item, None, source)
+
+    out: list[tuple[str, str]] = []
+    catalog = reader.trailer["/Root"]
+
+    # 1) NameTree
+    with contextlib.suppress(Exception):
+        names = catalog.get("/Names")
+        if isinstance(names, DictObj):
+            embedded = names.get("/EmbeddedFiles")
+            if embedded is not None:
+                out.extend(_walk_name_tree(embedded, "NamesTree"))
+
+    # 2) AF of catalog
+    out.extend(_iter_af(catalog, "AF:Catalog"))
+
+    # 3) Pages
+    for page_idx, page in enumerate(reader.pages):
+        p = _as_obj(page)
+        annots = p.get("/Annots")
+        if isinstance(annots, ArrObj):
+            for ann in annots:
+                a = _as_obj(ann)
+                if isinstance(a, DictObj) and a.get("/Subtype") == "/FileAttachment":
+                    fs = a.get("/FS")
+                    if fs is not None:
+                        out.extend(_yield_filespec(fs, None, f"Annot:p{page_idx}"))
+                out.extend(_iter_af(a, f"AF:Annot:p{page_idx}"))
+        out.extend(_iter_af(p, f"AF:Page:{page_idx}"))
+
+    return out

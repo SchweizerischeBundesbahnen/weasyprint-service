@@ -1,15 +1,22 @@
+import contextlib
 import logging
 import os
 import platform
+import shutil
+import tempfile
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import unquote
 
 import uvicorn
 import weasyprint  # type: ignore
-from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi import Depends, FastAPI, File, Form, Query, Request, Response, UploadFile
 from pydantic import BaseModel
 
-from app import svg_utils  # type: ignore
+from app import (
+    attachment_utils,  # type: ignore
+    svg_utils,  # type: ignore
+)
 from app.schemas import VersionSchema
 
 app = FastAPI(openapi_url="/static/openapi.json", docs_url="/api/docs")
@@ -99,10 +106,14 @@ async def convert_html(
     """
     Convert HTML to PDF
     """
+    raw: bytes = await request.body()
+    encoding: str = await __get_encoding(request, render.encoding)
     try:
-        base_url = unquote(render.base_url, encoding=render.encoding) if render.base_url else None
-        html = (await request.body()).decode(render.encoding)
+        base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
+
+        html = raw.decode(encoding)
         html = svg_utils.process_svg(html)
+
         weasyprint_html = weasyprint.HTML(
             string=html,
             base_url=base_url,
@@ -115,22 +126,91 @@ async def convert_html(
             custom_metadata=output.custom_metadata,
         )
 
-        response = Response(output_pdf, media_type="application/pdf", status_code=200)
-        response.headers.append("Content-Disposition", "attachment; filename=" + output.file_name)
-        response.headers.append("Python-Version", platform.python_version())
-        response.headers.append("Weasyprint-Version", weasyprint.__version__)
-        response.headers.append("Weasyprint-Service-Version", os.environ.get("WEASYPRINT_SERVICE_VERSION", ""))
-        return response
+        return await __create_response(output, output_pdf)
 
     except AssertionError as e:
-        return process_error(e, "Assertion error, check the request body html", 400)
+        return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
-        return process_error(e, "Cannot decode request html body", 400)
+        return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
-        return process_error(e, "Unexpected error due converting to PDF", 500)
+        return __process_error(e, "Unexpected error due converting to PDF", 500)
 
 
-def process_error(e: Exception, err_msg: str, status: int) -> Response:
+async def __get_encoding(request: Request, encoding: str | None) -> str:
+    ct = request.headers.get("content-type", "")
+    charset = None
+    with contextlib.suppress(Exception):
+        if "charset=" in ct:
+            charset = ct.split("charset=", 1)[1].split(";", 1)[0].strip()
+    return charset or encoding or "utf-8"
+
+
+@app.post(
+    "/convert/html-with-attachments",
+    responses={
+        400: {"content": {"text/plain": {}}, "description": "Invalid Input"},
+        500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"},
+    },
+)
+async def convert_html_with_attachments(
+    render: Annotated[RenderOptions, Depends(get_render_options)],
+    output: Annotated[OutputOptions, Depends(get_output_options)],
+    html: str = Form(...),
+    files: Annotated[list[UploadFile] | None, File()] = None,
+) -> Response:
+    """
+    Convert HTML to PDF and embed provided files as PDF attachments.
+    """
+    tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
+    try:
+        base_url = unquote(render.base_url, encoding=render.encoding) if render.base_url else None
+
+        html = svg_utils.process_svg(html)
+
+        # 1. find names referenced in HTML via rel="attachment"
+        referenced: set[str] = attachment_utils.find_referenced_attachment_names(html)
+        # 2. persist uploads into tmpdir and get mapping {name -> Path}
+        name_to_path: dict[str, Path] = await attachment_utils.save_uploads_to_tmpdir(files, Path(tmpdir))
+        # 3. build attachments only for files NOT referenced in HTML
+        attachments: list[weasyprint.Attachment] = attachment_utils.build_attachments_for_unreferenced(name_to_path, referenced)
+        # 4. rewrite rel="attachment" hrefs to absolute file:// URIs pointing to saved files
+        html = attachment_utils.rewrite_attachment_links_to_file_uri(html, name_to_path)
+
+        weasyprint_html = weasyprint.HTML(
+            string=html,
+            base_url=base_url,
+            media_type=render.media_type,
+            encoding=render.encoding,
+        )
+        output_pdf = weasyprint_html.write_pdf(
+            pdf_variant=output.pdf_variant,
+            presentational_hints=render.presentational_hints,
+            custom_metadata=output.custom_metadata,
+            attachments=attachments,
+        )
+
+        return await __create_response(output, output_pdf)
+
+    except AssertionError as e:
+        return __process_error(e, "Assertion error, check the request body html", 400)
+    except (UnicodeDecodeError, LookupError) as e:
+        return __process_error(e, "Cannot decode request html body", 400)
+    except Exception as e:
+        return __process_error(e, "Unexpected error due converting to PDF", 500)
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+async def __create_response(output: Annotated[OutputOptions, Depends(get_output_options)], output_pdf: bytes | None) -> Response:
+    response = Response(output_pdf, media_type="application/pdf", status_code=200)
+    response.headers.append("Content-Disposition", f"attachment; filename={output.file_name}")
+    response.headers.append("Python-Version", platform.python_version())
+    response.headers.append("Weasyprint-Version", weasyprint.__version__)
+    response.headers.append("Weasyprint-Service-Version", os.environ.get("WEASYPRINT_SERVICE_VERSION", ""))
+    return response
+
+
+def __process_error(e: Exception, err_msg: str, status: int) -> Response:
     logging.exception(msg=err_msg + ": " + str(e))
     return Response(err_msg + ": " + getattr(e, "message", repr(e)), media_type="plain/text", status_code=status)
 

@@ -1,5 +1,6 @@
 import os
 import platform
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -36,3 +37,42 @@ def test_convert_html():
             content=b'\x81<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+"/>',
         )
         assert result.status_code == 400
+
+
+def test_convert_html_with_attachments():
+    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+    with TestClient(app) as test_client:
+        result = test_client.post(
+            "/convert/html-with-attachments?base_url=/",
+            data={"html": '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc+"/>'},
+        )
+        assert result.status_code == 200
+        result = test_client.post(
+            "/convert/html-with-attachments",
+        )
+        # Missing required form field 'html' should return 422 Unprocessable Entity
+        assert result.status_code == 422
+
+
+def test_convert_html_with_attachments_files():
+    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+
+    file1_path = Path("tests/test-data/test-svg-ref-image.png")
+    file2_path = Path("tests/test-data/svg-image.html")
+
+    html = f'<html><body>Attachments: <a rel="attachment" href="{file2_path.name}">link</a></body></html>'
+
+    files = [
+        ("files", (file1_path.name, file1_path.read_bytes(), "image/png")),
+        ("files", (file2_path.name, file2_path.read_bytes(), "text/html")),
+    ]
+
+    with TestClient(app) as test_client:
+        result = test_client.post(
+            "/convert/html-with-attachments?base_url=/",
+            data={"html": html},
+            files=files,
+        )
+        assert result.status_code == 200

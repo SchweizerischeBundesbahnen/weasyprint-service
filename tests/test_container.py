@@ -279,6 +279,45 @@ def test_supported_pdf_variants(variant: str, is_supported: bool, test_parameter
         assert response.status_code == 400
 
 
+def test_convert_html_with_custom_metadata(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/html-with-custom-metadata.html")
+    # Enable inclusion of custom metadata in the generated PDF
+    response = __call_convert_html(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        parameters="custom_metadata=true",
+    )
+
+    assert response.status_code == 200
+    flush_tmp_file("test_convert_html_with_custom_metadata.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+
+    # Basic PDF validation
+    assert len(pdf_reader.pages) == 1
+    page_text = pdf_reader.pages[0].extract_text()
+    assert "Lorem ipsum dolor sit amet, consectetur adipiscing elit." in page_text
+
+    # Validate metadata populated from HTML meta tags
+    metadata = pdf_reader.metadata
+    assert metadata is not None, "Expected metadata to be present when custom_metadata=true"
+
+    title: str = metadata.get("/Title")
+    author: str = metadata.get("/Author")
+    keywords: str = metadata.get("/Keywords")
+    creator: str = metadata.get("/Creator")
+    producer: str = metadata.get("/Producer")
+
+    assert title == "test with custom metadata"
+    assert "Jane Doe, John Doe" in author
+    assert "HTML, CSS, PDF, custom, fields, metadata" in keywords
+    assert creator == "HTML generator"
+    assert producer.startswith("WeasyPrint")
+
+
 def __get_pdf_variant_from_metadata(pdf_reader: PyPDF.PdfReader) -> str:
     if pdf_reader.xmp_metadata and pdf_reader.xmp_metadata.rdf_root:
         for rdf_node in pdf_reader.xmp_metadata.rdf_root.childNodes:

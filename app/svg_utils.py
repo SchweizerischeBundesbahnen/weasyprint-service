@@ -60,7 +60,7 @@ def process_svg(html: str) -> str:
           finding all img tags, and manually processing each one,
           which would be less efficient and more error-prone.
     """
-    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')
+    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"') # NOSONAR (S5852) “explicit usage by design”
     return re.sub(pattern, replace_img_base64, html)
 
 

@@ -60,12 +60,33 @@ def process_svg(html: str) -> str:
           finding all img tags, and manually processing each one,
           which would be less efficient and more error-prone.
     """
-    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"') # NOSONAR (S5852) “explicit usage by design”
-    return re.sub(pattern, replace_img_base64, html)
+
+    svg_pattern = re.compile(r"<svg.*?</svg>", re.IGNORECASE | re.DOTALL)
+    after_svg_images_processed = re.sub(svg_pattern, replace_svg_base64, html)
+
+    image_base64_pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')  # NOSONAR (S5852) “explicit usage by design”
+    after_base64_encoded_images_processed = re.sub(image_base64_pattern, replace_img_base64, after_svg_images_processed)
+    return after_base64_encoded_images_processed
+
+
+def replace_svg_base64(match: re.Match[str]) -> str:
+    """
+    Replace SVG images with IMG tags in HTML.
+
+    Args:
+        match: Regular expression match object containing the svg tag.
+
+    Returns:
+        str: new img tag with SVG base64 encoded.
+    """
+    svg_code = match.group(0)
+    b64 = base64.b64encode(svg_code.encode("utf-8")).decode("ascii")
+    return f'<img src="data:image/svg+xml;base64,{b64}"/>'
 
 
 def replace_img_base64(match: re.Match[str]) -> str:
-    """Replace base64 SVG images with PNG equivalents in HTML img tags.
+    """
+    Replace base64 SVG images with PNG equivalents in HTML img tags.
 
     Args:
         match: Regular expression match object containing the img tag components.

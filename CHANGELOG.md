@@ -1,5 +1,19 @@
 # Changelog
 
+## [66.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.1...v66.0.2) (2025-09-03)
+
+
+### Features
+
+* support custom metadata in PDF conversion ([#194](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/194)) ([c744460](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/c7444600f0bfd5908ae7845fa7fcc6a40dedb940)), closes [#193](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/193)
+
+
+### Bug Fixes
+
+* better SVG conversion handling ([#200](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/200)) ([e8e6bdc](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/e8e6bdc29b621a3ed1325efe28b3570767f5034d))
+* fixed export svg images ([#199](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/199)) ([966cd95](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/966cd95c2b96847a13f58f396d5b6be5c6eca3a9)), closes [#198](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/198)
+* support attachments in PDF conversion ([#196](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/196)) ([893f149](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/893f149252c659b341d4b4f3871d9ef8dab002e9)), closes [#192](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/192)
+
 ## [66.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.0...v66.0.1) (2025-08-27)
 
 

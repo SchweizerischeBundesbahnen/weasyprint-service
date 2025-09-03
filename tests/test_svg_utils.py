@@ -169,8 +169,7 @@ def __load_test_html(file_path: str) -> str:
     Load HTML file contents.
     """
     with Path(file_path).open(encoding="utf-8") as html_file:
-        html = html_file.read()
-        return html
+        return html_file.read()
 
 
 def __equal_ignore_newlines(a: str, b: str) -> bool:

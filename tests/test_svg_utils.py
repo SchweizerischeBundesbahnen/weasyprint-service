@@ -177,7 +177,8 @@ def __equal_ignore_newlines(a: str, b: str) -> bool:
     """
     Compare two strings ignoring all newline characters.
     """
-    normalize = lambda s: s.replace("\r", "").replace("\n", "")
+    def normalize(s: str) -> str:
+        return s.replace("\r", "").replace("\n", "")
     return normalize(a) == normalize(b)
 
 

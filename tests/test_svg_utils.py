@@ -127,7 +127,7 @@ def test_process_svg_valid_conversion():
     assert "image/png" in result  # Verify PNG conversion
     assert "base64" in result  # Verify base64 encoding
 
-    # Test single SVG conversion
+    # Test inline SVG conversion
     html = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="40" fill="red"/></svg>'
     result = serialize(process_svg(deserialize(html)))
     assert "image/png" in result  # Verify PNG conversion

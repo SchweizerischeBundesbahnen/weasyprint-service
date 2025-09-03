@@ -50,8 +50,7 @@ def process_svg(input_html: BeautifulSoup) -> BeautifulSoup:
         str: Modified HTML with SVG images converted to PNG where appropriate.
     """
     parsed_html = replace_inline_svgs_with_img(input_html)
-    parsed_html = replace_img_base64(parsed_html)
-    return parsed_html
+    return replace_img_base64(parsed_html)
 
 
 def replace_inline_svgs_with_img(parsed_html: BeautifulSoup) -> BeautifulSoup:

@@ -125,7 +125,7 @@ def test_convert_complex_html_with_embedded_attachments(test_parameters: TestPar
     # Prepare HTML and two files to embed as attachments
     html = __load_test_html("tests/test-data/test-specification.html")
 
-    file1_path = Path("tests/test-data/test-svg-ref-image.png")
+    file1_path = Path("tests/test-data/svg-image-ref.png")
     file2_path = Path("tests/test-data/svg-image.html")
 
     file1_bytes = file1_path.read_bytes()
@@ -219,10 +219,23 @@ def test_convert_svg(test_parameters: TestParameters) -> None:
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     page_png_bytes = pymupdf.open(stream=response.content, filetype="pdf").load_page(0).get_pixmap().tobytes("png")
-    flush_tmp_file("test_convert_svg.pdf", response.content, test_parameters.flush_tmp_file_enabled)
-    flush_tmp_file("test_convert_svg.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
+    flush_tmp_file("test_convert_svg_image.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+    flush_tmp_file("test_convert_svg_image.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
     page_png = Image.open(io.BytesIO(page_png_bytes))
-    ref_image = Image.open("tests/test-data/test-svg-ref-image.png")
+    ref_image = Image.open("tests/test-data/svg-image-ref.png")
+    assert page_png.mode == ref_image.mode or page_png.size == ref_image.size
+    assert ImageChops.difference(page_png, ref_image).getbbox() is None
+
+
+def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/svg-image-as-base64.html")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    assert response.status_code == 200
+    page_png_bytes = pymupdf.open(stream=response.content, filetype="pdf").load_page(0).get_pixmap().tobytes("png")
+    flush_tmp_file("test_convert_svg_image_as_base64.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+    flush_tmp_file("test_convert_svg_image_as_base64.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
+    page_png = Image.open(io.BytesIO(page_png_bytes))
+    ref_image = Image.open("tests/test-data/svg-image-as-base64-ref.png")
     assert page_png.mode == ref_image.mode or page_png.size == ref_image.size
     assert ImageChops.difference(page_png, ref_image).getbbox() is None
 

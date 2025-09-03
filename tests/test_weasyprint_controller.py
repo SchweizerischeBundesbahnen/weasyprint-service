@@ -59,7 +59,7 @@ def test_convert_html_with_attachments_files():
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
 
-    file1_path = Path("tests/test-data/test-svg-ref-image.png")
+    file1_path = Path("tests/test-data/svg-image-ref.png")
     file2_path = Path("tests/test-data/svg-image.html")
 
     html = f'<html><body>Attachments: <a rel="attachment" href="{file2_path.name}">link</a></body></html>'

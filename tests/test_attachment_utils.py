@@ -2,8 +2,6 @@ import asyncio
 import io
 from pathlib import Path
 
-import pytest
-
 from app.attachment_utils import (
     build_attachments_for_unreferenced,
     find_referenced_attachment_names,
@@ -13,6 +11,8 @@ from app.attachment_utils import (
 from fastapi import UploadFile
 import weasyprint  # type: ignore
 
+from app.html_utils import deserialize, serialize
+
 
 def test_extracts_basenames_and_decodes():
     html = (
@@ -21,7 +21,7 @@ def test_extracts_basenames_and_decodes():
         '<a href="nope.txt">ignore</a>'
         '<a rel="attachment">missing</a>'
     )
-    names = find_referenced_attachment_names(html)
+    names = find_referenced_attachment_names(deserialize(html))
     assert names == {"report final.pdf", "photo.png"}
 
 
@@ -31,7 +31,7 @@ def test_ignores_non_attachment_and_other_tags():
         "<link rel='preload' href='a.bin'>"
         '<p rel="attachment" href="weird">text</p>'
     )
-    assert find_referenced_attachment_names(html) == set()
+    assert find_referenced_attachment_names(deserialize(html)) == set()
 
 
 def test_rewrites_only_attachment_links_matching_name(tmp_path: Path):
@@ -46,10 +46,11 @@ def test_rewrites_only_attachment_links_matching_name(tmp_path: Path):
         f"<a rel=\"attachment\" href=\"missing.bin\">M</a>"
         f"<a rel=\"stylesheet\" href=\"{a.name}\">CSS</a>"
     )
-    out = rewrite_attachment_links_to_file_uri(html, {a.name: a, b.name: b})
+    parsed_html = rewrite_attachment_links_to_file_uri(deserialize(html), {a.name: a, b.name: b})
+    out = serialize(parsed_html)
 
     assert f'href="{a.resolve().as_uri()}"' in out
-    assert f"href='{b.resolve().as_uri()}'" in out
+    assert f'href="{b.resolve().as_uri()}"' in out
     # missing mapping unchanged
     assert 'href="missing.bin"' in out
     # non-attachment unchanged
@@ -60,7 +61,9 @@ def test_handles_urlencoded_names(tmp_path: Path):
     f = tmp_path / "my file.txt"
     f.write_text("x")
     html = "<a rel='attachment' href='dir/my%20file.txt'>click</a>"
-    out = rewrite_attachment_links_to_file_uri(html, {f.name: f})
+    parsed_html = rewrite_attachment_links_to_file_uri(deserialize(html), {f.name: f})
+    out = serialize(parsed_html)
+
     assert f.resolve().as_uri() in out
 
 

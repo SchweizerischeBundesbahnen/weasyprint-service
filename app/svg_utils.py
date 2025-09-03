@@ -20,6 +20,7 @@ from pathlib import Path
 from uuid import uuid4
 from xml.etree.ElementTree import Element
 
+from bs4 import BeautifulSoup, Tag
 from defusedxml import ElementTree as DET
 from PIL import Image
 
@@ -38,56 +39,106 @@ CHROMIUM_HEIGHT_ADJUSTMENT = 100
 logger = logging.getLogger(__name__)
 
 
-def process_svg(html: str) -> str:
-    """Process img tags in HTML, replacing base64 SVG images with PNGs.
+def process_svg(input_html: BeautifulSoup) -> BeautifulSoup:
+    """
+    Process img tags in HTML, replacing base64 SVG images with PNGs.
 
     Args:
-        html: HTML content containing SVG images.
+        input_html: HTML content containing SVG images.
 
     Returns:
         str: Modified HTML with SVG images converted to PNG where appropriate.
-
-    Performance:
-        - Time complexity: O(n) where n is the number of SVG images
-        - Memory complexity: O(m) where m is the size of the largest SVG
-    Note:
-        This approach is elegant because (do not change this):
-        - It handles all matches in a single pass through the HTML
-        - It allows for complex processing of each match through the replacement function
-        - It preserves parts of the original tag that should not be changed
-        - It's more efficient than parsing the HTML as DOM and modifying it
-        - The alternative would be more complex and likely involve parsing the HTML,
-          finding all img tags, and manually processing each one,
-          which would be less efficient and more error-prone.
     """
-    pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"') # NOSONAR (S5852) “explicit usage by design”
-    return re.sub(pattern, replace_img_base64, html)
+    parsed_html = replace_inline_svgs_with_img(input_html)
+    return replace_img_base64(parsed_html)
 
 
-def replace_img_base64(match: re.Match[str]) -> str:
-    """Replace base64 SVG images with PNG equivalents in HTML img tags.
+def replace_inline_svgs_with_img(parsed_html: BeautifulSoup) -> BeautifulSoup:
+    """
+    Replace only top-level <svg>...</svg> with <img src="data:image/svg+xml;base64,...">.
+    - Skips nested <svg> (those having an <svg> ancestor).
+    - Preserves width/height if present.
+    - Returns parsed/normalized HTML as BeautifulSoup object.
+    """
+    # Collect only top-level <svg> (no <svg> ancestors)
+    top_level_svgs: list[Tag] = []
+    for node in parsed_html.find_all("svg"):
+        if isinstance(node, Tag) and node.find_parent("svg") is None:
+            top_level_svgs.append(node)
+
+    # Replace each top-level <svg> with an <img>
+    for svg in top_level_svgs:
+        # Serialize the full outer SVG (including nested content)
+        svg_str = str(svg)
+
+        # Encode SVG content into Base64
+        b64 = base64.b64encode(svg_str.encode("utf-8")).decode("ascii")
+
+        # Create <img> and propagate width/height if present
+        img: Tag = parsed_html.new_tag("img")
+        width = svg.get("width")
+        if isinstance(width, str):
+            img.attrs["width"] = width
+        height = svg.get("height")
+        if isinstance(height, str):
+            img.attrs["height"] = height
+        img.attrs["src"] = f"data:image/svg+xml;base64,{b64}"
+
+        # Replace the original <svg> with <img>
+        svg.replace_with(img)
+
+    return parsed_html
+
+
+def _get_attr_str(tag: Tag, name: str) -> str | None:
+    val = tag.get(name)
+    return val if isinstance(val, str) else None
+
+
+def replace_img_base64(parsed_html: BeautifulSoup) -> BeautifulSoup:
+    """
+    Replace base64 SVG images with PNG equivalents in HTML img tags.
 
     Args:
-        match: Regular expression match object containing the img tag components.
+        parsed_html: parsed HTML content containing img tags with base64 SVGs.
 
     Returns:
-        str: Modified img tag with SVG replaced by PNG if conversion successful,
-             otherwise returns original tag.
+        BeautifulSoup: the modified HTML with base64 SVG images replaced with PNG equivalents.
     """
-    entry = match.group(0)
-    content_type = match.group("type")
-    content_base64 = match.group("base64")
+    for node in parsed_html.find_all("img"):
+        if not isinstance(node, Tag):
+            continue
+        img: Tag = node
 
-    svg = get_svg(content_type, content_base64)
-    if svg is None:
-        return entry
+        src = _get_attr_str(img, "src")
+        if not src or not src.startswith("data:"):
+            continue
 
-    image_type, image_content = replace_svg_with_png(svg)
-    replaced_content_base64 = to_base64(image_content)
-    if replaced_content_base64 == content_base64:
-        return entry  # For some reason content wasn't replaced
+        # parse data:<type>;base64,<payload>
+        if ";base64," not in src:
+            continue
+        header, b64data = src.split(";base64,", 1)
+        if not header.startswith("data:"):
+            continue
 
-    return f'<img{match.group("intermediate")}{image_type};base64,{replaced_content_base64}"'
+        content_type = header[len("data:") :]
+        content_base64 = b64data
+
+        svg = get_svg(content_type, content_base64)
+        if svg is None:
+            continue
+
+        image_type, image_content = replace_svg_with_png(svg)
+        replaced_content_base64 = to_base64(image_content)
+
+        # if the base64 content is the same, skip replacing it
+        if replaced_content_base64 == content_base64:
+            continue
+
+        # otherwise, replace the src attribute with the new base64 content
+        img["src"] = f"data:{image_type};base64,{replaced_content_base64}"
+
+    return parsed_html
 
 
 def get_svg(content_type: str, content_base64: str) -> Element | None:

@@ -7,6 +7,7 @@ import pytest
 from defusedxml import ElementTree as DET
 from PIL import Image
 
+from app.html_utils import deserialize, serialize
 from app.svg_utils import (
     IMAGE_PNG,
     IMAGE_SVG,
@@ -27,7 +28,7 @@ from app.svg_utils import (
     replace_svg_size_attributes,
     replace_svg_with_png,
     svg_to_string,
-    to_base64,
+    to_base64, replace_inline_svgs_with_img,
 )
 
 test_script_path = "./tests/scripts/test_script.sh"
@@ -104,7 +105,7 @@ def test_process_svg_invalid_inputs(html: str, expected_output: str):
 
     The test uses parametrize to run multiple test cases with different inputs.
     """
-    assert process_svg(html) == expected_output
+    assert serialize(process_svg(deserialize(html))) == expected_output
 
 
 @setup_env_variables
@@ -122,7 +123,13 @@ def test_process_svg_valid_conversion():
 
     # Test single SVG conversion
     html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>'
-    result = process_svg(html)
+    result = serialize(process_svg(deserialize(html)))
+    assert "image/png" in result  # Verify PNG conversion
+    assert "base64" in result  # Verify base64 encoding
+
+    # Test inline SVG conversion
+    html = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="40" fill="red"/></svg>'
+    result = serialize(process_svg(deserialize(html)))
     assert "image/png" in result  # Verify PNG conversion
     assert "base64" in result  # Verify base64 encoding
 
@@ -131,8 +138,47 @@ def test_process_svg_valid_conversion():
         <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
         <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
     """
-    result = process_svg(html)
+    result = serialize(process_svg(deserialize(html)))
     assert result.count("image/png") == 2  # Verify both SVGs converted
+
+
+@pytest.mark.parametrize(
+    "input_html_file,expected_html_file",
+    [
+        ("tests/test-data/svg-image.html", "tests/test-data/svg-image.embedded.html"),
+        ("tests/test-data/svg-image-as-base64.html", "tests/test-data/svg-image-as-base64.embedded.html"),
+        ("tests/test-data/svg-image-recursive.html", "tests/test-data/svg-image-recursive.embedded.html"),
+    ],
+)
+def test_replace_inline_svgs_with_img(input_html_file: str, expected_html_file: str):
+    """
+    Test replace_inline_svgs_with_img with different inputs.
+
+    This test verifies that replace_inline_svgs_with_img correctly converts SVG to base64 encoded IMG tags:
+    """
+    html = __load_test_html(input_html_file)
+    parsed_html = deserialize(html)
+    replaced_svg_parsed_html = replace_inline_svgs_with_img(parsed_html)
+    replaced_svg_html = serialize(replaced_svg_parsed_html)
+    expected_html = __load_test_html(expected_html_file)
+    assert __equal_ignore_newlines(replaced_svg_html, expected_html)
+
+
+def __load_test_html(file_path: str) -> str:
+    """
+    Load HTML file contents.
+    """
+    with Path(file_path).open(encoding="utf-8") as html_file:
+        return html_file.read()
+
+
+def __equal_ignore_newlines(a: str, b: str) -> bool:
+    """
+    Compare two strings ignoring all newline characters.
+    """
+    def normalize(s: str) -> str:
+        return s.replace("\r", "").replace("\n", "")
+    return normalize(a) == normalize(b)
 
 
 # Test parsing SVG dimension values and units
@@ -585,17 +631,17 @@ def test_process_svg_comprehensive():
     """
     # Test non-SVG image
     html = '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="/>'
-    assert process_svg(html) == html
+    assert serialize(process_svg(deserialize(html))) == html
 
     # Test invalid base64
     html = '<img src="data:image/svg+xml;base64,invalid==="/>'
-    assert process_svg(html) == html
+    assert serialize(process_svg(deserialize(html))) == html
 
     # Test valid conversion
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[WRITE_OUTPUT] = "true"
     html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>'
-    result = process_svg(html)
+    result = serialize(process_svg(deserialize(html)))
     assert "image/png" in result
     assert "base64" in result
 
@@ -604,7 +650,7 @@ def test_process_svg_comprehensive():
         <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
         <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
     """
-    result = process_svg(html)
+    result = serialize(process_svg(deserialize(html)))
     assert result.count("image/png") == 2
 
 

@@ -64,7 +64,7 @@ def process_svg(html: str) -> str:
     svg_pattern = re.compile(r"<svg.*?</svg>", re.IGNORECASE | re.DOTALL)
     after_svg_images_processed = re.sub(svg_pattern, replace_svg_base64, html)
 
-    image_base64_pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')  # NOSONAR (S5852) “explicit usage by design”
+    image_base64_pattern = re.compile(r'<img(?P<intermediate>[^>]+?)src=(?P<quote>[\'"])data:(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^"\'>]+)(?P=quote)', re.IGNORECASE)  # NOSONAR (S5852) explicit usage by design
     after_base64_encoded_images_processed = re.sub(image_base64_pattern, replace_img_base64, after_svg_images_processed)
     return after_base64_encoded_images_processed
 

@@ -27,7 +27,7 @@ from app.svg_utils import (
     replace_svg_size_attributes,
     replace_svg_with_png,
     svg_to_string,
-    to_base64, replace_inline_svgs_with_img,
+    to_base64, replace_inline_svgs_with_img, parse_input_html, parsed_html_to_string,
 )
 
 test_script_path = "./tests/scripts/test_script.sh"
@@ -156,7 +156,9 @@ def test_replace_inline_svgs_with_img(input_html_file: str, expected_html_file: 
     This test verifies that replace_inline_svgs_with_img correctly converts SVG to base64 encoded IMG tags:
     """
     html = __load_test_html(input_html_file)
-    replaced_svg_html = replace_inline_svgs_with_img(html)
+    parsed_html, had_wrappers = parse_input_html(html)
+    replaced_svg_parsed_html = replace_inline_svgs_with_img(parsed_html)
+    replaced_svg_html = parsed_html_to_string(replaced_svg_parsed_html, had_wrappers)
     expected_html = __load_test_html(expected_html_file)
     assert __equal_ignore_newlines(replaced_svg_html, expected_html)
 

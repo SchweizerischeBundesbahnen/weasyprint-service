@@ -61,31 +61,43 @@ def process_svg(html: str) -> str:
           finding all img tags, and manually processing each one,
           which would be less efficient and more error-prone.
     """
-    after_svg_images_processed = replace_inline_svgs_with_img(html)
+    parsed_html, had_wrappers = parse_input_html(html)
+    parsed_html = replace_inline_svgs_with_img(parsed_html)
+    parsed_html = replace_img_base64(parsed_html)
+    return parsed_html_to_string(parsed_html, had_wrappers)
 
-    image_base64_pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')  # NOSONAR (S5852) “explicit usage by design”
-    after_base64_encoded_images_processed = re.sub(image_base64_pattern, replace_img_base64, after_svg_images_processed)
-    return after_base64_encoded_images_processed
+
+def parsed_html_to_string(parsed_html: BeautifulSoup, had_wrappers: bool) -> str:
+    # If the input had no document wrappers, return the fragment (no <html>/<body>)
+    if not had_wrappers and parsed_html.body is not None:
+        # Return inner HTML of <body> only
+        return parsed_html.body.decode_contents(formatter="minimal")
+    else:
+        # Otherwise return the full document as parsed/normalized
+        return parsed_html.decode(formatter="minimal")
 
 
 _HTML_WRAPPER_RE = re.compile(r"<!DOCTYPE|<\s*html[\s>]|<\s*body[\s>]", re.IGNORECASE)
 
 
-def replace_inline_svgs_with_img(html: str) -> str:
+def parse_input_html(html: str) -> tuple[BeautifulSoup, bool]:
+    # Detect if the original input already contained HTML document wrappers
+    had_wrappers = bool(_HTML_WRAPPER_RE.search(html))
+
+    parsed_html = BeautifulSoup(html, "html5lib")
+    return parsed_html, had_wrappers
+
+
+def replace_inline_svgs_with_img(parsed_html: BeautifulSoup) -> BeautifulSoup:
     """
     Replace only top-level <svg>...</svg> with <img src="data:image/svg+xml;base64,...">.
     - Skips nested <svg> (those having an <svg> ancestor).
     - Preserves width/height if present.
-    - Returns a fragment (no <html>/<body>) if the input had no such wrappers.
+    - Returns parsed/normalized HTML as BeautifulSoup object.
     """
-    # Detect if the original input already contained HTML document wrappers
-    had_wrappers = bool(_HTML_WRAPPER_RE.search(html))
-
-    soup = BeautifulSoup(html, "html5lib")
-
     # Collect only top-level <svg> (no <svg> ancestors)
     top_level_svgs: list[Tag] = []
-    for node in soup.find_all("svg"):
+    for node in parsed_html.find_all("svg"):
         if isinstance(node, Tag) and node.find_parent("svg") is None:
             top_level_svgs.append(node)
 
@@ -98,7 +110,7 @@ def replace_inline_svgs_with_img(html: str) -> str:
         b64 = base64.b64encode(svg_str.encode("utf-8")).decode("ascii")
 
         # Create <img> and propagate width/height if present
-        img: Tag = soup.new_tag("img")
+        img: Tag = parsed_html.new_tag("img")
         width = svg.get("width")
         if isinstance(width, str):
             img.attrs["width"] = width
@@ -110,40 +122,58 @@ def replace_inline_svgs_with_img(html: str) -> str:
         # Replace the original <svg> with <img>
         svg.replace_with(img)
 
-    # If the input had no document wrappers, return the fragment (no <html>/<body>)
-    if not had_wrappers and soup.body is not None:
-        # Return inner HTML of <body> only
-        return soup.body.decode_contents(formatter="minimal")
-    else:
-        # Otherwise return the full document as parsed/normalized
-        return soup.decode(formatter="minimal")
+    return parsed_html
 
 
-def replace_img_base64(match: re.Match[str]) -> str:
+def _get_attr_str(tag: Tag, name: str) -> str | None:
+    val = tag.get(name)
+    return val if isinstance(val, str) else None
+
+
+def replace_img_base64(parsed_html: BeautifulSoup) -> BeautifulSoup:
     """
     Replace base64 SVG images with PNG equivalents in HTML img tags.
 
     Args:
-        match: Regular expression match object containing the img tag components.
+        parsed_html: parsed HTML content containing img tags with base64 SVGs.
 
     Returns:
-        str: Modified img tag with SVG replaced by PNG if conversion successful,
-             otherwise returns original tag.
+        BeautifulSoup: the modified HTML with base64 SVG images replaced with PNG equivalents.
     """
-    entry = match.group(0)
-    content_type = match.group("type")
-    content_base64 = match.group("base64")
+    for node in parsed_html.find_all("img"):
+        if not isinstance(node, Tag):
+            continue
+        img: Tag = node
 
-    svg = get_svg(content_type, content_base64)
-    if svg is None:
-        return entry
+        src = _get_attr_str(img, "src")
+        if not src or not src.startswith("data:"):
+            continue
 
-    image_type, image_content = replace_svg_with_png(svg)
-    replaced_content_base64 = to_base64(image_content)
-    if replaced_content_base64 == content_base64:
-        return entry  # For some reason content wasn't replaced
+        # parse data:<type>;base64,<payload>
+        if ";base64," not in src:
+            continue
+        header, b64data = src.split(";base64,", 1)
+        if not header.startswith("data:"):
+            continue
 
-    return f'<img{match.group("intermediate")}{image_type};base64,{replaced_content_base64}"'
+        content_type = header[len("data:") :]
+        content_base64 = b64data
+
+        svg = get_svg(content_type, content_base64)
+        if svg is None:
+            continue
+
+        image_type, image_content = replace_svg_with_png(svg)
+        replaced_content_base64 = to_base64(image_content)
+
+        # if the base64 content is the same, skip replacing it
+        if replaced_content_base64 == content_base64:
+            continue
+
+        # otherwise, replace the src attribute with the new base64 content
+        img["src"] = f"data:{image_type};base64,{replaced_content_base64}"
+
+    return parsed_html
 
 
 def get_svg(content_type: str, content_base64: str) -> Element | None:

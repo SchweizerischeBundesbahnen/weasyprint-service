@@ -20,6 +20,7 @@ from pathlib import Path
 from uuid import uuid4
 from xml.etree.ElementTree import Element
 
+from bs4 import BeautifulSoup, Tag
 from defusedxml import ElementTree as DET
 from PIL import Image
 
@@ -60,28 +61,62 @@ def process_svg(html: str) -> str:
           finding all img tags, and manually processing each one,
           which would be less efficient and more error-prone.
     """
-
-    svg_pattern = re.compile(r"<svg.*?</svg>", re.IGNORECASE | re.DOTALL)
-    after_svg_images_processed = re.sub(svg_pattern, replace_svg_base64, html)
+    after_svg_images_processed = replace_inline_svgs_with_img(html)
 
     image_base64_pattern = re.compile(r'<img(?P<intermediate>[^>]+?src="data:)(?P<type>[^;>]+)?;base64,\s?(?P<base64>[^">]+)?"')  # NOSONAR (S5852) “explicit usage by design”
     after_base64_encoded_images_processed = re.sub(image_base64_pattern, replace_img_base64, after_svg_images_processed)
     return after_base64_encoded_images_processed
 
 
-def replace_svg_base64(match: re.Match[str]) -> str:
-    """
-    Replace SVG images with IMG tags in HTML.
+_HTML_WRAPPER_RE = re.compile(r"<!DOCTYPE|<\s*html[\s>]|<\s*body[\s>]", re.IGNORECASE)
 
-    Args:
-        match: Regular expression match object containing the svg tag.
 
-    Returns:
-        str: new img tag with SVG base64 encoded.
+def replace_inline_svgs_with_img(html: str) -> str:
     """
-    svg_code = match.group(0)
-    b64 = base64.b64encode(svg_code.encode("utf-8")).decode("ascii")
-    return f'<img src="data:image/svg+xml;base64,{b64}"/>'
+    Replace only top-level <svg>...</svg> with <img src="data:image/svg+xml;base64,...">.
+    - Skips nested <svg> (those having an <svg> ancestor).
+    - Preserves width/height if present.
+    - Returns a fragment (no <html>/<body>) if the input had no such wrappers.
+    """
+    # Detect if the original input already contained HTML document wrappers
+    had_wrappers = bool(_HTML_WRAPPER_RE.search(html))
+
+    soup = BeautifulSoup(html, "html5lib")
+
+    # Collect only top-level <svg> (no <svg> ancestors)
+    top_level_svgs: list[Tag] = []
+    for node in soup.find_all("svg"):
+        if isinstance(node, Tag) and node.find_parent("svg") is None:
+            top_level_svgs.append(node)
+
+    # Replace each top-level <svg> with an <img>
+    for svg in top_level_svgs:
+        # Serialize the full outer SVG (including nested content)
+        svg_str = str(svg)
+
+        # Encode SVG content into Base64
+        b64 = base64.b64encode(svg_str.encode("utf-8")).decode("ascii")
+
+        # Create <img> and propagate width/height if present
+        img: Tag = soup.new_tag("img")
+        width = svg.get("width")
+        if isinstance(width, str):
+            img.attrs["width"] = width
+        height = svg.get("height")
+        if isinstance(height, str):
+            img.attrs["height"] = height
+        img.attrs["src"] = f"data:image/svg+xml;base64,{b64}"
+
+        # Replace the original <svg> with <img>
+        svg.replace_with(img)
+
+    # If the input had no document wrappers, return the fragment (no <html>/<body>)
+    if not had_wrappers and soup.body is not None:
+        # Return inner HTML of <body> only
+        return soup.body.decode_contents(formatter="minimal")
+    else:
+        # Otherwise return the full document as parsed/normalized
+        return soup.decode(formatter="minimal")
 
 
 def replace_img_base64(match: re.Match[str]) -> str:

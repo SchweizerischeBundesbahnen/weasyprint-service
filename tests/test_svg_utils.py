@@ -27,7 +27,7 @@ from app.svg_utils import (
     replace_svg_size_attributes,
     replace_svg_with_png,
     svg_to_string,
-    to_base64,
+    to_base64, replace_inline_svgs_with_img,
 )
 
 test_script_path = "./tests/scripts/test_script.sh"
@@ -139,6 +139,43 @@ def test_process_svg_valid_conversion():
     """
     result = process_svg(html)
     assert result.count("image/png") == 2  # Verify both SVGs converted
+
+
+@pytest.mark.parametrize(
+    "input_html_file,expected_html_file",
+    [
+        ("tests/test-data/svg-image.html", "tests/test-data/svg-image.embedded.html"),
+        ("tests/test-data/svg-image-as-base64.html", "tests/test-data/svg-image-as-base64.embedded.html"),
+        ("tests/test-data/svg-image-recursive.html", "tests/test-data/svg-image-recursive.embedded.html"),
+    ],
+)
+def test_replace_inline_svgs_with_img(input_html_file: str, expected_html_file: str):
+    """
+    Test replace_inline_svgs_with_img with different inputs.
+
+    This test verifies that replace_inline_svgs_with_img correctly converts SVG to base64 encoded IMG tags:
+    """
+    html = __load_test_html(input_html_file)
+    replaced_svg_html = replace_inline_svgs_with_img(html)
+    expected_html = __load_test_html(expected_html_file)
+    assert __equal_ignore_newlines(replaced_svg_html, expected_html)
+
+
+def __load_test_html(file_path: str) -> str:
+    """
+    Load HTML file contents.
+    """
+    with Path(file_path).open(encoding="utf-8") as html_file:
+        html = html_file.read()
+        return html
+
+
+def __equal_ignore_newlines(a: str, b: str) -> bool:
+    """
+    Compare two strings ignoring all newline characters.
+    """
+    normalize = lambda s: s.replace("\r", "").replace("\n", "")
+    return normalize(a) == normalize(b)
 
 
 # Test parsing SVG dimension values and units

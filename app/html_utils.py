@@ -43,7 +43,10 @@ def _clear_leading_comment(html: BeautifulSoup) -> BeautifulSoup:
     """
     Removes comment like <!--?xml ... ?-->
     """
-    if html.contents and isinstance(html.contents[0], Comment) and str(html.contents[0]).strip().startswith("?xml"):
+    has_contents = bool(html.contents)
+    is_comment = has_contents and isinstance(html.contents[0], Comment)
+    is_xml_decl = is_comment and str(html.contents[0]).strip().startswith("?xml")
+    if is_xml_decl:
         html.contents[0].extract()
     return html
 

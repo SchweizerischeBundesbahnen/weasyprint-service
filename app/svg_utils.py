@@ -39,53 +39,19 @@ CHROMIUM_HEIGHT_ADJUSTMENT = 100
 logger = logging.getLogger(__name__)
 
 
-def process_svg(html: str) -> str:
-    """Process img tags in HTML, replacing base64 SVG images with PNGs.
+def process_svg(input_html: BeautifulSoup) -> BeautifulSoup:
+    """
+    Process img tags in HTML, replacing base64 SVG images with PNGs.
 
     Args:
-        html: HTML content containing SVG images.
+        input_html: HTML content containing SVG images.
 
     Returns:
         str: Modified HTML with SVG images converted to PNG where appropriate.
-
-    Performance:
-        - Time complexity: O(n) where n is the number of SVG images
-        - Memory complexity: O(m) where m is the size of the largest SVG
-    Note:
-        This approach is elegant because (do not change this):
-        - It handles all matches in a single pass through the HTML
-        - It allows for complex processing of each match through the replacement function
-        - It preserves parts of the original tag that should not be changed
-        - It's more efficient than parsing the HTML as DOM and modifying it
-        - The alternative would be more complex and likely involve parsing the HTML,
-          finding all img tags, and manually processing each one,
-          which would be less efficient and more error-prone.
     """
-    parsed_html, had_wrappers = parse_input_html(html)
-    parsed_html = replace_inline_svgs_with_img(parsed_html)
+    parsed_html = replace_inline_svgs_with_img(input_html)
     parsed_html = replace_img_base64(parsed_html)
-    return parsed_html_to_string(parsed_html, had_wrappers)
-
-
-def parsed_html_to_string(parsed_html: BeautifulSoup, had_wrappers: bool) -> str:
-    # If the input had no document wrappers, return the fragment (no <html>/<body>)
-    if not had_wrappers and parsed_html.body is not None:
-        # Return inner HTML of <body> only
-        return parsed_html.body.decode_contents(formatter="minimal")
-    else:
-        # Otherwise return the full document as parsed/normalized
-        return parsed_html.decode(formatter="minimal")
-
-
-_HTML_WRAPPER_RE = re.compile(r"<!DOCTYPE|<\s*html[\s>]|<\s*body[\s>]", re.IGNORECASE)
-
-
-def parse_input_html(html: str) -> tuple[BeautifulSoup, bool]:
-    # Detect if the original input already contained HTML document wrappers
-    had_wrappers = bool(_HTML_WRAPPER_RE.search(html))
-
-    parsed_html = BeautifulSoup(html, "html5lib")
-    return parsed_html, had_wrappers
+    return parsed_html
 
 
 def replace_inline_svgs_with_img(parsed_html: BeautifulSoup) -> BeautifulSoup:

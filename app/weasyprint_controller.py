@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app import (
     attachment_utils,  # type: ignore
+    html_utils,
     svg_utils,  # type: ignore
 )
 from app.schemas import VersionSchema
@@ -157,10 +158,12 @@ async def convert_html(
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
 
         html = raw.decode(encoding)
-        html = svg_utils.process_svg(html)
+        parsed_html = html_utils.deserialize(html)
+        parsed_html = svg_utils.process_svg(parsed_html)
+        processed_html = html_utils.serialize(parsed_html)
 
         weasyprint_html = weasyprint.HTML(
-            string=html,
+            string=processed_html,
             base_url=base_url,
             media_type=render.media_type,
             encoding=render.encoding,
@@ -214,19 +217,22 @@ async def convert_html_with_attachments(
     try:
         base_url = unquote(render.base_url, encoding=render.encoding) if render.base_url else None
 
-        html = svg_utils.process_svg(html)
+        parsed_html = html_utils.deserialize(html)
+        parsed_html = svg_utils.process_svg(parsed_html)
 
         # 1. find names referenced in HTML via rel="attachment"
-        referenced: set[str] = attachment_utils.find_referenced_attachment_names(html)
+        referenced: set[str] = attachment_utils.find_referenced_attachment_names(parsed_html)
         # 2. persist uploads into tmpdir and get mapping {name -> Path}
         name_to_path: dict[str, Path] = await attachment_utils.save_uploads_to_tmpdir(files, Path(tmpdir))
         # 3. build attachments only for files NOT referenced in HTML
         attachments: list[weasyprint.Attachment] = attachment_utils.build_attachments_for_unreferenced(name_to_path, referenced)
         # 4. rewrite rel="attachment" hrefs to absolute file:// URIs pointing to saved files
-        html = attachment_utils.rewrite_attachment_links_to_file_uri(html, name_to_path)
+        parsed_html = attachment_utils.rewrite_attachment_links_to_file_uri(parsed_html, name_to_path)
+
+        processed_html = html_utils.serialize(parsed_html)
 
         weasyprint_html = weasyprint.HTML(
-            string=html,
+            string=processed_html,
             base_url=base_url,
             media_type=render.media_type,
             encoding=render.encoding,

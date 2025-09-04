@@ -131,9 +131,32 @@ class SvgProcessor:
             if replaced_content_base64 == content_base64:
                 continue
 
+            # Preserve original rendered size by setting explicit width/height on <img>
+            self._apply_img_dimensions_from_svg(node, svg)
+
             node["src"] = f"data:{image_type};base64,{replaced_content_base64}"
 
         return parsed_html
+
+    def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element) -> None:
+        """Best-effort: set width/height attributes and inline style from SVG px dims."""
+        try:
+            w, h, _ = self.extract_svg_dimensions_as_px(svg)
+            style_val = self._get_attr_str(node, "style") or ""
+            style_parts = [s.strip() for s in style_val.split(";") if s.strip()]
+            if isinstance(w, int):
+                node["width"] = f"{w}px"
+                style_parts = [p for p in style_parts if not p.lower().startswith("width:")]
+                style_parts.append(f"width: {w}px")
+            if isinstance(h, int):
+                node["height"] = f"{h}px"
+                style_parts = [p for p in style_parts if not p.lower().startswith("height:")]
+                style_parts.append(f"height: {h}px")
+            if style_parts:
+                node["style"] = "; ".join(style_parts)
+        except Exception as e:  # noqa: BLE001
+            # Log at debug level to avoid noise but prevent silent pass
+            logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
     # ---------------- Core helpers ----------------
 
@@ -175,7 +198,7 @@ class SvgProcessor:
         if not self.convert_svg_to_png(width, height + self.chromium_height_adjustment, png_filepath, svg_filepath):
             return self.without_changes(svg)
 
-        if not self.crop_png(png_filepath, int(self.chromium_height_adjustment * self.device_scale_factor)):
+        if not self.crop_png(png_filepath, round(self.chromium_height_adjustment * self.device_scale_factor)):
             return self.without_changes(svg)
 
         png_content = self.read_and_cleanup_png(png_filepath)
@@ -404,21 +427,20 @@ class SvgProcessor:
 
     def get_px_conversion_ratio(self, unit: str | None) -> float:
         """
-        Convert CSS units to px at 96 DPI, then apply device scale factor.
+        Convert CSS units to px at 96 DPI.
+        Note: Device scale factor should NOT affect layout dimensions; it only controls rasterization DPI.
         """
         if not unit:
-            return 1.0 * self.device_scale_factor
-        base = {
+            return 1.0
+        return {
             "px": 1.0,
             "pt": 4 / 3,
             "in": 96.0,
-            "cm": 96.0 / 2.54,
-            # Legacy behavior expected by tests: use 96/2.54*10 for mm
-            "mm": 96.0 / 2.54 * 10,
+            "cm": 96 / 2.54,
+            "mm": 96 / 2.54 * 10,
             "pc": 16.0,
             "ex": 8.0,
         }.get(unit, 1.0)
-        return base * self.device_scale_factor
 
     @staticmethod
     def _get_attr_str(tag: Tag, name: str) -> str | None:

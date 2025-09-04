@@ -57,12 +57,14 @@ class RenderOptions(BaseModel):
         media_type: CSS media type to apply when rendering ("print" or "screen" are typical).
         presentational_hints: Whether to honor presentational HTML attributes as CSS hints.
         base_url: Base URL used to resolve relative links (e.g., stylesheets, images).
+        scale_factor: Device scale factor used for SVG/PNG rendering. If not provided, falls back to DEVICE_SCALE_FACTOR env var.
     """
 
     encoding: str = "utf-8"
     media_type: str = "print"
     presentational_hints: bool = False
     base_url: str | None = None
+    scale_factor: float | None = None
 
 
 class OutputOptions(BaseModel):
@@ -101,12 +103,18 @@ def get_render_options(
         title="Base URL",
         description="Base URL used to resolve relative links (stylesheets, images).",
     ),
+    scale_factor: float | None = Query(
+        None,
+        title="Scale Factor",
+        description="Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided.",
+    ),
 ) -> RenderOptions:
     return RenderOptions(
         encoding=encoding,
         media_type=media_type,
         presentational_hints=presentational_hints,
         base_url=base_url,
+        scale_factor=scale_factor,
     )
 
 
@@ -158,7 +166,7 @@ async def convert_html(
         html = raw.decode(encoding)
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-        parsed_html = SvgProcessor().process_svg(parsed_html)
+        parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
         processed_html = html_parser.serialize(parsed_html)
 
         weasyprint_html = weasyprint.HTML(
@@ -218,10 +226,9 @@ async def convert_html_with_attachments(
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-        parsed_html = SvgProcessor().process_svg(parsed_html)
+        parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
 
         attachment_manager = AttachmentManager()
-        # Perform the 4-step flow via a single AttachmentManager method
         parsed_html, attachments = await attachment_manager.process_html_and_uploads(
             parsed_html=parsed_html,
             files=files,

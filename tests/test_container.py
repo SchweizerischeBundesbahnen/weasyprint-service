@@ -16,11 +16,13 @@ from PIL import Image, ImageChops
 
 
 class TestParameters(NamedTuple):
-    __test__ = False
     base_url: str
     flush_tmp_file_enabled: bool
     request_session: requests.Session
     container: Container
+
+# prevent pytest from collecting NamedTuple as a test
+TestParameters.__test__ = False
 
 
 @pytest.fixture(scope="module")
@@ -125,15 +127,15 @@ def test_convert_complex_html_with_embedded_attachments(test_parameters: TestPar
     # Prepare HTML and two files to embed as attachments
     html = __load_test_html("tests/test-data/test-specification.html")
 
-    file1_path = Path("tests/test-data/svg-image-ref.png")
-    file2_path = Path("tests/test-data/svg-image.html")
+    file1_path = Path("tests/test-data/html-with-attachments/attachment1.pdf")
+    file2_path = Path("tests/test-data/html-with-attachments/attachment2.pdf")
 
     file1_bytes = file1_path.read_bytes()
     file2_bytes = file2_path.read_bytes()
 
     files = [
-        ("files", (file1_path.name, file1_bytes, "image/png")),
-        ("files", (file2_path.name, file2_bytes, "text/html")),
+        ("files", (file1_path.name, file1_bytes, "application/pdf")),
+        ("files", (file2_path.name, file2_bytes, "application/pdf")),
     ]
 
     response = __call_convert_html_with_attachments(
@@ -218,26 +220,144 @@ def test_convert_svg(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/svg-image.html")
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
-    page_png_bytes = pymupdf.open(stream=response.content, filetype="pdf").load_page(0).get_pixmap().tobytes("png")
+
+    # Render first page to PNG
+    doc = pymupdf.open(stream=response.content, filetype="pdf")
+    page = doc.load_page(0)
+    page_png_bytes = page.get_pixmap().tobytes("png")
+
     flush_tmp_file("test_convert_svg_image.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     flush_tmp_file("test_convert_svg_image.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
-    page_png = Image.open(io.BytesIO(page_png_bytes))
-    ref_image = Image.open("tests/test-data/svg-image-ref.png")
-    assert page_png.mode == ref_image.mode or page_png.size == ref_image.size
-    assert ImageChops.difference(page_png, ref_image).getbbox() is None
+
+    produced_img = Image.open(io.BytesIO(page_png_bytes))
+    ref_path = Path("tests/test-data/expected/svg-image-ref.png")
+
+    if not ref_path.exists():
+        import os
+        if os.environ.get("UPDATE_EXPECTED_REFS", "0") == "1":
+            ref_path.parent.mkdir(parents=True, exist_ok=True)
+            ref_path.write_bytes(page_png_bytes)
+            pdf_ref_path = ref_path.with_suffix(".pdf")
+            pdf_ref_path.write_bytes(response.content)
+            pytest.skip(
+                f"Reference {ref_path} (and {pdf_ref_path}) was missing and has been generated. Re-run tests."
+            )
+        else:
+            pytest.skip(
+                f"Missing reference image {ref_path}. Set UPDATE_EXPECTED_REFS=1 to generate references (PNG and PDF), then commit them under tests/test-data/expected."
+            )
+
+    ref_image = Image.open(ref_path)
+    assert produced_img.mode == ref_image.mode and produced_img.size == ref_image.size
+    assert ImageChops.difference(produced_img, ref_image).getbbox() is None
 
 
 def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/svg-image-as-base64.html")
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
-    page_png_bytes = pymupdf.open(stream=response.content, filetype="pdf").load_page(0).get_pixmap().tobytes("png")
+
+    # Render first page to PNG
+    doc = pymupdf.open(stream=response.content, filetype="pdf")
+    page = doc.load_page(0)
+    page_png_bytes = page.get_pixmap().tobytes("png")
+
     flush_tmp_file("test_convert_svg_image_as_base64.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     flush_tmp_file("test_convert_svg_image_as_base64.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
-    page_png = Image.open(io.BytesIO(page_png_bytes))
-    ref_image = Image.open("tests/test-data/svg-image-as-base64-ref.png")
-    assert page_png.mode == ref_image.mode or page_png.size == ref_image.size
-    assert ImageChops.difference(page_png, ref_image).getbbox() is None
+
+    produced_img = Image.open(io.BytesIO(page_png_bytes))
+    ref_path = Path("tests/test-data/expected/svg-image-as-base64-ref.png")
+
+    if not ref_path.exists():
+        import os
+        if os.environ.get("UPDATE_EXPECTED_REFS", "0") == "1":
+            ref_path.parent.mkdir(parents=True, exist_ok=True)
+            ref_path.write_bytes(page_png_bytes)
+            pdf_ref_path = ref_path.with_suffix(".pdf")
+            pdf_ref_path.write_bytes(response.content)
+            pytest.skip(
+                f"Reference {ref_path} (and {pdf_ref_path}) was missing and has been generated. Re-run tests."
+            )
+        else:
+            pytest.skip(
+                f"Missing reference image {ref_path}. Set UPDATE_EXPECTED_REFS=1 to generate references (PNG and PDF), then commit them under tests/test-data/expected."
+            )
+
+    ref_image = Image.open(ref_path)
+    assert produced_img.mode == ref_image.mode and produced_img.size == ref_image.size
+    assert ImageChops.difference(produced_img, ref_image).getbbox() is None
+
+
+@pytest.mark.parametrize("scale", [1.0, 2.0, 3.125, 6.25])
+def test_convert_svg_with_scale_factor(scale: float, test_parameters: TestParameters) -> None:
+    """
+    Integration test: render svg-image.html with different scale_factor values and
+    compare rasterized first page PNGs with reference images.
+
+    If a reference image is missing and the environment variable UPDATE_EXPECTED_REFS=1
+    is set, the test will generate the reference PNG into tests/test-data/expected and skip
+    with an explanatory message.
+    """
+    html = __load_test_html("tests/test-data/svg-image.html")
+    params = f"scale_factor={scale}"
+    response = __call_convert_html(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        parameters=params,
+    )
+    assert response.status_code == 200
+
+    # Render first page to PNG at high rasterization scale to reveal anti-aliasing differences
+    doc = pymupdf.open(stream=response.content, filetype="pdf")
+    page = doc.load_page(0)
+    # 10x zoom to better visualize quality differences coming from device scale factor
+    zoom = 10.0
+    mat = pymupdf.Matrix(zoom, zoom)
+    page_png_bytes = page.get_pixmap(matrix=mat).tobytes("png")
+    flush_tmp_file(f"test_convert_svg_image_scale_{scale}.pdf", response.content, test_parameters.flush_tmp_file_enabled)
+    flush_tmp_file(f"test_convert_svg_image_scale_{scale}-x{int(zoom)}.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
+
+    # Determine reference path
+    # Use a stable string format for floating point values in filenames
+    scale_str = ("%g" % scale).rstrip("0").rstrip(".") if "." in f"{scale}" else f"{scale}"
+    # Ensure we keep at least one decimal for integer-like floats (e.g., 1.0 -> 1.0)
+    if scale.is_integer():
+        scale_str = f"{int(scale)}.0"
+    ref_path = Path(f"tests/test-data/expected/svg-image-ref-scale-{scale_str}.png")
+
+    # Open produced image
+    produced_img = Image.open(io.BytesIO(page_png_bytes))
+
+    if not ref_path.exists():
+        import os
+        if os.environ.get("UPDATE_EXPECTED_REFS", "0") == "1":
+            # Generate the missing reference files: hi-res PNG (10x) and matching PDF next to it
+            ref_path.parent.mkdir(parents=True, exist_ok=True)
+            ref_path.write_bytes(page_png_bytes)
+            pdf_ref_path = ref_path.with_suffix(".pdf")
+            pdf_ref_path.write_bytes(response.content)
+            pytest.skip(
+                f"Reference {ref_path} (and {pdf_ref_path}) was missing and has been generated at 10x raster scale. Re-run tests."
+            )
+        else:
+            pytest.skip(
+                f"Missing reference image {ref_path}. Set UPDATE_EXPECTED_REFS=1 to generate references (PNG and PDF), "
+                f"then commit them under tests/test-data/expected."
+            )
+
+    ref_image = Image.open(ref_path)
+    # Basic sanity: mode and size should match
+    assert produced_img.mode == ref_image.mode and produced_img.size == ref_image.size, (
+        f"Image mode/size mismatch for scale={scale}. "
+        f"Got mode={produced_img.mode}, size={produced_img.size}; "
+        f"expected mode={ref_image.mode}, size={ref_image.size} from {ref_path}"
+    )
+
+    # Pixel-by-pixel comparison
+    diff_bbox = ImageChops.difference(produced_img, ref_image).getbbox()
+    assert diff_bbox is None, f"Rendered image differs from reference for scale={scale} at bbox={diff_bbox}"
 
 
 def test_convert_incorrect_data(test_parameters: TestParameters) -> None:

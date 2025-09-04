@@ -7,29 +7,8 @@ import pytest
 from defusedxml import ElementTree as DET
 from PIL import Image
 
-from app.html_utils import deserialize, serialize
-from app.svg_utils import (
-    IMAGE_PNG,
-    IMAGE_SVG,
-    calculate_dimension,
-    calculate_special_unit,
-    convert_svg_to_png,
-    convert_to_px,
-    create_chromium_command,
-    crop_png,
-    extract_svg_dimensions_as_px,
-    get_px_conversion_ratio,
-    get_svg,
-    get_svg_dimension,
-    parse_viewbox,
-    prepare_temp_files,
-    process_svg,
-    read_and_cleanup_png,
-    replace_svg_size_attributes,
-    replace_svg_with_png,
-    svg_to_string,
-    to_base64, replace_inline_svgs_with_img,
-)
+from app.html_parser import HtmlParser
+from app.svg_processor import SvgProcessor
 
 test_script_path = "./tests/scripts/test_script.sh"
 cropped_test_script_output = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xf6\x178U\x00\x00\x00\x00IEND\xaeB`\x82"
@@ -105,7 +84,9 @@ def test_process_svg_invalid_inputs(html: str, expected_output: str):
 
     The test uses parametrize to run multiple test cases with different inputs.
     """
-    assert serialize(process_svg(deserialize(html))) == expected_output
+    html_parser = HtmlParser()
+    svg_processor = SvgProcessor()
+    assert html_parser.serialize(svg_processor.process_svg(html_parser.parse(html))) == expected_output
 
 
 @setup_env_variables
@@ -121,15 +102,18 @@ def test_process_svg_valid_conversion():
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[WRITE_OUTPUT] = "true"
 
+    html_parser = HtmlParser()
+    svg_processor = SvgProcessor()
+
     # Test single SVG conversion
     html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>'
-    result = serialize(process_svg(deserialize(html)))
+    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
     assert "image/png" in result  # Verify PNG conversion
     assert "base64" in result  # Verify base64 encoding
 
     # Test inline SVG conversion
     html = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="40" fill="red"/></svg>'
-    result = serialize(process_svg(deserialize(html)))
+    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
     assert "image/png" in result  # Verify PNG conversion
     assert "base64" in result  # Verify base64 encoding
 
@@ -138,7 +122,7 @@ def test_process_svg_valid_conversion():
         <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
         <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
     """
-    result = serialize(process_svg(deserialize(html)))
+    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
     assert result.count("image/png") == 2  # Verify both SVGs converted
 
 
@@ -156,10 +140,13 @@ def test_replace_inline_svgs_with_img(input_html_file: str, expected_html_file: 
 
     This test verifies that replace_inline_svgs_with_img correctly converts SVG to base64 encoded IMG tags:
     """
+    html_parser = HtmlParser()
+    svg_processor = SvgProcessor()
+
     html = __load_test_html(input_html_file)
-    parsed_html = deserialize(html)
-    replaced_svg_parsed_html = replace_inline_svgs_with_img(parsed_html)
-    replaced_svg_html = serialize(replaced_svg_parsed_html)
+    parsed_html = html_parser.parse(html)
+    replaced_svg_parsed_html = svg_processor.replace_inline_svgs_with_img(parsed_html)
+    replaced_svg_html = html_parser.serialize(replaced_svg_parsed_html)
     expected_html = __load_test_html(expected_html_file)
     assert __equal_ignore_newlines(replaced_svg_html, expected_html)
 
@@ -204,7 +191,7 @@ def test_parse_svg_dimension(svg_content: str, dimension: str, expected: tuple[s
     Verifies handling of different unit types and invalid formats.
     """
     svg = DET.fromstring(svg_content)
-    value, unit = get_svg_dimension(svg, dimension)
+    value, unit = SvgProcessor().get_svg_dimension(svg, dimension)
     assert (value, unit) == expected
 
 
@@ -226,7 +213,7 @@ def test_parse_viewbox(svg_content: str, expected: tuple[float | None, float | N
     Verifies handling of decimal values and invalid formats.
     """
     content = DET.fromstring(svg_content)
-    width, height = parse_viewbox(content)
+    width, height = SvgProcessor().parse_viewbox(content)
     assert (width, height) == expected
 
 
@@ -259,7 +246,7 @@ def test_extract_svg_dimensions(svg_content: str, expected_width: int | None, ex
     - Mixed explicit/viewBox dimensions
     """
     svg = DET.fromstring(svg_content)
-    width, height, updated_svg = extract_svg_dimensions_as_px(svg)
+    width, height, updated_svg = SvgProcessor().extract_svg_dimensions_as_px(svg)
     assert width == expected_width
     assert height == expected_height
 
@@ -280,7 +267,7 @@ def test_extract_svg_dimensions_relative_units_error(svg_content: str, expected_
     without a viewBox to reference.
     """
     with pytest.raises(ValueError, match=expected_error):
-        extract_svg_dimensions_as_px(DET.fromstring(svg_content))
+        SvgProcessor().extract_svg_dimensions_as_px(DET.fromstring(svg_content))
 
 
 # Test handling of relative units with viewBox
@@ -300,10 +287,11 @@ def test_extract_svg_dimensions_relative_units(svg_content: str, expected_width:
     Tests conversion of relative units (vw, vh, %) to absolute pixel values
     when a viewBox is present to provide reference dimensions.
     """
-    width, height, updated_svg = extract_svg_dimensions_as_px(DET.fromstring(svg_content))
+    svg_processor = SvgProcessor()
+    width, height, updated_svg = svg_processor.extract_svg_dimensions_as_px(DET.fromstring(svg_content))
     assert width == expected_width
     assert height == expected_height
-    updated_svg_content = svg_to_string(updated_svg)
+    updated_svg_content = svg_processor.svg_to_string(updated_svg)
     assert f'width="{width}px"' in updated_svg_content
     assert f'height="{height}px"' in updated_svg_content
 
@@ -342,11 +330,12 @@ def test_get_svg_content(content_type: str, content_base64: str, expected_conten
         content_base64: Base64 encoded content
         expected_content: Expected decoded SVG content or None if invalid
     """
-    svg = get_svg(content_type, content_base64)
+    svg_processor = SvgProcessor()
+    svg = svg_processor.get_svg(content_type, content_base64)
     if expected_content is None:
         assert svg is None
     else:
-        assert svg_to_string(svg) == expected_content
+        assert svg_processor.svg_to_string(svg) == expected_content
 
 
 @setup_env_variables
@@ -358,23 +347,25 @@ def test_replace_svg_with_png():
     - Chrome execution failures
     - Successful conversion
     """
+    svg_processor = SvgProcessor()
+
     # Chrome executable not set, return same content
     svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
-    mime, content = replace_svg_with_png(svg)
-    assert mime == IMAGE_SVG, content == svg
+    mime, content = svg_processor.replace_svg_with_png(svg)
+    assert mime == svg_processor.IMAGE_SVG, content == svg
 
     # Chrome executable test script returns empty, return same content
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
-    mime, content = replace_svg_with_png(svg)
-    assert mime == IMAGE_SVG, content == svg
+    mime, content = svg_processor.replace_svg_with_png(svg)
+    assert mime == svg_processor.IMAGE_SVG, content == svg
 
     # Valid input with chrome executable test script set correctly, return script output
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[WRITE_OUTPUT] = "true"
     svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
-    mime, content = replace_svg_with_png(svg)
-    assert mime == IMAGE_PNG
+    mime, content = svg_processor.replace_svg_with_png(svg)
+    assert mime == svg_processor.IMAGE_PNG
     assert content == cropped_test_script_output
 
 
@@ -384,12 +375,14 @@ def test_prepare_temp_files():
 
     Tests creation of temporary files for SVG input and PNG output.
     """
+    svg_processor = SvgProcessor()
+
     # Test with no content
-    svg_filepath, png_filepath = prepare_temp_files(None)
+    svg_filepath, png_filepath = svg_processor.prepare_temp_files(None)
     assert svg_filepath is None and png_filepath is None
 
     # Test with content
-    svg_filepath, png_filepath = prepare_temp_files("test")
+    svg_filepath, png_filepath = svg_processor.prepare_temp_files("test")
     assert svg_filepath is not None and svg_filepath != ""
     assert png_filepath is not None and png_filepath != ""
 
@@ -404,25 +397,27 @@ def test_convert_svg_to_png():
     - Invalid Chrome path
     - Successful conversion
     """
+    svg_processor = SvgProcessor()
+
     # Test missing Chrome executable
-    res = convert_svg_to_png(1, 1, Path("/"), Path("/"))
+    res = svg_processor.convert_svg_to_png(1, 1, Path("/"), Path("/"))
     assert not res
 
     # Test Chrome execution failure
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[EXIT_ONE] = "true"
-    res = convert_svg_to_png(1, 1, Path("/"), Path("/"))
+    res = svg_processor.convert_svg_to_png(1, 1, Path("/"), Path("/"))
     assert not res
 
     # Test invalid Chrome path
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = "definitely_not_a_valid_command"
-    res = convert_svg_to_png(1, 1, Path("/"), Path("/"))
+    res = svg_processor.convert_svg_to_png(1, 1, Path("/"), Path("/"))
     assert not res
 
     # Test successful conversion
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[EXIT_ONE] = ""
-    res = convert_svg_to_png(1, 1, Path("/"), Path("/"))
+    res = svg_processor.convert_svg_to_png(1, 1, Path("/"), Path("/"))
     assert res
 
 
@@ -437,11 +432,13 @@ def test_read_and_cleanup_png():
     png_file.touch()
     png_file.write_bytes(b"test")
 
+    svg_processor = SvgProcessor()
+
     # Test reading content
-    assert read_and_cleanup_png(png_file) == b"test"
+    assert svg_processor.read_and_cleanup_png(png_file) == b"test"
 
     # Test file cleanup
-    assert read_and_cleanup_png(png_file) is None
+    assert svg_processor.read_and_cleanup_png(png_file) is None
 
 
 @setup_env_variables
@@ -450,12 +447,14 @@ def test_create_chromium_command():
 
     Tests command line argument construction for Chrome headless mode.
     """
+    svg_processor = SvgProcessor()
+
     # Test without Chrome executable
-    assert create_chromium_command(1, 1, Path("/"), Path("/")) is None
+    assert svg_processor.create_chromium_command(1, 1, Path("/"), Path("/")) is None
 
     # Test with Chrome executable
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = "/"
-    assert create_chromium_command(1, 1, Path("/"), Path("/")) == [
+    assert svg_processor.create_chromium_command(1, 1, Path("/"), Path("/")) == [
         "/",
         "--headless=new",
         "--no-sandbox",
@@ -478,8 +477,8 @@ def test_to_base64():
 
     Tests encoding of both bytes and string inputs.
     """
-    assert to_base64(b"00000") == "MDAwMDA="
-    assert to_base64("abcde") == "YWJjZGU="
+    assert SvgProcessor().to_base64(b"00000") == "MDAwMDA="
+    assert SvgProcessor().to_base64("abcde") == "YWJjZGU="
 
 
 @setup_env_variables
@@ -488,14 +487,15 @@ def test_convert_to_px():
 
     Tests conversion of different units to pixel values.
     """
-    assert convert_to_px("10", "px") == 10
-    assert convert_to_px("1", "mm") == 378
-    assert convert_to_px(None, "px") is None
-    assert convert_to_px("abc", "px") is None
-    assert convert_to_px("100", "vh") is None
-    assert convert_to_px("100", "vw") is None
-    assert convert_to_px("100", "%") is None
-    assert convert_to_px("27.595", "ex") == 221
+    svg_processor = SvgProcessor()
+    assert svg_processor.convert_to_px("10", "px") == 10
+    assert svg_processor.convert_to_px("1", "mm") == 378
+    assert svg_processor.convert_to_px(None, "px") is None
+    assert svg_processor.convert_to_px("abc", "px") is None
+    assert svg_processor.convert_to_px("100", "vh") is None
+    assert svg_processor.convert_to_px("100", "vw") is None
+    assert svg_processor.convert_to_px("100", "%") is None
+    assert svg_processor.convert_to_px("27.595", "ex") == 221
 
 
 @setup_env_variables
@@ -504,15 +504,16 @@ def test_px_conversion_ratio():
 
     Tests conversion ratios for standard CSS units.
     """
-    assert get_px_conversion_ratio("px") == 1
-    assert get_px_conversion_ratio("pt") == 4 / 3
-    assert get_px_conversion_ratio("in") == 96
-    assert get_px_conversion_ratio("cm") == 96 / 2.54
-    assert get_px_conversion_ratio("mm") == 96 / 2.54 * 10
-    assert get_px_conversion_ratio("pc") == 16
-    assert get_px_conversion_ratio("ex") == 8
-    assert get_px_conversion_ratio("abcde") == 1
-    assert get_px_conversion_ratio(None) == 1
+    svg_processor = SvgProcessor()
+    assert svg_processor.get_px_conversion_ratio("px") == 1
+    assert svg_processor.get_px_conversion_ratio("pt") == 4 / 3
+    assert svg_processor.get_px_conversion_ratio("in") == 96
+    assert svg_processor.get_px_conversion_ratio("cm") == 96 / 2.54
+    assert svg_processor.get_px_conversion_ratio("mm") == 96 / 2.54 * 10
+    assert svg_processor.get_px_conversion_ratio("pc") == 16
+    assert svg_processor.get_px_conversion_ratio("ex") == 8
+    assert svg_processor.get_px_conversion_ratio("abcde") == 1
+    assert svg_processor.get_px_conversion_ratio(None) == 1
 
 
 @setup_env_variables
@@ -531,18 +532,20 @@ def test_crop_png():
         with Image.new("RGBA", (10, 20)) as img:
             img.save(temp_file)
 
+        svg_processor = SvgProcessor()
+
         # Test successful crop
-        assert crop_png(temp_file, 5) is True
+        assert svg_processor.crop_png(temp_file, 5) is True
 
         # Verify dimensions after crop
         with Image.open(temp_file) as img:
             assert img.size == (10, 15)
 
         # Test crop more than height
-        assert crop_png(temp_file, 20) is False
+        assert svg_processor.crop_png(temp_file, 20) is False
 
         # Test invalid file
-        assert crop_png(Path("nonexistent.png"), 5) is False
+        assert svg_processor.crop_png(Path("nonexistent.png"), 5) is False
     finally:
         if temp_file.exists():
             temp_file.unlink()
@@ -557,25 +560,27 @@ def test_calculate_dimension():
     - Relative units with viewBox
     - Error handling
     """
+    svg_processor = SvgProcessor()
+
     # Test absolute units
-    assert calculate_dimension("100", "px", None) == 100
-    assert calculate_dimension("75", "pt", None) == 100  # 75 * 4/3 = 100
+    assert svg_processor.calculate_dimension("100", "px", None) == 100
+    assert svg_processor.calculate_dimension("75", "pt", None) == 100  # 75 * 4/3 = 100
 
     # Test relative units with viewBox
-    assert calculate_dimension("100", "vw", 800.0) == 800
-    assert calculate_dimension("50", "vh", 600.0) == 300
-    assert calculate_dimension("50", "%", 1000.0) == 500
+    assert svg_processor.calculate_dimension("100", "vw", 800.0) == 800
+    assert svg_processor.calculate_dimension("50", "vh", 600.0) == 300
+    assert svg_processor.calculate_dimension("50", "%", 1000.0) == 500
 
     # Test relative units without viewBox
     try:
-        calculate_dimension("100", "vw", None)
+        svg_processor.calculate_dimension("100", "vw", None)
         raise AssertionError("Should raise ValueError")
     except ValueError as e:
         assert "vw units require a viewBox to be defined" in str(e)
 
     # Test invalid input
-    assert calculate_dimension(None, "px", None) is None
-    assert calculate_dimension("abc", "px", None) is None
+    assert svg_processor.calculate_dimension(None, "px", None) is None
+    assert svg_processor.calculate_dimension("abc", "px", None) is None
 
 
 @setup_env_variables
@@ -584,10 +589,12 @@ def test_replace_svg_size_attributes():
 
     Tests updating width/height attributes in SVG content.
     """
+    svg_processor = SvgProcessor()
+
     # Test valid SVG
     svg = DET.fromstring('<svg width="100" height="100"></svg>')
-    updated_svg = replace_svg_size_attributes(svg, 200, 300)
-    result = svg_to_string(updated_svg)
+    updated_svg = svg_processor.replace_svg_size_attributes(svg, 200, 300)
+    result = svg_processor.svg_to_string(updated_svg)
     assert 'width="200px"' in result
     assert 'height="300px"' in result
 
@@ -598,22 +605,24 @@ def test_calculate_special_unit():
 
     Tests conversion of viewport and percentage units.
     """
+    svg_processor = SvgProcessor()
+
     # Test percentage
-    assert calculate_special_unit("50", "%", 1000) == 500
+    assert svg_processor.calculate_special_unit("50", "%", 1000) == 500
 
     # Test viewport units
-    assert calculate_special_unit("100", "vw", 800) == 800
-    assert calculate_special_unit("50", "vh", 600) == 300
+    assert svg_processor.calculate_special_unit("100", "vw", 800) == 800
+    assert svg_processor.calculate_special_unit("50", "vh", 600) == 300
 
     # Test non-special unit (should use convert_to_px)
-    assert calculate_special_unit("75", "pt", 1000) == 100  # 75 * 4/3 = 100
+    assert svg_processor.calculate_special_unit("75", "pt", 1000) == 100  # 75 * 4/3 = 100
 
     # Test invalid unit (should use default conversion ratio of 1.0)
-    assert calculate_special_unit("100", "invalid", 1000) == 100  # 100 * 1.0 = 100
+    assert svg_processor.calculate_special_unit("100", "invalid", 1000) == 100  # 100 * 1.0 = 100
 
     # Test invalid value
     try:
-        calculate_special_unit("abc", "px", 1000)
+        svg_processor.calculate_special_unit("abc", "px", 1000)
         raise AssertionError("Should raise ValueError")
     except ValueError as e:
         assert "could not convert string to float: 'abc'" in str(e)
@@ -629,19 +638,22 @@ def test_process_svg_comprehensive():
     - Single SVG conversion
     - Multiple SVG conversion
     """
+    html_parser = HtmlParser()
+    svg_processor = SvgProcessor()
+
     # Test non-SVG image
     html = '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="/>'
-    assert serialize(process_svg(deserialize(html))) == html
+    assert html_parser.serialize(svg_processor.process_svg(html_parser.parse(html))) == html
 
     # Test invalid base64
     html = '<img src="data:image/svg+xml;base64,invalid==="/>'
-    assert serialize(process_svg(deserialize(html))) == html
+    assert html_parser.serialize(svg_processor.process_svg(html_parser.parse(html))) == html
 
     # Test valid conversion
     os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ[WRITE_OUTPUT] = "true"
     html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>'
-    result = serialize(process_svg(deserialize(html)))
+    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
     assert "image/png" in result
     assert "base64" in result
 
@@ -650,7 +662,7 @@ def test_process_svg_comprehensive():
         <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
         <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
     """
-    result = serialize(process_svg(deserialize(html)))
+    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
     assert result.count("image/png") == 2
 
 
@@ -673,6 +685,7 @@ def test_get_svg_content_with_namespace(svg_content, expected_output):
 
     Tests processing of SVG content with XML namespaces and nested elements.
     """
-    svg = get_svg("image/svg+xml", to_base64(svg_content))
-    content = svg_to_string(svg)
+    svg_processor = SvgProcessor()
+    svg = svg_processor.get_svg("image/svg+xml", svg_processor.to_base64(svg_content))
+    content = svg_processor.svg_to_string(svg)
     assert content == expected_output

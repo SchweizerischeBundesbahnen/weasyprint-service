@@ -1,8 +1,6 @@
 import pytest
 
-from app.html_utils import (
-    deserialize, serialize,
-)
+from app.html_parser import HtmlParser
 
 
 @pytest.mark.parametrize(
@@ -68,8 +66,9 @@ from app.html_utils import (
     ],
 )
 def test_process_html_inputs(html: str, expected_output: str):
-    html = deserialize(html)
-    output = serialize(html)
+    html_parser = HtmlParser()
+    html = html_parser.parse(html)
+    output = html_parser.serialize(html)
     assert __strip_string(output) == __strip_string(expected_output)
 
 

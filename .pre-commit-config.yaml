@@ -48,6 +48,13 @@ repos:
         exclude: (^tests/)
         args: [--config-file, pyproject.toml]
         require_serial: true  # Serial processing is required for mypy (better performance and error reporting)
+      - id: generate-openapi
+        name: Generate OpenAPI (update app/static/openapi.json)
+        entry: scripts/precommit_generate_openapi.sh
+        language: script
+        pass_filenames: false
+        files: ^(app/.*\.py|scripts/.*\.py|pyproject\.toml)$
+        stages: [pre-commit]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.12
     hooks:

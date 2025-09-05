@@ -51,8 +51,8 @@ def test_convert_html_with_attachments():
         result = test_client.post(
             "/convert/html-with-attachments",
         )
-        # Missing required form field 'html' should return 422 Unprocessable Entity
-        assert result.status_code == 422
+        # Missing required form field 'html' should return 400 Bad Request
+        assert result.status_code == 400
 
 
 def test_convert_html_with_attachments_files():

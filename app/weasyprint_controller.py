@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import unquote
 
-import uvicorn
 import weasyprint  # type: ignore
-from fastapi import Depends, FastAPI, File, Form, Query, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, Query, Request, Response
 from pydantic import BaseModel
 
 from app.attachment_manager import AttachmentManager
+from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.schemas import VersionSchema
 from app.svg_processor import SvgProcessor
@@ -212,17 +212,26 @@ async def __get_encoding(request: Request, encoding: str | None) -> str:
     tags=["convert"],
 )
 async def convert_html_with_attachments(
+    request: Request,
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
-    html: str = Form(..., title="HTML", description="HTML content to render to PDF."),
-    files: Annotated[list[UploadFile] | None, File(title="Attachments", description="Files to embed as PDF attachments.")] = None,
 ) -> Response:
     """
     Convert HTML to PDF and embed provided files as PDF attachments.
+
+    Expects a multipart/form-data request where:
+      - field 'html' contains the HTML content
+      - remaining file parts are treated as attachments
     """
     tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
     try:
-        base_url = unquote(render.base_url, encoding=render.encoding) if render.base_url else None
+        encoding: str = await __get_encoding(request, render.encoding)
+        base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
+
+        form_parser = FormParser()
+        form = await form_parser.parse(request)
+        html = form_parser.html_from_form(form, encoding)
+        files = form_parser.collect_files_from_form(form)
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
@@ -262,7 +271,7 @@ async def convert_html_with_attachments(
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-async def __create_response(output: Annotated[OutputOptions, Depends(get_output_options)], output_pdf: bytes | None) -> Response:
+async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> Response:
     response = Response(output_pdf, media_type="application/pdf", status_code=200)
     response.headers.append("Content-Disposition", f"attachment; filename={output.file_name}")
     response.headers.append("Python-Version", platform.python_version())
@@ -274,7 +283,3 @@ async def __create_response(output: Annotated[OutputOptions, Depends(get_output_
 def __process_error(e: Exception, err_msg: str, status: int) -> Response:
     logging.exception(msg=err_msg + ": " + str(e))
     return Response(err_msg + ": " + getattr(e, "message", repr(e)), media_type="plain/text", status_code=status)
-
-
-def start_server(port: int) -> None:
-    uvicorn.run(app=app, host="", port=port)

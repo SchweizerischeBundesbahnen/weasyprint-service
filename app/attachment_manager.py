@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup, Tag
 if TYPE_CHECKING:  # imports used only for type hints
     from collections.abc import Sequence
 
-    from fastapi import UploadFile
+    from starlette.datastructures import UploadFile
 
 
 class AttachmentManager:

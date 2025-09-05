@@ -19,7 +19,7 @@ def test_main_runs(monkeypatch, tmp_path):
     def fake_start_server(port):
         logger.info(f"Fake server started on port {port}")
 
-    monkeypatch.setattr(weasyprint_service_application.weasyprint_controller, "start_server", fake_start_server)
+    monkeypatch.setattr(weasyprint_service_application, "start_server", fake_start_server)
 
     # Run main and verify
     weasyprint_service_application.main()

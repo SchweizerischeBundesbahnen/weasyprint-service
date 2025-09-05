@@ -43,25 +43,30 @@ class AttachmentManager:
         for tag in soup.find_all(["a", "link"]):
             if not isinstance(tag, Tag):
                 continue
-
-            rels = tag.get("rel")
-            # SonarCloud: extract nested conditional into independent statements for readability
-            rel_list: list[str] = []
-            if isinstance(rels, str):
-                if rels:
-                    rel_list = [r.strip().lower() for r in rels.split()]
-            elif isinstance(rels, list | tuple):
-                rel_list = [str(r).lower() for r in rels]
-            else:
-                rel_list = []
-            if "attachment" not in rel_list:
+            if not self._has_attachment_rel(tag):
                 continue
-
-            href = tag.get("href")
-            if isinstance(href, str):
-                names.add(Path(unquote(href)).name)
+            name = self._resolve_href_name(tag)
+            if name:
+                names.add(name)
 
         return names
+
+    def _has_attachment_rel(self, tag: Tag) -> bool:
+        """Return True if the tag has rel attribute including 'attachment'."""
+        rels = tag.get("rel")
+        rel_list: list[str] = []
+        if isinstance(rels, str):
+            if rels:
+                rel_list = [r.strip().lower() for r in rels.split()]
+        elif isinstance(rels, (list | tuple)):
+            rel_list = [str(r).lower() for r in rels]
+        return "attachment" in rel_list
+
+    def _resolve_href_name(self, tag: Tag) -> str | None:
+        href = tag.get("href")
+        if not isinstance(href, str):
+            return None
+        return Path(unquote(href)).name
 
     def rewrite_attachment_links_to_file_uri(
         self,
@@ -72,34 +77,24 @@ class AttachmentManager:
         Rewrite href in <a|link rel="attachment"...> to absolute file:// URIs
         so that PDF viewers can click and open the embedded file.
         """
+        # Build the set of referenced names using the existing helper to avoid duplication
+        referenced_names = self.find_referenced_attachment_names(soup)
+        if not referenced_names:
+            return soup
+
+        # Iterate again and only rewrite those attachment links whose basename matches a saved file
         for tag in soup.find_all(["a", "link"]):
             if not isinstance(tag, Tag):
                 continue
-
-            rels = tag.get("rel")
-            # SonarCloud: extract nested conditional into independent statements for readability
-            rel_list: list[str] = []
-            if isinstance(rels, str):
-                if rels:
-                    rel_list = [r.strip().lower() for r in rels.split()]
-            elif isinstance(rels, list | tuple):
-                rel_list = [str(r).lower() for r in rels]
-            else:
-                rel_list = []
-            if "attachment" not in rel_list:
+            if not self._has_attachment_rel(tag):
                 continue
-
-            href = tag.get("href")
-            if not isinstance(href, str):
+            name = self._resolve_href_name(tag)
+            if not name or name not in referenced_names:
                 continue
-
-            name = Path(unquote(href)).name
             p = name_to_path.get(name)
             if not p:
                 continue
-
             tag["href"] = p.resolve().as_uri()
-
         return soup
 
     # ---------- Upload handling ----------

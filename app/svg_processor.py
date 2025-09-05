@@ -198,7 +198,7 @@ class SvgProcessor:
         if not self.convert_svg_to_png(width, height + self.chromium_height_adjustment, png_filepath, svg_filepath):
             return self.without_changes(svg)
 
-        if not self.crop_png(png_filepath, round(self.chromium_height_adjustment * self.device_scale_factor)):
+        if not self.crop_png(png_filepath, max(1, round(self.chromium_height_adjustment * self.device_scale_factor))):
             return self.without_changes(svg)
 
         png_content = self.read_and_cleanup_png(png_filepath)

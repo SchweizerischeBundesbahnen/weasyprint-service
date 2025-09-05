@@ -45,7 +45,15 @@ class AttachmentManager:
                 continue
 
             rels = tag.get("rel")
-            rel_list = ([r.strip().lower() for r in rels.split()] if rels else []) if isinstance(rels, str) else [str(r).lower() for r in rels] if isinstance(rels, list | tuple) else []
+            # SonarCloud: extract nested conditional into independent statements for readability
+            rel_list: list[str] = []
+            if isinstance(rels, str):
+                if rels:
+                    rel_list = [r.strip().lower() for r in rels.split()]
+            elif isinstance(rels, list | tuple):
+                rel_list = [str(r).lower() for r in rels]
+            else:
+                rel_list = []
             if "attachment" not in rel_list:
                 continue
 
@@ -69,7 +77,15 @@ class AttachmentManager:
                 continue
 
             rels = tag.get("rel")
-            rel_list = ([r.strip().lower() for r in rels.split()] if rels else []) if isinstance(rels, str) else [str(r).lower() for r in rels] if isinstance(rels, list | tuple) else []
+            # SonarCloud: extract nested conditional into independent statements for readability
+            rel_list: list[str] = []
+            if isinstance(rels, str):
+                if rels:
+                    rel_list = [r.strip().lower() for r in rels.split()]
+            elif isinstance(rels, list | tuple):
+                rel_list = [str(r).lower() for r in rels]
+            else:
+                rel_list = []
             if "attachment" not in rel_list:
                 continue
 

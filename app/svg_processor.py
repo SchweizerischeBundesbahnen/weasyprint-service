@@ -112,15 +112,11 @@ class SvgProcessor:
                 continue
 
             src = self._get_attr_str(node, "src")
-            if not src or not src.startswith(SvgProcessor.DATA_PREFIX) or ";base64," not in src:
+            parsed = self._parse_data_url_base64(src) if src else None
+            if not parsed:
                 continue
 
-            header, b64data = src.split(";base64,", 1)
-            if not header.startswith(SvgProcessor.DATA_PREFIX):
-                continue
-
-            content_type = header[len(SvgProcessor.DATA_PREFIX) :]
-            content_base64 = b64data
+            content_type, content_base64 = parsed
 
             svg = self.get_svg(content_type, content_base64)
             if svg is None:
@@ -161,6 +157,19 @@ class SvgProcessor:
             logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
     # ---------------- Core helpers ----------------
+
+    def _parse_data_url_base64(self, src: str | None) -> tuple[str, str] | None:
+        """
+        Parse a data URL of the form "data:<content-type>;base64,<payload>".
+        Returns a tuple (content_type, base64_payload) or None if not applicable.
+        """
+        if not src or not src.startswith(self.DATA_PREFIX) or ";base64," not in src:
+            return None
+        header, b64data = src.split(";base64,", 1)
+        if not header.startswith(self.DATA_PREFIX):
+            return None
+        content_type = header[len(self.DATA_PREFIX) :]
+        return content_type, b64data
 
     def get_svg(self, content_type: str, content_base64: str) -> Element | None:
         """

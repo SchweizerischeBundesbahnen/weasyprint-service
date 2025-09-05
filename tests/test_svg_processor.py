@@ -203,6 +203,13 @@ def test_parse_svg_dimension(svg_content: str, dimension: str, expected: tuple[s
         ("<svg></svg>", (None, None)),  # No viewBox
         ('<svg viewBox="0 0 800"></svg>', (None, None)),  # Invalid viewBox (missing height)
         ('<svg viewBox="0 0 800.5 600.5"></svg>', (800.5, 600.5)),  # Decimal values
+        ('<svg viewBox="0,0,800,600"></svg>', (800.0, 600.0)),  # Comma-separated tokens
+        ('<svg viewBox="0, 0 800, 600"></svg>', (800.0, 600.0)),  # Mixed commas and spaces
+        ('<svg viewBox="   0   0    800    600   "></svg>', (800.0, 600.0)),  # Extra whitespace
+        ('<svg viewBox="0 0 abc 600"></svg>', (None, None)),  # Non-numeric width
+        ('<svg viewBox="0 0 800 def"></svg>', (None, None)),  # Non-numeric height
+        ('<svg viewBox="-10 -20 800.25 600.75"></svg>', (800.25, 600.75)),  # Negative mins, float dims
+        ('<svg viewBox="0 0 800 600 700"></svg>', (None, None)),  # Too many tokens
     ],
 )
 @setup_env_variables
@@ -278,6 +285,8 @@ def test_extract_svg_dimensions_relative_units_error(svg_content: str, expected_
         ('<svg width="50vw" height="50vh" viewBox="0 0 800 600"></svg>', 400, 300),
         ('<svg width="100%" height="100%" viewBox="0 0 800 600"></svg>', 800, 600),
         ('<svg width="50%" height="25%" viewBox="0 0 800 600"></svg>', 400, 150),
+        ('<svg width="50%" height="25%" viewBox="0,0,800,600"></svg>', 400, 150),  # Comma-separated viewBox
+        ('<svg width="50%" height="25%" viewBox="0, 0 800, 600"></svg>', 400, 150),  # Mixed separators
     ],
 )
 @setup_env_variables

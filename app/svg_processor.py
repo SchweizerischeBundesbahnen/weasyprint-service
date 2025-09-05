@@ -40,6 +40,7 @@ class SvgProcessor:
     IMAGE_PNG = "image/png"
     IMAGE_SVG = "image/svg+xml"
     NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
+    VIEWBOX_PARTS_COUNT = 4  # min-x, min-y, width, height
 
     def __init__(
         self,
@@ -286,14 +287,17 @@ class SvgProcessor:
         if viewbox is None:
             return None, None
 
-        match = re.search(
-            r"[\d.\-]+\s+[\d.\-]+\s+(?P<vb_width>[\d.\-]+)\s+(?P<vb_height>[\d.\-]+)",
-            viewbox,
-            flags=re.IGNORECASE,
-        )
-        if match:
-            return float(match.group("vb_width")), float(match.group("vb_height"))
-        return None, None
+        # SVG viewBox format: "min-x min-y width height" with spaces and/or commas.
+        try:
+            # Normalize commas to spaces and split on whitespace
+            parts = viewbox.replace(",", " ").split()
+            if len(parts) != SvgProcessor.VIEWBOX_PARTS_COUNT:
+                return None, None
+            vb_width = float(parts[2])
+            vb_height = float(parts[3])
+            return vb_width, vb_height
+        except Exception:
+            return None, None
 
     def calculate_dimension(
         self,

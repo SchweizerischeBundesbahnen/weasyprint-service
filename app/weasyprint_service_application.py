@@ -4,6 +4,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import uvicorn
+
 from app import weasyprint_controller  # type: ignore
 
 
@@ -68,6 +70,10 @@ def setup_logging() -> Path:
     return log_file  # Return log file path for testing
 
 
+def start_server(port: int) -> None:
+    uvicorn.run(app=weasyprint_controller.app, host="", port=port)
+
+
 def main() -> None:
     """
     Main entry point for the WeasyPrint service.
@@ -82,7 +88,7 @@ def main() -> None:
     setup_logging()
     logging.info("Weasyprint service listening port: " + str(args.port))
 
-    weasyprint_controller.start_server(args.port)
+    start_server(args.port)
 
 
 if __name__ == "__main__":

@@ -8,13 +8,12 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import unquote
 
-import uvicorn
 import weasyprint  # type: ignore
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Depends, FastAPI, Query, Request, Response
 from pydantic import BaseModel
-from starlette.datastructures import FormData, UploadFile
 
 from app.attachment_manager import AttachmentManager
+from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.schemas import VersionSchema
 from app.svg_processor import SvgProcessor
@@ -26,45 +25,6 @@ app = FastAPI(
     docs_url="/api/docs",
     openapi_version="3.1.0",
 )
-
-
-def _get_int_env(name: str, default: int) -> int:
-    """Read positive int from env var or fall back to default."""
-    try:
-        value = int(os.environ.get(name, str(default)))
-        return max(0, value)
-    except (ValueError, TypeError):
-        return default
-
-
-async def _parse_form_with_limits(request: Request) -> FormData:
-    max_files_env = _get_int_env("FORM_MAX_FILES", 1000)
-    max_fields_env = _get_int_env("FORM_MAX_FIELDS", 1000)
-    max_part_size_env = _get_int_env("FORM_MAX_PART_SIZE", 10 * 1024 * 1024)
-    return await request.form(
-        max_files=max_files_env,
-        max_fields=max_fields_env,
-        max_part_size=max_part_size_env,
-    )
-
-
-def _html_from_form(form: FormData, encoding: str) -> str:
-    html_field = form.get("html")
-    if html_field is None:
-        raise HTTPException(400, "Missing html form field")
-    return html_field.decode(encoding) if isinstance(html_field, bytes) else str(html_field)
-
-
-def _collect_files_from_form(form: FormData) -> list[UploadFile]:
-    files: list[UploadFile] = []
-    seen_names: set[str] = set()
-    for v in form.getlist("files"):
-        if isinstance(v, UploadFile):
-            name = Path(v.filename).name if v.filename else "attachment.bin"
-            if name not in seen_names:
-                files.append(v)
-                seen_names.add(name)
-    return files
 
 
 @app.get(
@@ -268,9 +228,10 @@ async def convert_html_with_attachments(
         encoding: str = await __get_encoding(request, render.encoding)
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
 
-        form = await _parse_form_with_limits(request)
-        html = _html_from_form(form, encoding)
-        files = _collect_files_from_form(form)
+        form_parser = FormParser()
+        form = await form_parser.parse(request)
+        html = form_parser.html_from_form(form, encoding)
+        files = form_parser.collect_files_from_form(form)
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
@@ -322,7 +283,3 @@ async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> 
 def __process_error(e: Exception, err_msg: str, status: int) -> Response:
     logging.exception(msg=err_msg + ": " + str(e))
     return Response(err_msg + ": " + getattr(e, "message", repr(e)), media_type="plain/text", status_code=status)
-
-
-def start_server(port: int) -> None:
-    uvicorn.run(app=app, host="", port=port)

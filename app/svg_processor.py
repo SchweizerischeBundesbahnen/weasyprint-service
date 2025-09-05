@@ -41,6 +41,7 @@ class SvgProcessor:
     IMAGE_SVG = "image/svg+xml"
     NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
     VIEWBOX_PARTS_COUNT = 4  # min-x, min-y, width, height
+    DATA_PREFIX = "data:"
 
     def __init__(
         self,
@@ -111,14 +112,14 @@ class SvgProcessor:
                 continue
 
             src = self._get_attr_str(node, "src")
-            if not src or not src.startswith("data:") or ";base64," not in src:
+            if not src or not src.startswith(SvgProcessor.DATA_PREFIX) or ";base64," not in src:
                 continue
 
             header, b64data = src.split(";base64,", 1)
-            if not header.startswith("data:"):
+            if not header.startswith(SvgProcessor.DATA_PREFIX):
                 continue
 
-            content_type = header[len("data:") :]
+            content_type = header[len(SvgProcessor.DATA_PREFIX) :]
             content_base64 = b64data
 
             svg = self.get_svg(content_type, content_base64)

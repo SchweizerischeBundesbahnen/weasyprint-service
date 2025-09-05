@@ -91,6 +91,24 @@
             "description": "Base URL used to resolve relative links (stylesheets, images)."
           },
           {
+            "name": "scale_factor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scale Factor",
+              "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided."
+            },
+            "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided."
+          },
+          {
             "name": "file_name",
             "in": "query",
             "required": false,
@@ -229,6 +247,24 @@
               "description": "Base URL used to resolve relative links (stylesheets, images)."
             },
             "description": "Base URL used to resolve relative links (stylesheets, images)."
+          },
+          {
+            "name": "scale_factor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scale Factor",
+              "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided."
+            },
+            "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided."
           },
           {
             "name": "file_name",

@@ -13,12 +13,10 @@ import weasyprint  # type: ignore
 from fastapi import Depends, FastAPI, File, Form, Query, Request, Response, UploadFile
 from pydantic import BaseModel
 
-from app import (
-    attachment_utils,  # type: ignore
-    html_utils,
-    svg_utils,  # type: ignore
-)
+from app.attachment_manager import AttachmentManager
+from app.html_parser import HtmlParser
 from app.schemas import VersionSchema
+from app.svg_processor import SvgProcessor
 
 app = FastAPI(
     title="WeasyPrint Service API",
@@ -59,12 +57,14 @@ class RenderOptions(BaseModel):
         media_type: CSS media type to apply when rendering ("print" or "screen" are typical).
         presentational_hints: Whether to honor presentational HTML attributes as CSS hints.
         base_url: Base URL used to resolve relative links (e.g., stylesheets, images).
+        scale_factor: Device scale factor used for SVG/PNG rendering. If not provided, falls back to DEVICE_SCALE_FACTOR env var.
     """
 
     encoding: str = "utf-8"
     media_type: str = "print"
     presentational_hints: bool = False
     base_url: str | None = None
+    scale_factor: float | None = None
 
 
 class OutputOptions(BaseModel):
@@ -103,12 +103,18 @@ def get_render_options(
         title="Base URL",
         description="Base URL used to resolve relative links (stylesheets, images).",
     ),
+    scale_factor: float | None = Query(
+        None,
+        title="Scale Factor",
+        description="Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided.",
+    ),
 ) -> RenderOptions:
     return RenderOptions(
         encoding=encoding,
         media_type=media_type,
         presentational_hints=presentational_hints,
         base_url=base_url,
+        scale_factor=scale_factor,
     )
 
 
@@ -158,9 +164,10 @@ async def convert_html(
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
 
         html = raw.decode(encoding)
-        parsed_html = html_utils.deserialize(html)
-        parsed_html = svg_utils.process_svg(parsed_html)
-        processed_html = html_utils.serialize(parsed_html)
+        html_parser = HtmlParser()
+        parsed_html = html_parser.parse(html)
+        parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
+        processed_html = html_parser.serialize(parsed_html)
 
         weasyprint_html = weasyprint.HTML(
             string=processed_html,
@@ -217,19 +224,18 @@ async def convert_html_with_attachments(
     try:
         base_url = unquote(render.base_url, encoding=render.encoding) if render.base_url else None
 
-        parsed_html = html_utils.deserialize(html)
-        parsed_html = svg_utils.process_svg(parsed_html)
+        html_parser = HtmlParser()
+        parsed_html = html_parser.parse(html)
+        parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
 
-        # 1. find names referenced in HTML via rel="attachment"
-        referenced: set[str] = attachment_utils.find_referenced_attachment_names(parsed_html)
-        # 2. persist uploads into tmpdir and get mapping {name -> Path}
-        name_to_path: dict[str, Path] = await attachment_utils.save_uploads_to_tmpdir(files, Path(tmpdir))
-        # 3. build attachments only for files NOT referenced in HTML
-        attachments: list[weasyprint.Attachment] = attachment_utils.build_attachments_for_unreferenced(name_to_path, referenced)
-        # 4. rewrite rel="attachment" hrefs to absolute file:// URIs pointing to saved files
-        parsed_html = attachment_utils.rewrite_attachment_links_to_file_uri(parsed_html, name_to_path)
+        attachment_manager = AttachmentManager()
+        parsed_html, attachments = await attachment_manager.process_html_and_uploads(
+            parsed_html=parsed_html,
+            files=files,
+            tmpdir=Path(tmpdir),
+        )
 
-        processed_html = html_utils.serialize(parsed_html)
+        processed_html = html_parser.serialize(parsed_html)
 
         weasyprint_html = weasyprint.HTML(
             string=processed_html,

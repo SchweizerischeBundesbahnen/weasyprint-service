@@ -172,7 +172,7 @@ poetry run pytest
 
 ```bash
 # a specific test
-poetry run pytest tests/test_svg_utils.py -v
+poetry run pytest tests/test_svg_processor.py -v
 ```
 
 #### pre-commit

@@ -2,16 +2,11 @@ import asyncio
 import io
 from pathlib import Path
 
-from app.attachment_utils import (
-    build_attachments_for_unreferenced,
-    find_referenced_attachment_names,
-    rewrite_attachment_links_to_file_uri,
-    save_uploads_to_tmpdir,
-)
 from fastapi import UploadFile
 import weasyprint  # type: ignore
 
-from app.html_utils import deserialize, serialize
+from app.attachment_manager import AttachmentManager
+from app.html_parser import HtmlParser
 
 
 def test_extracts_basenames_and_decodes():
@@ -21,7 +16,7 @@ def test_extracts_basenames_and_decodes():
         '<a href="nope.txt">ignore</a>'
         '<a rel="attachment">missing</a>'
     )
-    names = find_referenced_attachment_names(deserialize(html))
+    names = AttachmentManager().find_referenced_attachment_names(HtmlParser().parse(html))
     assert names == {"report final.pdf", "photo.png"}
 
 
@@ -31,7 +26,7 @@ def test_ignores_non_attachment_and_other_tags():
         "<link rel='preload' href='a.bin'>"
         '<p rel="attachment" href="weird">text</p>'
     )
-    assert find_referenced_attachment_names(deserialize(html)) == set()
+    assert AttachmentManager().find_referenced_attachment_names(HtmlParser().parse(html)) == set()
 
 
 def test_rewrites_only_attachment_links_matching_name(tmp_path: Path):
@@ -46,8 +41,9 @@ def test_rewrites_only_attachment_links_matching_name(tmp_path: Path):
         f"<a rel=\"attachment\" href=\"missing.bin\">M</a>"
         f"<a rel=\"stylesheet\" href=\"{a.name}\">CSS</a>"
     )
-    parsed_html = rewrite_attachment_links_to_file_uri(deserialize(html), {a.name: a, b.name: b})
-    out = serialize(parsed_html)
+    html_parser = HtmlParser()
+    parsed_html = AttachmentManager().rewrite_attachment_links_to_file_uri(html_parser.parse(html), {a.name: a, b.name: b})
+    out = html_parser.serialize(parsed_html)
 
     assert f'href="{a.resolve().as_uri()}"' in out
     assert f'href="{b.resolve().as_uri()}"' in out
@@ -61,8 +57,9 @@ def test_handles_urlencoded_names(tmp_path: Path):
     f = tmp_path / "my file.txt"
     f.write_text("x")
     html = "<a rel='attachment' href='dir/my%20file.txt'>click</a>"
-    parsed_html = rewrite_attachment_links_to_file_uri(deserialize(html), {f.name: f})
-    out = serialize(parsed_html)
+    html_parser = HtmlParser()
+    parsed_html = AttachmentManager().rewrite_attachment_links_to_file_uri(html_parser.parse(html), {f.name: f})
+    out = html_parser.serialize(parsed_html)
 
     assert f.resolve().as_uri() in out
 
@@ -78,7 +75,7 @@ def test_saves_files_and_uniquifies_names(tmp_path: Path):
     up2 = _mk_upload(b"two", "doc.txt")
     up3 = _mk_upload(b"bin", None)
 
-    mapping = asyncio.run(save_uploads_to_tmpdir([up1, up2, up3], tmp_path))
+    mapping = asyncio.run(AttachmentManager().save_uploads_to_tmpdir([up1, up2, up3], tmp_path))
 
     # Original base name should point to the last saved unique path
     assert set(mapping.keys()) == {"doc.txt", "attachment.bin"}
@@ -95,8 +92,9 @@ def test_saves_files_and_uniquifies_names(tmp_path: Path):
 
 
 def test_empty_or_none_files_returns_empty_mapping(tmp_path: Path):
-    assert asyncio.run(save_uploads_to_tmpdir([], tmp_path)) == {}
-    assert asyncio.run(save_uploads_to_tmpdir(None, tmp_path)) == {}
+    attachment_manager = AttachmentManager()
+    assert asyncio.run(attachment_manager.save_uploads_to_tmpdir([], tmp_path)) == {}
+    assert asyncio.run(attachment_manager.save_uploads_to_tmpdir(None, tmp_path)) == {}
 
 
 def test_builds_for_unreferenced_and_avoids_duplicates(tmp_path: Path):
@@ -108,7 +106,7 @@ def test_builds_for_unreferenced_and_avoids_duplicates(tmp_path: Path):
     mapping = {"a.pdf": p1, "b.pdf": p2, "alias-b.pdf": p2}
     referenced = {"a.pdf"}
 
-    atts = build_attachments_for_unreferenced(mapping, referenced)
+    atts = AttachmentManager().build_attachments_for_unreferenced(mapping, referenced)
 
     # Only b.pdf once
     assert len(atts) == 1
@@ -123,5 +121,5 @@ def test_builds_for_unreferenced_and_avoids_duplicates(tmp_path: Path):
 def test_all_referenced_results_empty(tmp_path: Path):
     p = tmp_path / "x.bin"
     p.write_bytes(b"x")
-    atts = build_attachments_for_unreferenced({"x.bin": p}, {"x.bin"})
+    atts = AttachmentManager().build_attachments_for_unreferenced({"x.bin": p}, {"x.bin"})
     assert atts == []

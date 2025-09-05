@@ -10,8 +10,9 @@ from urllib.parse import unquote
 
 import uvicorn
 import weasyprint  # type: ignore
-from fastapi import Depends, FastAPI, File, Form, Query, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, Query, Request, Response
 from pydantic import BaseModel
+from starlette.datastructures import FormData, UploadFile
 
 from app.attachment_manager import AttachmentManager
 from app.html_parser import HtmlParser
@@ -25,6 +26,45 @@ app = FastAPI(
     docs_url="/api/docs",
     openapi_version="3.1.0",
 )
+
+
+def _get_int_env(name: str, default: int) -> int:
+    """Read positive int from env var or fall back to default."""
+    try:
+        value = int(os.environ.get(name, str(default)))
+        return max(0, value)
+    except Exception:
+        return default
+
+
+async def _parse_form_with_limits(request: Request) -> FormData:
+    max_files_env = _get_int_env("FORM_MAX_FILES", 1000)
+    max_fields_env = _get_int_env("FORM_MAX_FIELDS", 1000)
+    max_part_size_env = _get_int_env("FORM_MAX_PART_SIZE", 10 * 1024 * 1024)
+    return await request.form(
+        max_files=max_files_env,
+        max_fields=max_fields_env,
+        max_part_size=max_part_size_env,
+    )
+
+
+def _html_from_form(form: FormData, encoding: str) -> str:
+    html_field = form.get("html")
+    if html_field is None:
+        raise AssertionError("Missing 'html' form field")
+    return html_field.decode(encoding) if isinstance(html_field, bytes) else str(html_field)
+
+
+def _collect_files_from_form(form: FormData) -> list[UploadFile]:
+    files: list[UploadFile] = []
+    seen_names: set[str] = set()
+    for v in form.getlist("files"):
+        if isinstance(v, UploadFile):
+            name = Path(v.filename).name if v.filename else "attachment.bin"
+            if name not in seen_names:
+                files.append(v)
+                seen_names.add(name)
+    return files
 
 
 @app.get(
@@ -212,17 +252,25 @@ async def __get_encoding(request: Request, encoding: str | None) -> str:
     tags=["convert"],
 )
 async def convert_html_with_attachments(
+    request: Request,
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
-    html: str = Form(..., title="HTML", description="HTML content to render to PDF."),
-    files: Annotated[list[UploadFile] | None, File(title="Attachments", description="Files to embed as PDF attachments.")] = None,
 ) -> Response:
     """
     Convert HTML to PDF and embed provided files as PDF attachments.
+
+    Expects a multipart/form-data request where:
+      - field 'html' contains the HTML content
+      - remaining file parts are treated as attachments
     """
     tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
     try:
-        base_url = unquote(render.base_url, encoding=render.encoding) if render.base_url else None
+        encoding: str = await __get_encoding(request, render.encoding)
+        base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
+
+        form = await _parse_form_with_limits(request)
+        html = _html_from_form(form, encoding)
+        files = _collect_files_from_form(form)
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
@@ -262,7 +310,7 @@ async def convert_html_with_attachments(
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-async def __create_response(output: Annotated[OutputOptions, Depends(get_output_options)], output_pdf: bytes | None) -> Response:
+async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> Response:
     response = Response(output_pdf, media_type="application/pdf", status_code=200)
     response.headers.append("Content-Disposition", f"attachment; filename={output.file_name}")
     response.headers.append("Python-Version", platform.python_version())

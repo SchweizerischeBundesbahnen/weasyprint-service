@@ -95,6 +95,46 @@ docker-compose up -d
 
 The Docker Compose configuration includes the `init: true` parameter which enables proper process management for the container.
 
+### Multipart form limits (environment variables)
+
+The endpoint /convert/html-with-attachments parses multipart/form-data and supports configuring Starlette's form parsing limits via environment variables:
+
+- FORM_MAX_FIELDS: Maximum number of non-file form fields to accept. Default: 1000.
+- FORM_MAX_FILES: Maximum number of file parts to accept. Default: 1000.
+- FORM_MAX_PART_SIZE: Maximum allowed size in bytes for any single part (file or field). Default: 10485760 (10 MiB).
+
+Notes:
+- Values are parsed as integers. Invalid or negative values fall back to the defaults (negative values are clamped to 0 internally).
+- These limits only affect the /convert/html-with-attachments endpoint. The endpoint requires Content-Type: multipart/form-data and will return 400 Bad Request otherwise.
+
+Examples:
+
+Docker run:
+```bash
+docker run --detach \
+  --init \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  -e FORM_MAX_FIELDS=2000 \
+  -e FORM_MAX_FILES=2000 \
+  -e FORM_MAX_PART_SIZE=20971520 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+docker-compose.yml:
+```yaml
+services:
+  weasyprint:
+    image: ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+    init: true
+    environment:
+      FORM_MAX_FIELDS: 2000
+      FORM_MAX_FILES: 2000
+      FORM_MAX_PART_SIZE: 20971520
+    ports:
+      - "9080:9080"
+```
+
 ## Development
 
 ### Building the Docker Image

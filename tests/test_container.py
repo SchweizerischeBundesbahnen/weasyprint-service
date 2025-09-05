@@ -20,9 +20,8 @@ class TestParameters(NamedTuple):
     flush_tmp_file_enabled: bool
     request_session: requests.Session
     container: Container
-
-# prevent pytest from collecting NamedTuple as a test
-TestParameters.__test__ = False
+    # prevent pytest from collecting NamedTuple as a test
+    __test__ = False
 
 
 @pytest.fixture(scope="module")

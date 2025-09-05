@@ -10,7 +10,7 @@ from urllib.parse import unquote
 
 import uvicorn
 import weasyprint  # type: ignore
-from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from pydantic import BaseModel
 from starlette.datastructures import FormData, UploadFile
 
@@ -33,7 +33,7 @@ def _get_int_env(name: str, default: int) -> int:
     try:
         value = int(os.environ.get(name, str(default)))
         return max(0, value)
-    except Exception:
+    except (ValueError, TypeError):
         return default
 
 
@@ -51,7 +51,7 @@ async def _parse_form_with_limits(request: Request) -> FormData:
 def _html_from_form(form: FormData, encoding: str) -> str:
     html_field = form.get("html")
     if html_field is None:
-        raise AssertionError("Missing 'html' form field")
+        raise HTTPException(400, "Missing html form field")
     return html_field.decode(encoding) if isinstance(html_field, bytes) else str(html_field)
 
 

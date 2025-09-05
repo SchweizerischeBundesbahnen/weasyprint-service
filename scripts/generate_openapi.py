@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app.weasyprint_controller import app
+
 DEFAULT_OUT = ROOT / "app" / "static" / "openapi.json"
 
 

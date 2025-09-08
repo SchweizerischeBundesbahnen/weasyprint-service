@@ -53,6 +53,11 @@ repos:
         entry: scripts/precommit_generate_openapi.sh
         language: script
         pass_filenames: false
+        # Run this hook only when sources that affect the generated OpenAPI can change it:
+        #  - app/**/*.py: FastAPI routes, models, dependencies
+        #  - scripts/**/*.py: tooling that may influence generation
+        #  - pyproject.toml: dependencies/entry-points that can affect startup and schema
+        # This avoids running the generator on unrelated changes (e.g., docs, tests) for faster commits.
         files: ^(app/.*\.py|scripts/.*\.py|pyproject\.toml)$
         stages: [pre-commit]
   - repo: https://github.com/astral-sh/ruff-pre-commit

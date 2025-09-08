@@ -22,7 +22,6 @@ dynamic = ["dependencies"]
 
 [tool.poetry]
 packages = [{include = "app"}]
-scripts = { generate-openapi = "scripts.generate_openapi:main" }
 
 # this duplication and legacy format must be kept until Renovate support is added for [project.dependencies] for poetry-lock updates
 # for more information check comments above

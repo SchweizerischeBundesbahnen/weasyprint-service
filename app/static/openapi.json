@@ -1,4 +1,349 @@
 {
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WeasyPrint Service API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/version": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Service version information",
+        "description": "Returns versions of Python, WeasyPrint, the service itself, build timestamp, and Chromium.",
+        "operationId": "getVersion",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/convert/html": {
+      "post": {
+        "tags": [
+          "convert"
+        ],
+        "summary": "Convert HTML to PDF",
+        "description": "Accepts raw HTML in the request body and returns a generated PDF.",
+        "operationId": "convert_html_post",
+        "parameters": [
+          {
+            "name": "encoding",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Encoding",
+              "description": "Text encoding used to decode the incoming HTML body (e.g., utf-8).",
+              "default": "utf-8"
+            },
+            "description": "Text encoding used to decode the incoming HTML body (e.g., utf-8)."
+          },
+          {
+            "name": "media_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "CSS Media Type",
+              "description": "CSS media type to apply when rendering (e.g., 'print' or 'screen').",
+              "default": "print"
+            },
+            "description": "CSS media type to apply when rendering (e.g., 'print' or 'screen')."
+          },
+          {
+            "name": "presentational_hints",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "title": "Presentational Hints",
+              "description": "Honor presentational HTML attributes as CSS hints.",
+              "default": false
+            },
+            "description": "Honor presentational HTML attributes as CSS hints."
+          },
+          {
+            "name": "base_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base URL",
+              "description": "Base URL used to resolve relative links (stylesheets, images)."
+            },
+            "description": "Base URL used to resolve relative links (stylesheets, images)."
+          },
+          {
+            "name": "scale_factor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scale Factor",
+              "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided."
+            },
+            "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided."
+          },
+          {
+            "name": "file_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Output File Name",
+              "description": "Filename suggested in the Content-Disposition header.",
+              "default": "converted-document.pdf"
+            },
+            "description": "Filename suggested in the Content-Disposition header."
+          },
+          {
+            "name": "pdf_variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "PDF Variant",
+              "description": "PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b')."
+            },
+            "description": "PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b')."
+          },
+          {
+            "name": "custom_metadata",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "title": "Custom Metadata",
+              "description": "Include custom metadata in the generated PDF.",
+              "default": false
+            },
+            "description": "Include custom metadata in the generated PDF."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "text/plain": {}
+            },
+            "description": "Invalid Input"
+          },
+          "500": {
+            "content": {
+              "text/plain": {}
+            },
+            "description": "Internal PDF Conversion Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/convert/html-with-attachments": {
+      "post": {
+        "tags": [
+          "convert"
+        ],
+        "summary": "Convert HTML to PDF with attachments",
+        "description": "Accepts HTML as a form field and optional files to be embedded as PDF attachments.",
+        "operationId": "convert_html_with_attachments_post",
+        "parameters": [
+          {
+            "name": "encoding",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Encoding",
+              "description": "Text encoding used to decode the incoming HTML body (e.g., utf-8).",
+              "default": "utf-8"
+            },
+            "description": "Text encoding used to decode the incoming HTML body (e.g., utf-8)."
+          },
+          {
+            "name": "media_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "CSS Media Type",
+              "description": "CSS media type to apply when rendering (e.g., 'print' or 'screen').",
+              "default": "print"
+            },
+            "description": "CSS media type to apply when rendering (e.g., 'print' or 'screen')."
+          },
+          {
+            "name": "presentational_hints",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "title": "Presentational Hints",
+              "description": "Honor presentational HTML attributes as CSS hints.",
+              "default": false
+            },
+            "description": "Honor presentational HTML attributes as CSS hints."
+          },
+          {
+            "name": "base_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base URL",
+              "description": "Base URL used to resolve relative links (stylesheets, images)."
+            },
+            "description": "Base URL used to resolve relative links (stylesheets, images)."
+          },
+          {
+            "name": "scale_factor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scale Factor",
+              "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided."
+            },
+            "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided."
+          },
+          {
+            "name": "file_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Output File Name",
+              "description": "Filename suggested in the Content-Disposition header.",
+              "default": "converted-document.pdf"
+            },
+            "description": "Filename suggested in the Content-Disposition header."
+          },
+          {
+            "name": "pdf_variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "PDF Variant",
+              "description": "PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b')."
+            },
+            "description": "PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b')."
+          },
+          {
+            "name": "custom_metadata",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "title": "Custom Metadata",
+              "description": "Include custom metadata in the generated PDF.",
+              "default": false
+            },
+            "description": "Include custom metadata in the generated PDF."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "text/plain": {}
+            },
+            "description": "Invalid Input"
+          },
+          "500": {
+            "content": {
+              "text/plain": {}
+            },
+            "description": "Internal PDF Conversion Error"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
   "components": {
     "schemas": {
       "HTTPValidationError": {
@@ -7,12 +352,12 @@
             "items": {
               "$ref": "#/components/schemas/ValidationError"
             },
-            "title": "Detail",
-            "type": "array"
+            "type": "array",
+            "title": "Detail"
           }
         },
-        "title": "HTTPValidationError",
-        "type": "object"
+        "type": "object",
+        "title": "HTTPValidationError"
       },
       "ValidationError": {
         "properties": {
@@ -27,55 +372,55 @@
                 }
               ]
             },
-            "title": "Location",
-            "type": "array"
+            "type": "array",
+            "title": "Location"
           },
           "msg": {
-            "title": "Message",
-            "type": "string"
+            "type": "string",
+            "title": "Message"
           },
           "type": {
-            "title": "Error Type",
-            "type": "string"
+            "type": "string",
+            "title": "Error Type"
           }
         },
+        "type": "object",
         "required": [
           "loc",
           "msg",
           "type"
         ],
-        "title": "ValidationError",
-        "type": "object"
+        "title": "ValidationError"
       },
       "VersionSchema": {
-        "description": "Schema for response /version",
         "properties": {
-          "chromium": {
-            "description": "Chromium version",
-            "title": "Chromium",
-            "type": "string"
-          },
           "python": {
-            "description": "Python version",
+            "type": "string",
             "title": "Python",
-            "type": "string"
-          },
-          "timestamp": {
-            "description": "Build timestamp",
-            "title": "Build Timestamp",
-            "type": "string"
+            "description": "Python version"
           },
           "weasyprint": {
-            "description": "WeasyPrint version",
+            "type": "string",
             "title": "WeasyPrint",
-            "type": "string"
+            "description": "WeasyPrint version"
           },
           "weasyprintService": {
-            "description": "Service version",
+            "type": "string",
             "title": "WeasyPrint Service",
-            "type": "string"
+            "description": "Service version"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Build Timestamp",
+            "description": "Build timestamp"
+          },
+          "chromium": {
+            "type": "string",
+            "title": "Chromium",
+            "description": "Chromium version"
           }
         },
+        "type": "object",
         "required": [
           "python",
           "weasyprint",
@@ -84,352 +429,7 @@
           "chromium"
         ],
         "title": "VersionSchema",
-        "type": "object"
-      }
-    }
-  },
-  "info": {
-    "title": "WeasyPrint Service API",
-    "version": "1.0.0"
-  },
-  "openapi": "3.1.0",
-  "paths": {
-    "/convert/html": {
-      "post": {
-        "description": "Accepts raw HTML in the request body and returns a generated PDF.",
-        "operationId": "convert_html_post",
-        "parameters": [
-          {
-            "description": "Text encoding used to decode the incoming HTML body (e.g., utf-8).",
-            "in": "query",
-            "name": "encoding",
-            "required": false,
-            "schema": {
-              "default": "utf-8",
-              "description": "Text encoding used to decode the incoming HTML body (e.g., utf-8).",
-              "title": "Encoding",
-              "type": "string"
-            }
-          },
-          {
-            "description": "CSS media type to apply when rendering (e.g., 'print' or 'screen').",
-            "in": "query",
-            "name": "media_type",
-            "required": false,
-            "schema": {
-              "default": "print",
-              "description": "CSS media type to apply when rendering (e.g., 'print' or 'screen').",
-              "title": "CSS Media Type",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Honor presentational HTML attributes as CSS hints.",
-            "in": "query",
-            "name": "presentational_hints",
-            "required": false,
-            "schema": {
-              "default": false,
-              "description": "Honor presentational HTML attributes as CSS hints.",
-              "title": "Presentational Hints",
-              "type": "boolean"
-            }
-          },
-          {
-            "description": "Base URL used to resolve relative links (stylesheets, images).",
-            "in": "query",
-            "name": "base_url",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL used to resolve relative links (stylesheets, images).",
-              "title": "Base URL"
-            }
-          },
-          {
-            "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided.",
-            "in": "query",
-            "name": "scale_factor",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided.",
-              "title": "Scale Factor"
-            }
-          },
-          {
-            "description": "Filename suggested in the Content-Disposition header.",
-            "in": "query",
-            "name": "file_name",
-            "required": false,
-            "schema": {
-              "default": "converted-document.pdf",
-              "description": "Filename suggested in the Content-Disposition header.",
-              "title": "Output File Name",
-              "type": "string"
-            }
-          },
-          {
-            "description": "PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b').",
-            "in": "query",
-            "name": "pdf_variant",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b').",
-              "title": "PDF Variant"
-            }
-          },
-          {
-            "description": "Include custom metadata in the generated PDF.",
-            "in": "query",
-            "name": "custom_metadata",
-            "required": false,
-            "schema": {
-              "default": false,
-              "description": "Include custom metadata in the generated PDF.",
-              "title": "Custom Metadata",
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "400": {
-            "content": {
-              "text/plain": {}
-            },
-            "description": "Invalid Input"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "500": {
-            "content": {
-              "text/plain": {}
-            },
-            "description": "Internal PDF Conversion Error"
-          }
-        },
-        "summary": "Convert HTML to PDF",
-        "tags": [
-          "convert"
-        ]
-      }
-    },
-    "/convert/html-with-attachments": {
-      "post": {
-        "description": "Accepts HTML as a form field and optional files to be embedded as PDF attachments.",
-        "operationId": "convert_html_with_attachments_post",
-        "parameters": [
-          {
-            "description": "Text encoding used to decode the incoming HTML body (e.g., utf-8).",
-            "in": "query",
-            "name": "encoding",
-            "required": false,
-            "schema": {
-              "default": "utf-8",
-              "description": "Text encoding used to decode the incoming HTML body (e.g., utf-8).",
-              "title": "Encoding",
-              "type": "string"
-            }
-          },
-          {
-            "description": "CSS media type to apply when rendering (e.g., 'print' or 'screen').",
-            "in": "query",
-            "name": "media_type",
-            "required": false,
-            "schema": {
-              "default": "print",
-              "description": "CSS media type to apply when rendering (e.g., 'print' or 'screen').",
-              "title": "CSS Media Type",
-              "type": "string"
-            }
-          },
-          {
-            "description": "Honor presentational HTML attributes as CSS hints.",
-            "in": "query",
-            "name": "presentational_hints",
-            "required": false,
-            "schema": {
-              "default": false,
-              "description": "Honor presentational HTML attributes as CSS hints.",
-              "title": "Presentational Hints",
-              "type": "boolean"
-            }
-          },
-          {
-            "description": "Base URL used to resolve relative links (stylesheets, images).",
-            "in": "query",
-            "name": "base_url",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Base URL used to resolve relative links (stylesheets, images).",
-              "title": "Base URL"
-            }
-          },
-          {
-            "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided.",
-            "in": "query",
-            "name": "scale_factor",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "number"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided.",
-              "title": "Scale Factor"
-            }
-          },
-          {
-            "description": "Filename suggested in the Content-Disposition header.",
-            "in": "query",
-            "name": "file_name",
-            "required": false,
-            "schema": {
-              "default": "converted-document.pdf",
-              "description": "Filename suggested in the Content-Disposition header.",
-              "title": "Output File Name",
-              "type": "string"
-            }
-          },
-          {
-            "description": "PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b').",
-            "in": "query",
-            "name": "pdf_variant",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b').",
-              "title": "PDF Variant"
-            }
-          },
-          {
-            "description": "Include custom metadata in the generated PDF.",
-            "in": "query",
-            "name": "custom_metadata",
-            "required": false,
-            "schema": {
-              "default": false,
-              "description": "Include custom metadata in the generated PDF.",
-              "title": "Custom Metadata",
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "400": {
-            "content": {
-              "text/plain": {}
-            },
-            "description": "Invalid Input"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          },
-          "500": {
-            "content": {
-              "text/plain": {}
-            },
-            "description": "Internal PDF Conversion Error"
-          }
-        },
-        "summary": "Convert HTML to PDF with attachments",
-        "tags": [
-          "convert"
-        ]
-      }
-    },
-    "/version": {
-      "get": {
-        "description": "Returns versions of Python, WeasyPrint, the service itself, build timestamp, and Chromium.",
-        "operationId": "getVersion",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VersionSchema"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Service version information",
-        "tags": [
-          "meta"
-        ]
+        "description": "Schema for response /version"
       }
     }
   }

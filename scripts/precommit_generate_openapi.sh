@@ -45,18 +45,16 @@ cleanup() {
     echo "Stopping local FastAPI app (pid=${APP_PID})..."
     kill "${APP_PID}" >/dev/null 2>&1 || true
   fi
-  # Optional: cleanup temporary logs directory if empty
+  # Cleanup temporary logs directory
   if [ -n "${LOG_DIR_LOCAL}" ] && [ -d "${LOG_DIR_LOCAL}" ]; then
-    rmdir "${LOG_DIR_LOCAL}" >/dev/null 2>&1 || true
-    rmdir "$(dirname "${LOG_DIR_LOCAL}")" >/dev/null 2>&1 || true
+    rm -rf "${LOG_DIR_LOCAL}" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
 
 if [ "$URL" = "$DEFAULT_URL" ]; then
-  # Ensure a writable LOG_DIR for local run to avoid permission issues with /opt/weasyprint/logs
-  LOG_DIR_LOCAL="${ROOT_DIR}/.logs"
-  mkdir -p "$LOG_DIR_LOCAL"
+  # Use a temporary LOG_DIR outside the repository to ensure this script only changes app/static/openapi.json
+  LOG_DIR_LOCAL="$(mktemp -d 2>/dev/null || mktemp -d -t weasyprint-logs)"
   export LOG_DIR="$LOG_DIR_LOCAL"
   if command -v poetry >/dev/null 2>&1; then
     echo "Starting local FastAPI app via poetry on port 9980 (LOG_DIR=$LOG_DIR_LOCAL)..."
@@ -73,17 +71,17 @@ fi
 
 # Wait for the endpoint to be ready, then fetch
 wait_for_url "$URL" 120
-TMP_FILE="${OUTPUT}.tmp"
+# Use a temporary file outside the repository for download/formatting to avoid touching other files
+TMP_FILE="$(mktemp 2>/dev/null || mktemp -t openapi.json)"
 mkdir -p "$(dirname "$OUTPUT")"
 
 # Fetch the OpenAPI JSON
 if curl -fsS "$URL" -o "$TMP_FILE"; then
-  # If jq is available, pretty-print and normalize
+  # If jq is available, pretty-print only (no sorting or re-ordering)
   if command -v jq >/dev/null 2>&1; then
-    # Deterministic formatting: sort all object keys recursively (-S) and pretty-print
-    jq -S '.' "$TMP_FILE" > "${TMP_FILE}.fmt" && mv "${TMP_FILE}.fmt" "$TMP_FILE"
+    jq '.' "$TMP_FILE" > "${TMP_FILE}.fmt" && mv "${TMP_FILE}.fmt" "$TMP_FILE"
   else
-    echo "Warning: jq not found. OpenAPI JSON will not be sorted; diffs may be noisy." >&2
+    echo "Warning: jq not found. OpenAPI JSON will not be pretty-printed." >&2
   fi
   # Only replace if changed
   if [ ! -f "$OUTPUT" ] || ! cmp -s "$TMP_FILE" "$OUTPUT"; then

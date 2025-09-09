@@ -40,13 +40,17 @@ def weasyprint_container():
         name="weasyprint_service",
         ports={"9080": 9080},
         init=True,  # Enable Docker's init process (equivalent to tini)
+        auto_remove=True,  # Ensure container is automatically removed after it stops
+        labels={"test-suite": "weasyprint-service"},
     )
     time.sleep(5)
 
     yield container
 
-    container.stop()
-    container.remove()
+    try:
+        container.stop()
+    except Exception:
+        pass  # container may already be stopped/removed due to auto_remove=True
 
 
 @pytest.fixture(scope="module")

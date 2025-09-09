@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import TypedDict
 from weakref import WeakKeyDictionary
 
@@ -36,9 +35,6 @@ class HtmlParser:
         self.parser = parser
         self.formatter = formatter
         self._meta: WeakKeyDictionary[BeautifulSoup, _Meta] = WeakKeyDictionary()
-
-    _COMMENT_RE = re.compile(r"<!--(?:(?!<!--).)*?-->", re.S)
-    _DOC_MARKER_RE = re.compile(r"(?is)(<!doctype\b|<html\b)")
 
     # -------- Public API --------
 
@@ -111,7 +107,83 @@ class HtmlParser:
 
     @staticmethod
     def _is_full_document(s: str) -> bool:
-        # 1) remove comments not to catch <html> inside <!-- ... -->
-        cleaned = HtmlParser._COMMENT_RE.sub("", s)
-        # 2) check if <!DOCTYPE ...> or <html ...> exist
-        return bool(HtmlParser._DOC_MARKER_RE.search(cleaned))
+        """Detect if input string is a full HTML/XHTML document without regex.
+
+        Rules inferred from tests:
+        - Allow leading BOM, whitespace, comments <!-- ... -->, and XML PI.
+        - Consider a string a full document if, after skipping allowed leading
+          constructs, we encounter either:
+            * a <!DOCTYPE ...> declaration (any case), or
+            * an <html ...> start tag (any case).
+        - Ignore any <html> that appears inside comments.
+        """
+        i = 0
+        n = len(s)
+
+        def startswith_ci(idx: int, token: str) -> bool:
+            return s[idx:idx + len(token)].lower() == token
+
+        # Skip BOM if present
+        if i < n and s[i] == "\ufeff":
+            i += 1
+
+        while i < n:
+            # Skip whitespace
+            while i < n and s[i].isspace():
+                i += 1
+            if i >= n:
+                return False
+
+            # Comments <!-- ... -->
+            if s.startswith("<!--", i):
+                i += 4
+                # find closing -->
+                end = s.find("-->", i)
+                if end == -1:
+                    # Unclosed comment; treat as comment to the end
+                    return False
+                i = end + 3
+                continue
+
+            # Processing instruction / XML declaration <? ... ?>
+            if s.startswith("<?", i):
+                end = s.find("?>", i + 2)
+                if end == -1:
+                    return False
+                i = end + 2
+                continue
+
+            # Doctype
+            if startswith_ci(i, "<!doctype"):
+                return True
+
+            # <html ...>
+            if s.startswith("<", i):
+                j = i + 1
+                # skip possible whitespace after '<'
+                while j < n and s[j].isspace():
+                    j += 1
+                if j < n and s[j].lower() == 'h':
+                    # check for 'html' name
+                    if s[j:j+4].lower() == 'html':
+                        j2 = j + 4
+                        # next must be whitespace, '>' or attribute delimiter
+                        if j2 < n:
+                            ch = s[j2]
+                            if ch.isspace() or ch == '>' or ch == '/':
+                                return True
+                        else:
+                            # end after html
+                            return True
+                # Other tags: don't decide yet — continue scanning in case doctype/html appears later
+                i = j
+                # move forward until next '<' to keep linear progress
+                while i < n and s[i] != '<':
+                    i += 1
+                continue
+
+            # Any other visible character before markers: keep scanning (doctype/html may appear later)
+            i += 1
+            continue
+
+        return False

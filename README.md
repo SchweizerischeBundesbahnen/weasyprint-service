@@ -135,6 +135,15 @@ services:
       - "9080:9080"
 ```
 
+### Mount a custom fonts folder
+The following entry may be added to the `run` command:
+
+```bash
+  docker run -v /path/to/host/fonts:/usr/share/fonts/custom ...
+```
+
+Replace `/path/to/host/fonts` with the folder containing custom fonts
+
 ## Development
 
 ### Building the Docker Image

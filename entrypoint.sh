@@ -5,6 +5,9 @@ export WEASYPRINT_SERVICE_BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
 CHROMIUM_VERSION="$(${CHROMIUM_EXECUTABLE_PATH} --version | awk '{print $2}')"
 export WEASYPRINT_SERVICE_CHROMIUM_VERSION=${CHROMIUM_VERSION}
 
+# Update font cache to include any custom mounted fonts
+fc-cache -f
+
 if ! pgrep -x 'dbus-daemon' > /dev/null; then
     mkdir -p "/run/dbus/"
     if [ -f "/run/dbus/pid" ]; then

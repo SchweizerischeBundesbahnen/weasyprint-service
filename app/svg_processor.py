@@ -42,6 +42,7 @@ class SvgProcessor:
     NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
     VIEWBOX_PARTS_COUNT = 4  # min-x, min-y, width, height
     DATA_PREFIX = "data:"
+    SVG_NS = "http://www.w3.org/2000/svg"  # NOSONAR
 
     def __init__(
         self,
@@ -196,7 +197,9 @@ class SvgProcessor:
         Convert SVG Element to PNG bytes using headless Chromium.
         Returns tuple of (mime, content). If conversion fails, returns original SVG.
         """
-        width, height, updated_svg = self.extract_svg_dimensions_as_px(svg)
+        updated_svg = self.ensure_mandatory_attributes(svg)
+
+        width, height, updated_svg = self.extract_svg_dimensions_as_px(updated_svg)
         if not width or not height:
             return self.without_changes(svg)
 
@@ -218,6 +221,12 @@ class SvgProcessor:
 
         return self.IMAGE_PNG, png_content
 
+    def ensure_mandatory_attributes(self, svg: Element) -> Element:
+        # Ensure required XML namespace exists and non-empty
+        if not svg.tag.startswith("{"):
+            svg.tag = f"{{{SvgProcessor.SVG_NS}}}svg"
+        return svg
+
     def without_changes(self, svg: Element) -> tuple[str, str | bytes]:
         return self.IMAGE_SVG, self.svg_to_string(svg)
 
@@ -232,7 +241,7 @@ class SvgProcessor:
 
     @staticmethod
     def svg_to_string(svg: Element) -> str:
-        ET.register_namespace("", "http://www.w3.org/2000/svg")  # NOSONAR
+        ET.register_namespace("", SvgProcessor.SVG_NS)  # NOSONAR
         return ET.tostring(svg, encoding="unicode")
 
     # ---------------- Image utilities ----------------

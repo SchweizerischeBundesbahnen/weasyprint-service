@@ -111,5 +111,5 @@ def __strip_string(string: str) -> str:
         ("<!-- <html></html> --><div style='break-after:page'>page to be removed</div><?xml version='1.0' encoding='UTF-8'?>", False),
     ],
 )
-def test_is_full_document_parametrized(html, expected):
+def test_is_full_document(html, expected):
     assert HtmlParser()._is_full_document(html) is expected

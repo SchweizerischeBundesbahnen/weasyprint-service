@@ -124,6 +124,36 @@ class HtmlParser:
             idx += 1
         return idx
 
+    @staticmethod
+    def _skip_ws_comments_and_pi(s: str, pos: int) -> int:
+        n = len(s)
+        pos = HtmlParser._skip_ws(s, pos)
+        while pos < n:
+            next_pos, ok = HtmlParser._try_skip_comment(s, pos)
+            if ok:
+                if next_pos == -1:
+                    return n
+                pos = HtmlParser._skip_ws(s, next_pos)
+                continue
+            next_pos, ok = HtmlParser._try_skip_pi(s, pos)
+            if ok:
+                if next_pos == -1:
+                    return n
+                pos = HtmlParser._skip_ws(s, next_pos)
+                continue
+            break
+        return pos
+
+    @staticmethod
+    def _advance_to_next_angle(s: str, pos: int) -> int:
+        n = len(s)
+        if s.startswith("<", pos):
+            j = pos + 1
+            while j < n and s[j] != "<":
+                j += 1
+            return HtmlParser._skip_ws(s, j)
+        return HtmlParser._skip_ws(s, pos + 1)
+
     def _set_meta(self, soup: BeautifulSoup, *, was_full_document: bool, xml_decl: str) -> None:
         meta: _Meta = {"was_full_document": was_full_document, "xml_decl": xml_decl}
         self._meta[soup] = meta
@@ -165,41 +195,9 @@ class HtmlParser:
         if i < n and s[i] == "\ufeff":
             i += 1
 
-        def skip_ws_comments_and_pi(pos: int) -> int:
-            # Repeatedly skip whitespace, comments and processing instructions.
-            pos = HtmlParser._skip_ws(s, pos)
-            while pos < n:
-                next_pos, ok = HtmlParser._try_skip_comment(s, pos)
-                if ok:
-                    if next_pos == -1:
-                        return n  # Unclosed comment -> treat as finished (no full doc)
-                    pos = HtmlParser._skip_ws(s, next_pos)
-                    continue
-
-                next_pos, ok = HtmlParser._try_skip_pi(s, pos)
-                if ok:
-                    if next_pos == -1:
-                        return n  # Unclosed PI -> treat as finished (no full doc)
-                    pos = HtmlParser._skip_ws(s, next_pos)
-                    continue
-                break
-            return pos
-
-        def advance_to_next_angle(pos: int) -> int:
-            if s.startswith("<", pos):
-                j = pos + 1
-                while j < n and s[j] != "<":
-                    j += 1
-                return HtmlParser._skip_ws(s, j)
-            return HtmlParser._skip_ws(s, pos + 1)
-
-        i = skip_ws_comments_and_pi(i)
+        i = HtmlParser._skip_ws_comments_and_pi(s, i)
         while i < n:
-            # Check for markers of a full document
             if HtmlParser._startswith_ci(s, i, "<!doctype") or HtmlParser._looks_like_html_tag(s, i):
                 return True
-
-            # Otherwise advance and try again after skipping allowed constructs
-            i = skip_ws_comments_and_pi(advance_to_next_angle(i))
-
+            i = HtmlParser._skip_ws_comments_and_pi(s, HtmlParser._advance_to_next_angle(s, i))
         return False

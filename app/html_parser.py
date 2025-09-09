@@ -108,7 +108,7 @@ class HtmlParser:
         j = idx + 1
         while j < n and s[j].isspace():
             j += 1
-        if j < n and s[j].lower() == "h" and s[j : j + 4].lower() == "html":
+        if j < n and s[j : j + 4].lower() == "html":
             j2 = j + 4
             if j2 >= n:
                 return True

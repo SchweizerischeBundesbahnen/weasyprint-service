@@ -37,6 +37,9 @@ class HtmlParser:
         self.formatter = formatter
         self._meta: WeakKeyDictionary[BeautifulSoup, _Meta] = WeakKeyDictionary()
 
+    _COMMENT_RE = re.compile(r"(?is)<!--.*?-->")
+    _DOC_MARKER_RE = re.compile(r"(?is)(<!doctype\b|<html\b)")
+
     # -------- Public API --------
 
     def parse(self, string: str) -> BeautifulSoup:
@@ -108,10 +111,7 @@ class HtmlParser:
 
     @staticmethod
     def _is_full_document(s: str) -> bool:
-        _COMMENT_RE = re.compile(r"(?is)<!--.*?-->")
-        _DOC_MARKER_RE = re.compile(r"(?is)(<!doctype\b|<html\b)")
-
         # 1) remove comments not to catch <html> inside <!-- ... -->
-        cleaned = _COMMENT_RE.sub("", s)
+        cleaned = HtmlParser._COMMENT_RE.sub("", s)
         # 2) check if <!DOCTYPE ...> or <html ...> exist
-        return bool(_DOC_MARKER_RE.search(cleaned))
+        return bool(HtmlParser._DOC_MARKER_RE.search(cleaned))

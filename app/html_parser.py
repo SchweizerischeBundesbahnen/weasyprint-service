@@ -165,34 +165,41 @@ class HtmlParser:
         if i < n and s[i] == "\ufeff":
             i += 1
 
-        found = False
-        i = HtmlParser._skip_ws(s, i)
-        while i < n and not found:
-            next_i, ok = HtmlParser._try_skip_comment(s, i)
-            if ok:
-                if next_i == -1:
-                    break
-                i = HtmlParser._skip_ws(s, next_i)
-                continue
+        def skip_ws_comments_and_pi(pos: int) -> int:
+            # Repeatedly skip whitespace, comments and processing instructions.
+            pos = HtmlParser._skip_ws(s, pos)
+            while pos < n:
+                next_pos, ok = HtmlParser._try_skip_comment(s, pos)
+                if ok:
+                    if next_pos == -1:
+                        return n  # Unclosed comment -> treat as finished (no full doc)
+                    pos = HtmlParser._skip_ws(s, next_pos)
+                    continue
 
-            next_i, ok = HtmlParser._try_skip_pi(s, i)
-            if ok:
-                if next_i == -1:
-                    break
-                i = HtmlParser._skip_ws(s, next_i)
-                continue
-
-            if HtmlParser._startswith_ci(s, i, "<!doctype") or HtmlParser._looks_like_html_tag(s, i):
-                found = True
+                next_pos, ok = HtmlParser._try_skip_pi(s, pos)
+                if ok:
+                    if next_pos == -1:
+                        return n  # Unclosed PI -> treat as finished (no full doc)
+                    pos = HtmlParser._skip_ws(s, next_pos)
+                    continue
                 break
+            return pos
 
-            # advance to next candidate position
-            if s.startswith("<", i):
-                j = i + 1
+        def advance_to_next_angle(pos: int) -> int:
+            if s.startswith("<", pos):
+                j = pos + 1
                 while j < n and s[j] != "<":
                     j += 1
-                i = HtmlParser._skip_ws(s, j)
-            else:
-                i = HtmlParser._skip_ws(s, i + 1)
+                return HtmlParser._skip_ws(s, j)
+            return HtmlParser._skip_ws(s, pos + 1)
 
-        return found
+        i = skip_ws_comments_and_pi(i)
+        while i < n:
+            # Check for markers of a full document
+            if HtmlParser._startswith_ci(s, i, "<!doctype") or HtmlParser._looks_like_html_tag(s, i):
+                return True
+
+            # Otherwise advance and try again after skipping allowed constructs
+            i = skip_ws_comments_and_pi(advance_to_next_angle(i))
+
+        return False

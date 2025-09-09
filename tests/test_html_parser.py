@@ -1,3 +1,5 @@
+from pickle import FALSE
+
 import pytest
 
 from app.html_parser import HtmlParser
@@ -102,10 +104,12 @@ def __strip_string(string: str) -> str:
         ("<!--  ?xml version='1.0' encoding='UTF-8'?  -->\n<!DOCTYPE html>\n<html></html>", True),
 
         # other cases
+        ("<?xml version='1.0' encoding='UTF-8'?>\n<div style='break-after:page'>page to be removed</div>", False),
         ("   <!-- multi-line \n comment -->   <HTML></HTML>", True),
         ("\t\r\n<!-- c --><!-- d --><?xml version='1.0'?><html></html>", True),
         ("<!--not start-->  <?pi?>  <!--x-->\n<div>only fragment</div>", False),
         ("<div style='break-after:page'>page to be removed</div><?xml version='1.0' encoding='UTF-8'?><!DOCTYPE html PUBLIC '-//W3C//DTD XHTML 1.0 Strict//EN' 'http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd'><html lang='en' xml:lang='en' xmlns='http://www.w3.org/1999/xhtml'></html>", True),
+        ("<!-- <html></html> --><div style='break-after:page'>page to be removed</div><?xml version='1.0' encoding='UTF-8'?>", False),
     ],
 )
 def test_is_full_document_parametrized(html, expected):

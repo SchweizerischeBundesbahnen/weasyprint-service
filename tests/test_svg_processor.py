@@ -698,3 +698,26 @@ def test_get_svg_content_with_namespace(svg_content, expected_output):
     svg = svg_processor.get_svg("image/svg+xml", svg_processor.to_base64(svg_content))
     content = svg_processor.svg_to_string(svg)
     assert content == expected_output
+
+
+@pytest.mark.parametrize(
+    "svg_input",
+    [
+        "<svg width='10' height='10'></svg>",
+        "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'></svg>",
+        "<svg xmlns:xlink='http://www.w3.org/1999/xlink' width='10' height='10'></svg>",
+        "<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='10' height='10'></svg>",
+        "<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='10' height='10'></svg>",
+    ],
+)
+def test_ensure_mandatory_attributes(svg_input):
+    svg_processor = SvgProcessor()
+
+    svg = svg_processor.svg_from_string(svg_input)
+    updated_svg = svg_processor.ensure_mandatory_attributes(svg)
+
+    # Ensure it returns the same element instance
+    assert updated_svg is svg
+
+    svg_content = svg_processor.svg_to_string(updated_svg)
+    assert svg_content.count("xmlns=\"http://www.w3.org/2000/svg\"") == 1

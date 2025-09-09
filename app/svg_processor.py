@@ -42,7 +42,7 @@ class SvgProcessor:
     NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
     VIEWBOX_PARTS_COUNT = 4  # min-x, min-y, width, height
     DATA_PREFIX = "data:"
-    SVG_NS = "http://www.w3.org/2000/svg"
+    SVG_NS = "http://www.w3.org/2000/svg"  # NOSONAR
 
     def __init__(
         self,

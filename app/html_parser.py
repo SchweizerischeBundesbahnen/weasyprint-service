@@ -82,6 +82,48 @@ class HtmlParser:
 
     # -------- Internal helpers --------
 
+    @staticmethod
+    def _startswith_ci(s: str, idx: int, token: str) -> bool:
+        return s[idx : idx + len(token)].lower() == token
+
+    @staticmethod
+    def _try_skip_comment(s: str, idx: int) -> tuple[int, bool]:
+        if s.startswith("<!--", idx):
+            end = s.find("-->", idx + 4)
+            return (-1 if end == -1 else end + 3, end != -1)
+        return (idx, False)
+
+    @staticmethod
+    def _try_skip_pi(s: str, idx: int) -> tuple[int, bool]:
+        if s.startswith("<?", idx):
+            end = s.find("?>", idx + 2)
+            return (-1 if end == -1 else end + 2, end != -1)
+        return (idx, False)
+
+    @staticmethod
+    def _looks_like_html_tag(s: str, idx: int) -> bool:
+        n = len(s)
+        if not s.startswith("<", idx):
+            return False
+        j = idx + 1
+        while j < n and s[j].isspace():
+            j += 1
+        if j < n and s[j].lower() == "h" and s[j : j + 4].lower() == "html":
+            j2 = j + 4
+            if j2 >= n:
+                return True
+            ch = s[j2]
+            if ch.isspace() or ch in {">", "/"}:
+                return True
+        return False
+
+    @staticmethod
+    def _skip_ws(s: str, idx: int) -> int:
+        n = len(s)
+        while idx < n and s[idx].isspace():
+            idx += 1
+        return idx
+
     def _set_meta(self, soup: BeautifulSoup, *, was_full_document: bool, xml_decl: str) -> None:
         meta: _Meta = {"was_full_document": was_full_document, "xml_decl": xml_decl}
         self._meta[soup] = meta
@@ -112,78 +154,45 @@ class HtmlParser:
         Rules inferred from tests:
         - Allow leading BOM, whitespace, comments <!-- ... -->, and XML PI.
         - Consider a string a full document if, after skipping allowed leading
-          constructs, we encounter either:
-            * a <!DOCTYPE ...> declaration (any case), or
-            * an <html ...> start tag (any case).
-        - Ignore any <html> that appears inside comments.
+          constructs, we encounter either a <!DOCTYPE ...> declaration (any case)
+          or an <html ...> start tag (any case).
+        - Ignore <html> that appears inside comments.
         """
         i = 0
         n = len(s)
-
-        def startswith_ci(idx: int, token: str) -> bool:
-            return s[idx:idx + len(token)].lower() == token
 
         # Skip BOM if present
         if i < n and s[i] == "\ufeff":
             i += 1
 
-        while i < n:
-            # Skip whitespace
-            while i < n and s[i].isspace():
-                i += 1
-            if i >= n:
-                return False
-
-            # Comments <!-- ... -->
-            if s.startswith("<!--", i):
-                i += 4
-                # find closing -->
-                end = s.find("-->", i)
-                if end == -1:
-                    # Unclosed comment; treat as comment to the end
-                    return False
-                i = end + 3
+        found = False
+        i = HtmlParser._skip_ws(s, i)
+        while i < n and not found:
+            next_i, ok = HtmlParser._try_skip_comment(s, i)
+            if ok:
+                if next_i == -1:
+                    break
+                i = HtmlParser._skip_ws(s, next_i)
                 continue
 
-            # Processing instruction / XML declaration <? ... ?>
-            if s.startswith("<?", i):
-                end = s.find("?>", i + 2)
-                if end == -1:
-                    return False
-                i = end + 2
+            next_i, ok = HtmlParser._try_skip_pi(s, i)
+            if ok:
+                if next_i == -1:
+                    break
+                i = HtmlParser._skip_ws(s, next_i)
                 continue
 
-            # Doctype
-            if startswith_ci(i, "<!doctype"):
-                return True
+            if HtmlParser._startswith_ci(s, i, "<!doctype") or HtmlParser._looks_like_html_tag(s, i):
+                found = True
+                break
 
-            # <html ...>
+            # advance to next candidate position
             if s.startswith("<", i):
                 j = i + 1
-                # skip possible whitespace after '<'
-                while j < n and s[j].isspace():
+                while j < n and s[j] != "<":
                     j += 1
-                if j < n and s[j].lower() == 'h':
-                    # check for 'html' name
-                    if s[j:j+4].lower() == 'html':
-                        j2 = j + 4
-                        # next must be whitespace, '>' or attribute delimiter
-                        if j2 < n:
-                            ch = s[j2]
-                            if ch.isspace() or ch == '>' or ch == '/':
-                                return True
-                        else:
-                            # end after html
-                            return True
-                # Other tags: don't decide yet — continue scanning in case doctype/html appears later
-                i = j
-                # move forward until next '<' to keep linear progress
-                while i < n and s[i] != '<':
-                    i += 1
-                continue
+                i = HtmlParser._skip_ws(s, j)
+            else:
+                i = HtmlParser._skip_ws(s, i + 1)
 
-            # Any other visible character before markers: keep scanning (doctype/html may appear later)
-            i += 1
-            continue
-
-        return False
+        return found

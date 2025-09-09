@@ -37,7 +37,7 @@ class HtmlParser:
         self.formatter = formatter
         self._meta: WeakKeyDictionary[BeautifulSoup, _Meta] = WeakKeyDictionary()
 
-    _COMMENT_RE = re.compile(r"(?is)<!--.*?-->")
+    _COMMENT_RE = re.compile(r"<!--(?:(?!<!--).)*?-->", re.S)
     _DOC_MARKER_RE = re.compile(r"(?is)(<!doctype\b|<html\b)")
 
     # -------- Public API --------

@@ -707,7 +707,6 @@ def test_get_svg_content_with_namespace(svg_content, expected_output):
         "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'></svg>",
         "<svg xmlns:xlink='http://www.w3.org/1999/xlink' width='10' height='10'></svg>",
         "<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='10' height='10'></svg>",
-        "<svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' width='10' height='10'></svg>",
     ],
 )
 def test_ensure_mandatory_attributes(svg_input):

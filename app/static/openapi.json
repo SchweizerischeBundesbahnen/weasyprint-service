@@ -309,16 +309,6 @@
             "description": "Include custom metadata in the generated PDF."
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_convert_html_with_attachments_post"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -356,36 +346,6 @@
   },
   "components": {
     "schemas": {
-      "Body_convert_html_with_attachments_post": {
-        "properties": {
-          "html": {
-            "type": "string",
-            "title": "HTML",
-            "description": "HTML content to render to PDF."
-          },
-          "files": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string",
-                  "format": "binary"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Attachments",
-            "description": "Files to embed as PDF attachments."
-          }
-        },
-        "type": "object",
-        "required": [
-          "html"
-        ],
-        "title": "Body_convert_html_with_attachments_post"
-      },
       "HTTPValidationError": {
         "properties": {
           "detail": {

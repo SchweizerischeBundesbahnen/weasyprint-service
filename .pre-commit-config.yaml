@@ -77,7 +77,7 @@ repos:
     hooks:
       - id: hadolint
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.12.1
+    rev: v1.13.0
     hooks:
       - id: zizmor
   - repo: https://github.com/rhysd/actionlint

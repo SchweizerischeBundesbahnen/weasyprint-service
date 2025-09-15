@@ -1,5 +1,19 @@
 # Changelog
 
+## [66.0.3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.2...v66.0.3) (2025-09-10)
+
+
+### Features
+
+* ability to add additional fonts ([#209](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/209)) ([5a331b6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/5a331b6b1f5394f1c128567c4042bcb7200c7e04)), closes [#207](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/207)
+* add `scale_factor` query parameter for SVG/PNG rendering configuration ([#202](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/202)) ([28ed641](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/28ed641a86dde3331db05449a38d0a7d94ae9f0d))
+* Add environment variables to configure form parsing limits (`FORM_MAX_FIELDS`, `FORM_MAX_FILES`, `FORM_MAX_PART_SIZE`) ([#205](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/205)) ([4b92ed2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4b92ed25adb5299ac6d8e4354fbcc3dcb9f7bd17))
+
+
+### Bug Fixes
+
+* ensure `xmlns` and `xmlns:xlink` attributes are set for proper SVG rendering ([#208](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/208)) ([23b29ac](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/23b29ac21ab5cdc5b878f2b41eda48f3ba39fdfc))
+
 ## [66.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.1...v66.0.2) (2025-09-03)
 
 

@@ -82,6 +82,78 @@ class HtmlParser:
 
     # -------- Internal helpers --------
 
+    @staticmethod
+    def _startswith_ci(s: str, idx: int, token: str) -> bool:
+        return s[idx : idx + len(token)].lower() == token
+
+    @staticmethod
+    def _try_skip_comment(s: str, idx: int) -> tuple[int, bool]:
+        if s.startswith("<!--", idx):
+            end = s.find("-->", idx + 4)
+            return (-1 if end == -1 else end + 3, end != -1)
+        return (idx, False)
+
+    @staticmethod
+    def _try_skip_pi(s: str, idx: int) -> tuple[int, bool]:
+        if s.startswith("<?", idx):
+            end = s.find("?>", idx + 2)
+            return (-1 if end == -1 else end + 2, end != -1)
+        return (idx, False)
+
+    @staticmethod
+    def _looks_like_html_tag(s: str, idx: int) -> bool:
+        n = len(s)
+        if not s.startswith("<", idx):
+            return False
+        j = idx + 1
+        while j < n and s[j].isspace():
+            j += 1
+        if j < n and s[j : j + 4].lower() == "html":
+            j2 = j + 4
+            if j2 >= n:
+                return True
+            ch = s[j2]
+            if ch.isspace() or ch in {">", "/"}:
+                return True
+        return False
+
+    @staticmethod
+    def _skip_ws(s: str, idx: int) -> int:
+        n = len(s)
+        while idx < n and s[idx].isspace():
+            idx += 1
+        return idx
+
+    @staticmethod
+    def _skip_ws_comments_and_pi(s: str, pos: int) -> int:
+        n = len(s)
+        pos = HtmlParser._skip_ws(s, pos)
+        while pos < n:
+            next_pos, ok = HtmlParser._try_skip_comment(s, pos)
+            if ok:
+                if next_pos == -1:
+                    return n
+                pos = HtmlParser._skip_ws(s, next_pos)
+                continue
+            next_pos, ok = HtmlParser._try_skip_pi(s, pos)
+            if ok:
+                if next_pos == -1:
+                    return n
+                pos = HtmlParser._skip_ws(s, next_pos)
+                continue
+            break
+        return pos
+
+    @staticmethod
+    def _advance_to_next_angle(s: str, pos: int) -> int:
+        n = len(s)
+        if s.startswith("<", pos):
+            j = pos + 1
+            while j < n and s[j] != "<":
+                j += 1
+            return HtmlParser._skip_ws(s, j)
+        return HtmlParser._skip_ws(s, pos + 1)
+
     def _set_meta(self, soup: BeautifulSoup, *, was_full_document: bool, xml_decl: str) -> None:
         meta: _Meta = {"was_full_document": was_full_document, "xml_decl": xml_decl}
         self._meta[soup] = meta
@@ -107,5 +179,25 @@ class HtmlParser:
 
     @staticmethod
     def _is_full_document(s: str) -> bool:
-        s2 = s.lstrip().lower()
-        return s2.startswith("<!doctype") or s2.startswith("<html") or s2.startswith("<?xml")
+        """Detect if input string is a full HTML/XHTML document without regex.
+
+        Rules inferred from tests:
+        - Allow leading BOM, whitespace, comments <!-- ... -->, and XML PI.
+        - Consider a string a full document if, after skipping allowed leading
+          constructs, we encounter either a <!DOCTYPE ...> declaration (any case)
+          or an <html ...> start tag (any case).
+        - Ignore <html> that appears inside comments.
+        """
+        i = 0
+        n = len(s)
+
+        # Skip BOM if present
+        if i < n and s[i] == "\ufeff":
+            i += 1
+
+        i = HtmlParser._skip_ws_comments_and_pi(s, i)
+        while i < n:
+            if HtmlParser._startswith_ci(s, i, "<!doctype") or HtmlParser._looks_like_html_tag(s, i):
+                return True
+            i = HtmlParser._skip_ws_comments_and_pi(s, HtmlParser._advance_to_next_angle(s, i))
+        return False

@@ -1,23 +1,22 @@
-import contextlib
 import io
 import logging
 import time
 from collections import Counter
 from pathlib import Path
-from typing import NamedTuple, Iterator
+from typing import NamedTuple
 
 import docker
-import pymupdf
 import pypdf as PyPDF
 import pytest
 import requests
 from docker.models.containers import Container
 from PIL import Image, ImageChops
 
+from tests import utils_pdf
+
 
 class TestParameters(NamedTuple):
     base_url: str
-    flush_tmp_file_enabled: bool
     request_session: requests.Session
     container: Container
     # prevent pytest from collecting NamedTuple as a test
@@ -41,13 +40,17 @@ def weasyprint_container():
         name="weasyprint_service",
         ports={"9080": 9080},
         init=True,  # Enable Docker's init process (equivalent to tini)
+        auto_remove=True,  # Ensure container is automatically removed after it stops
+        labels={"test-suite": "weasyprint-service"},
     )
     time.sleep(5)
 
     yield container
 
-    container.stop()
-    container.remove()
+    try:
+        container.stop()
+    except Exception:
+        pass  # container may already be stopped/removed due to auto_remove=True
 
 
 @pytest.fixture(scope="module")
@@ -63,9 +66,8 @@ def test_parameters(weasyprint_container: Container):
         TestParameters: The setup test parameters
     """
     base_url = "http://localhost:9080"
-    flush_tmp_file_enabled = False
     request_session = requests.Session()
-    yield TestParameters(base_url, flush_tmp_file_enabled, request_session, weasyprint_container)
+    yield TestParameters(base_url, request_session, weasyprint_container)
     request_session.close()
 
 
@@ -80,7 +82,6 @@ def test_convert_simple_html(test_parameters: TestParameters) -> None:
 
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True)
     assert response.status_code == 200
-    flush_tmp_file("test_convert_simple_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
     pdf_reader = PyPDF.PdfReader(stream)
     total_pages = len(pdf_reader.pages)
@@ -95,7 +96,6 @@ def test_convert_complex_html(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/test-specification.html")
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
-    flush_tmp_file("test_convert_complex_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
     pdf_reader = PyPDF.PdfReader(stream)
     total_pages = len(pdf_reader.pages)
@@ -113,7 +113,6 @@ def test_convert_complex_html_without_embedded_attachments(test_parameters: Test
         print_error=True
     )
     assert response.status_code == 200
-    flush_tmp_file("test_convert_complex_html.pdf", response.content, test_parameters.flush_tmp_file_enabled)
     stream = io.BytesIO(response.content)
     pdf_reader = PyPDF.PdfReader(stream)
     total_pages = len(pdf_reader.pages)
@@ -146,7 +145,6 @@ def test_convert_complex_html_with_embedded_attachments(test_parameters: TestPar
     )
 
     assert response.status_code == 200
-    flush_tmp_file("test_convert_complex_html_with_embedded_attachments.pdf", response.content, test_parameters.flush_tmp_file_enabled)
 
     stream = io.BytesIO(response.content)
     pdf_reader = PyPDF.PdfReader(stream)
@@ -191,7 +189,6 @@ def test_convert_html_with_embedded_attachments(test_parameters: TestParameters)
     )
 
     assert response.status_code == 200
-    flush_tmp_file("test_convert_html_with_embedded_attachments.pdf", response.content, test_parameters.flush_tmp_file_enabled)
 
     stream = io.BytesIO(response.content)
     pdf_reader = PyPDF.PdfReader(stream)
@@ -202,7 +199,7 @@ def test_convert_html_with_embedded_attachments(test_parameters: TestParameters)
     assert "Lorem ipsum dolor sit amet, consectetur adipiscing elit." in page
 
     # Validate attachments
-    attachments = __extract_all_attachments(pdf_reader)
+    attachments = utils_pdf.extract_all_attachments(pdf_reader)
 
     expected = [
         (file1_path.name, 'NamesTree'),
@@ -220,35 +217,19 @@ def test_convert_svg(test_parameters: TestParameters) -> None:
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
 
-    # Render first page to PNG
-    doc = pymupdf.open(stream=response.content, filetype="pdf")
-    page = doc.load_page(0)
-    page_png_bytes = page.get_pixmap().tobytes("png")
+    # Render all pages to PNGs and compare all pages to references
+    pages_png = utils_pdf.pdf_bytes_to_png_pages(response.content)
 
-    flush_tmp_file("test_convert_svg_image.pdf", response.content, test_parameters.flush_tmp_file_enabled)
-    flush_tmp_file("test_convert_svg_image.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
 
-    produced_img = Image.open(io.BytesIO(page_png_bytes))
-    ref_path = Path("tests/test-data/expected/svg-image-ref.png")
-
-    if not ref_path.exists():
-        import os
-        if os.environ.get("UPDATE_EXPECTED_REFS", "0") == "1":
-            ref_path.parent.mkdir(parents=True, exist_ok=True)
-            ref_path.write_bytes(page_png_bytes)
-            pdf_ref_path = ref_path.with_suffix(".pdf")
-            pdf_ref_path.write_bytes(response.content)
-            pytest.skip(
-                f"Reference {ref_path} (and {pdf_ref_path}) was missing and has been generated. Re-run tests."
-            )
-        else:
-            pytest.skip(
-                f"Missing reference image {ref_path}. Set UPDATE_EXPECTED_REFS=1 to generate references (PNG and PDF), then commit them under tests/test-data/expected."
-            )
-
-    ref_image = Image.open(ref_path)
-    assert produced_img.mode == ref_image.mode and produced_img.size == ref_image.size
-    assert ImageChops.difference(produced_img, ref_image).getbbox() is None
+    ref_base = Path("tests/test-data/expected/svg-image-ref.png")
+    try:
+        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base)
+    except utils_pdf.ReferenceGenerated:
+        pytest.skip(
+            f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests."
+        )
+    except utils_pdf.ReferenceMissing as e:
+        pytest.skip(str(e))
 
 
 def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
@@ -256,35 +237,39 @@ def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
 
-    # Render first page to PNG
-    doc = pymupdf.open(stream=response.content, filetype="pdf")
-    page = doc.load_page(0)
-    page_png_bytes = page.get_pixmap().tobytes("png")
+    # Render all pages to PNGs and compare all pages to references
+    pages_png = utils_pdf.pdf_bytes_to_png_pages(response.content)
 
-    flush_tmp_file("test_convert_svg_image_as_base64.pdf", response.content, test_parameters.flush_tmp_file_enabled)
-    flush_tmp_file("test_convert_svg_image_as_base64.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
 
-    produced_img = Image.open(io.BytesIO(page_png_bytes))
-    ref_path = Path("tests/test-data/expected/svg-image-as-base64-ref.png")
+    ref_base = Path("tests/test-data/expected/svg-image-as-base64-ref.png")
+    try:
+        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base)
+    except utils_pdf.ReferenceGenerated:
+        pytest.skip(
+            f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests."
+        )
+    except utils_pdf.ReferenceMissing as e:
+        pytest.skip(str(e))
 
-    if not ref_path.exists():
-        import os
-        if os.environ.get("UPDATE_EXPECTED_REFS", "0") == "1":
-            ref_path.parent.mkdir(parents=True, exist_ok=True)
-            ref_path.write_bytes(page_png_bytes)
-            pdf_ref_path = ref_path.with_suffix(".pdf")
-            pdf_ref_path.write_bytes(response.content)
-            pytest.skip(
-                f"Reference {ref_path} (and {pdf_ref_path}) was missing and has been generated. Re-run tests."
-            )
-        else:
-            pytest.skip(
-                f"Missing reference image {ref_path}. Set UPDATE_EXPECTED_REFS=1 to generate references (PNG and PDF), then commit them under tests/test-data/expected."
-            )
 
-    ref_image = Image.open(ref_path)
-    assert produced_img.mode == ref_image.mode and produced_img.size == ref_image.size
-    assert ImageChops.difference(produced_img, ref_image).getbbox() is None
+def test_convert_svg_without_xmlns(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/svg-image-without-xmlns.html")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    assert response.status_code == 200
+
+    # Render all pages to PNGs and compare all pages to references
+    pages_png = utils_pdf.pdf_bytes_to_png_pages(response.content)
+
+
+    ref_base = Path("tests/test-data/expected/svg-image-ref.png")
+    try:
+        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base)
+    except utils_pdf.ReferenceGenerated:
+        pytest.skip(
+            f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests."
+        )
+    except utils_pdf.ReferenceMissing as e:
+        pytest.skip(str(e))
 
 
 @pytest.mark.parametrize("scale", [1.0, 2.0, 3.125, 6.25])
@@ -309,14 +294,9 @@ def test_convert_svg_with_scale_factor(scale: float, test_parameters: TestParame
     assert response.status_code == 200
 
     # Render first page to PNG at high rasterization scale to reveal anti-aliasing differences
-    doc = pymupdf.open(stream=response.content, filetype="pdf")
-    page = doc.load_page(0)
     # 10x zoom to better visualize quality differences coming from device scale factor
     zoom = 10.0
-    mat = pymupdf.Matrix(zoom, zoom)
-    page_png_bytes = page.get_pixmap(matrix=mat).tobytes("png")
-    flush_tmp_file(f"test_convert_svg_image_scale_{scale}.pdf", response.content, test_parameters.flush_tmp_file_enabled)
-    flush_tmp_file(f"test_convert_svg_image_scale_{scale}-x{int(zoom)}.png", page_png_bytes, test_parameters.flush_tmp_file_enabled)
+    page_png_bytes = utils_pdf.pdf_bytes_to_png_pages(response.content, zoom=zoom)[0]
 
     # Determine reference path
     # Use a stable string format for floating point values in filenames
@@ -365,6 +345,18 @@ def test_convert_incorrect_data(test_parameters: TestParameters) -> None:
     assert response.status_code == 400
 
 
+def test_svg_has_no_extra_labels(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/test-svg.html")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    assert response.status_code == 200
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+    total_pages = len(pdf_reader.pages)
+    assert total_pages == 1
+    page = pdf_reader.pages[0].extract_text()
+    assert "cannotdisplay" not in page
+
+
 @pytest.mark.parametrize(
     "variant, is_supported",
     [
@@ -392,7 +384,7 @@ def test_supported_pdf_variants(variant: str, is_supported: bool, test_parameter
         assert total_pages == 1
         first_page = pdf_reader.pages[0].extract_text()
         assert f"Pdf variant {variant}" in first_page
-        result_metadata_variant = __get_pdf_variant_from_metadata(pdf_reader)
+        result_metadata_variant = utils_pdf.get_pdf_variant_from_metadata(pdf_reader)
         assert variant == result_metadata_variant
     else:
         assert response.status_code == 400
@@ -410,7 +402,6 @@ def test_convert_html_with_custom_metadata(test_parameters: TestParameters) -> N
     )
 
     assert response.status_code == 200
-    flush_tmp_file("test_convert_html_with_custom_metadata.pdf", response.content, test_parameters.flush_tmp_file_enabled)
 
     stream = io.BytesIO(response.content)
     pdf_reader = PyPDF.PdfReader(stream)
@@ -437,14 +428,6 @@ def test_convert_html_with_custom_metadata(test_parameters: TestParameters) -> N
     assert producer.startswith("WeasyPrint")
 
 
-def __get_pdf_variant_from_metadata(pdf_reader: PyPDF.PdfReader) -> str:
-    if pdf_reader.xmp_metadata and pdf_reader.xmp_metadata.rdf_root:
-        for rdf_node in pdf_reader.xmp_metadata.rdf_root.childNodes:
-            part = rdf_node.attributes.get("pdfaid:part")
-            conformance = rdf_node.attributes.get("pdfaid:conformance")
-            if part and conformance:
-                return f"pdf/a-{part.value}{conformance.value}".lower()
-    return ""
 
 
 def __load_test_html(file_path: str) -> str:
@@ -480,81 +463,3 @@ def __call_convert_html(base_url: str, request_session: requests.Session, data, 
     except requests.exceptions.RequestException as e:
         logging.error(f"Error: {e}")
         raise
-
-
-def flush_tmp_file(file_name: str, file_bytes: bytes, flush_tmp_file_enabled: bool) -> None:
-    if flush_tmp_file_enabled:
-        with Path(file_name).open("wb") as f:
-            f.write(file_bytes)
-
-
-def __extract_all_attachments(reader: PyPDF.PdfReader):
-    DictObj = PyPDF.generic.DictionaryObject
-    IndObj  = PyPDF.generic.IndirectObject
-    ArrObj  = PyPDF.generic.ArrayObject
-
-    def _as_obj(x):
-        return x.get_object() if isinstance(x, IndObj) else x
-
-    def _yield_filespec(fs_obj, name_hint: str, source: str) -> Iterator[tuple[str, str]]:
-        fs = _as_obj(fs_obj)
-        if not isinstance(fs, DictObj):
-            return
-        name = fs.get("/UF") or fs.get("/F") or name_hint or "unnamed"
-        yield (str(name), source)
-
-    def _walk_name_tree(node, source: str):
-        node = _as_obj(node)
-        if not isinstance(node, DictObj):
-            return
-        names = node.get("/Names")
-        if isinstance(names, ArrObj):
-            for i in range(0, len(names), 2):
-                name = names[i]
-                fs   = names[i + 1]
-                yield from _yield_filespec(fs, str(name), source)
-        kids = node.get("/Kids")
-        if isinstance(kids, ArrObj):
-            for kid in kids:
-                yield from _walk_name_tree(kid, source)
-
-    def _iter_af(holder, source: str):
-        holder = _as_obj(holder)
-        if not isinstance(holder, DictObj):
-            return
-        af = holder.get("/AF")
-        if af is None:
-            return
-        items = af if isinstance(af, ArrObj) else [af]
-        for item in items:
-            yield from _yield_filespec(item, None, source)
-
-    out: list[tuple[str, str]] = []
-    catalog = reader.trailer["/Root"]
-
-    # 1) NameTree
-    with contextlib.suppress(Exception):
-        names = catalog.get("/Names")
-        if isinstance(names, DictObj):
-            embedded = names.get("/EmbeddedFiles")
-            if embedded is not None:
-                out.extend(_walk_name_tree(embedded, "NamesTree"))
-
-    # 2) AF of catalog
-    out.extend(_iter_af(catalog, "AF:Catalog"))
-
-    # 3) Pages
-    for page_idx, page in enumerate(reader.pages):
-        p = _as_obj(page)
-        annots = p.get("/Annots")
-        if isinstance(annots, ArrObj):
-            for ann in annots:
-                a = _as_obj(ann)
-                if isinstance(a, DictObj) and a.get("/Subtype") == "/FileAttachment":
-                    fs = a.get("/FS")
-                    if fs is not None:
-                        out.extend(_yield_filespec(fs, None, f"Annot:p{page_idx}"))
-                out.extend(_iter_af(a, f"AF:Annot:p{page_idx}"))
-        out.extend(_iter_af(p, f"AF:Page:{page_idx}"))
-
-    return out

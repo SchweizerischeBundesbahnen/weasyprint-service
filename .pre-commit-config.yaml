@@ -61,13 +61,13 @@ repos:
         files: ^(app/.*|scripts/.*|pyproject\.toml)$
         stages: [pre-commit]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.12
+    rev: v0.13.0
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/python-poetry/poetry
-    rev: 2.1.4
+    rev: 2.2.0
     hooks:
       - id: poetry-lock
       - id: poetry-check
@@ -81,7 +81,7 @@ repos:
       - id: check-git-config-user-email
         args: [--templates, ^\S+\.\S+@sbb\.ch$]
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.8.4
+    rev: v4.9.1
     hooks:
       - id: commitizen
   - repo: https://github.com/hadolint/hadolint
@@ -89,7 +89,7 @@ repos:
     hooks:
       - id: hadolint
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.12.1
+    rev: v1.13.0
     hooks:
       - id: zizmor
   - repo: https://github.com/rhysd/actionlint

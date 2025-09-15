@@ -1,5 +1,12 @@
 # Changelog
 
+## [66.0.4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.3...v66.0.4) (2025-09-15)
+
+
+### Features
+
+* add OpenAPI schema generator script and pre-commit hook for schema updates ([#206](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/206)) ([146b68f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/146b68ff52196a809a9aaaa4d01685d27d7bcd7e))
+
 ## [66.0.3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.2...v66.0.3) (2025-09-10)
 
 

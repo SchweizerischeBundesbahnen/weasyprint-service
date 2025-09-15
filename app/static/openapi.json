@@ -153,11 +153,12 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "PDF file generated from the provided HTML",
             "content": {
               "application/json": {
                 "schema": {}
-              }
+              },
+              "application/pdf": {}
             }
           },
           "400": {
@@ -311,11 +312,12 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "PDF file generated from the provided HTML (with optional attachments)",
             "content": {
               "application/json": {
                 "schema": {}
-              }
+              },
+              "application/pdf": {}
             }
           },
           "400": {
@@ -337,6 +339,35 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "multipart/form-data with form fields: html — a string containing HTML; files — one or more file attachments. The html field is required. The files field is optional.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "html": {
+                    "type": "string",
+                    "description": "HTML document content. Can be provided as a regular text form field.",
+                    "example": "<html><body><h1>Hello</h1></body></html>"
+                  },
+                  "files": {
+                    "type": "array",
+                    "description": "List of files to be embedded into the resulting PDF as attachments. Submit multiple form parts with the same name 'files'.",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                },
+                "required": [
+                  "html"
+                ]
               }
             }
           }

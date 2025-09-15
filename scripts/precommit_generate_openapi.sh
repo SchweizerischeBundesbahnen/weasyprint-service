@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Generate and stage an up-to-date OpenAPI spec without using Python directly.
-# Strategy:
-#  - If OPENAPI_SOURCE_URL is provided, fetch from it.
-#  - Otherwise, start the FastAPI app locally (via poetry or python), wait until the OpenAPI endpoint responds, fetch it, and then stop the app.
-#  - Finally, stage the updated app/static/openapi.json if it changed.
+# Start the app locally and save app/static/openapi.json
+# - Starts FastAPI on configurable port via python from local virtualenv only
+# - Waits until OpenAPI endpoint is up
+# - Downloads and pretty-prints directly to app/static/openapi.json
 
 ROOT_DIR="$(cd "$(dirname "$0")"/.. && pwd)"
 OUTPUT="${ROOT_DIR}/app/static/openapi.json"
-DEFAULT_URL="http://localhost:9980/static/openapi.json"
-URL="${OPENAPI_SOURCE_URL:-$DEFAULT_URL}"
+PORT="${OPENAPI_PORT:-9980}"
+URL="http://localhost:${PORT}/static/openapi.json"
 
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "Error: required command '$1' not found." >&2; exit 1; }; }
 
-# Ensure curl is available
 need_cmd curl
+need_cmd lsof
 
-
-# Helper to wait for URL to be ready (HTTP 200)
 wait_for_url() {
-  local url="$1"; local timeout="${2:-90}"; local start ts now
+  local url="$1"; local timeout="${2:-90}"; local start now
   start=$(date +%s)
   echo "Waiting for ${url} to become available (timeout=${timeout}s)..."
   while true; do
@@ -37,7 +34,6 @@ wait_for_url() {
   done
 }
 
-# If URL is default localhost, try to start the FastAPI app directly with uvicorn via the project's entry script
 APP_PID=""
 LOG_DIR_LOCAL=""
 cleanup() {
@@ -45,69 +41,50 @@ cleanup() {
     echo "Stopping local FastAPI app (pid=${APP_PID})..."
     kill "${APP_PID}" >/dev/null 2>&1 || true
   fi
-  # Cleanup temporary logs directory
   if [ -n "${LOG_DIR_LOCAL}" ] && [ -d "${LOG_DIR_LOCAL}" ]; then
     rm -rf "${LOG_DIR_LOCAL}" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT
 
-if [ "$URL" = "$DEFAULT_URL" ]; then
-  # Use a temporary LOG_DIR outside the repository to ensure this script only changes app/static/openapi.json
-  LOG_DIR_LOCAL="$(mktemp -d 2>/dev/null || mktemp -d -t weasyprint-logs)"
-  export LOG_DIR="$LOG_DIR_LOCAL"
-  if command -v poetry >/dev/null 2>&1; then
-    echo "Starting local FastAPI app via poetry on port 9980 (LOG_DIR=$LOG_DIR_LOCAL)..."
-    (cd "$ROOT_DIR" && LOG_DIR="$LOG_DIR_LOCAL" poetry run python -m app.weasyprint_service_application --port 9980) >/dev/null 2>&1 &
-    APP_PID=$!
-  elif command -v python >/dev/null 2>&1; then
-    echo "Starting local FastAPI app via python on port 9980 (LOG_DIR=$LOG_DIR_LOCAL)..."
-    (cd "$ROOT_DIR" && LOG_DIR="$LOG_DIR_LOCAL" python -m app.weasyprint_service_application --port 9980) >/dev/null 2>&1 &
-    APP_PID=$!
-  else
-    echo "Note: Neither poetry nor python is available. Assuming the service is already running at $URL."
-  fi
-fi
+LOG_DIR_LOCAL="$(mktemp -d 2>/dev/null || mktemp -d -t weasyprint-logs)"
+export LOG_DIR="$LOG_DIR_LOCAL"
 
-# Wait for the endpoint to be ready, then fetch
-wait_for_url "$URL" 120
-# Use a temporary file outside the repository for download/formatting to avoid touching other files
-TMP_FILE="$(mktemp 2>/dev/null || mktemp -t openapi.json)"
-mkdir -p "$(dirname "$OUTPUT")"
-
-# Fetch the OpenAPI JSON
-if curl -fsS "$URL" -o "$TMP_FILE"; then
-  # If jq is available, pretty-print only (no sorting or re-ordering)
-  if command -v jq >/dev/null 2>&1; then
-    jq '.' "$TMP_FILE" > "${TMP_FILE}.fmt" && mv "${TMP_FILE}.fmt" "$TMP_FILE"
-  else
-    echo "Warning: jq not found. OpenAPI JSON will not be pretty-printed." >&2
-  fi
-  # Only replace if changed
-  if [ ! -f "$OUTPUT" ] || ! cmp -s "$TMP_FILE" "$OUTPUT"; then
-    mv "$TMP_FILE" "$OUTPUT"
-    echo "Updated ${OUTPUT} from ${URL}."
-  else
-    rm -f "$TMP_FILE"
-    echo "No changes in OpenAPI specification."
-  fi
-else
-  echo "Error: Failed to download OpenAPI from ${URL}" >&2
-  # Cleanup and exit with error
-  rm -f "$TMP_FILE" || true
+# Enforce running from local virtual environment's python
+VENV_PYTHON="${ROOT_DIR}/.venv/bin/python"
+if [ ! -x "$VENV_PYTHON" ]; then
+  echo "Error: Local virtual environment python not found at $VENV_PYTHON. Please create and activate a local venv (.venv)." >&2
   exit 1
 fi
 
-# If we started a local app process, stop it
-if [ -n "${APP_PID}" ]; then
-  echo "Stopping local FastAPI app (pid=${APP_PID})..."
-  kill "$APP_PID" >/dev/null 2>&1 || true
+# Ensure the selected port is free before starting
+if lsof -ti :"${PORT}" >/dev/null 2>&1; then
+  echo "Error: Port ${PORT} is already in use. Set OPENAPI_PORT to a free port and retry." >&2
+  exit 1
 fi
 
-# Stage changes if any
-if ! git diff --quiet -- "$OUTPUT"; then
-  git add "$OUTPUT"
-  echo "Staged changes in ${OUTPUT}."
+echo "Starting local FastAPI app via local venv python on port ${PORT}..."
+(cd "$ROOT_DIR" && LOG_DIR="$LOG_DIR_LOCAL" "$VENV_PYTHON" -m app.weasyprint_service_application --port "${PORT}") >/dev/null 2>&1 &
+
+wait_for_url "$URL" 60
+
+APP_PID=$(lsof -ti :"${PORT}" || true)
+
+mkdir -p "$(dirname "$OUTPUT")"
+
+# Stream directly into OUTPUT, pretty-print with jq if available
+if command -v jq >/dev/null 2>&1; then
+  if curl -fsS "$URL" | jq '.' > "$OUTPUT"; then
+    echo "Saved ${OUTPUT} from ${URL}."
+  else
+    echo "Error: Failed to download or format OpenAPI from ${URL}" >&2
+    exit 1
+  fi
 else
-  echo "OpenAPI is up-to-date (no changes to stage)."
+  if curl -fsS "$URL" > "$OUTPUT"; then
+    echo "Saved ${OUTPUT} from ${URL}."
+  else
+    echo "Error: Failed to download OpenAPI from ${URL}" >&2
+    exit 1
+  fi
 fi

@@ -144,7 +144,10 @@ def get_output_options(
 
 @app.post(
     "/convert/html",
-    responses={400: {"content": {"text/plain": {}}, "description": "Invalid Input"}, 500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"}},
+    responses={
+        400: {"content": {"text/plain": {}}, "description": "Invalid Input"},
+        500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"},
+    },
     summary="Convert HTML to PDF",
     description="Accepts raw HTML in the request body and returns a generated PDF.",
     operation_id="convert_html_post",

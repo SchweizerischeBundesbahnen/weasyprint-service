@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING
 
 from starlette.datastructures import FormData, UploadFile
 
-# ruff: noqa: TCH004
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # ruff: noqa: TCH004
     from fastapi import Request
 
 

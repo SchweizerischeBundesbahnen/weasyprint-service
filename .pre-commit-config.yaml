@@ -54,8 +54,8 @@ repos:
         language: script
         pass_filenames: false
         # Run this hook only when sources that affect the generated OpenAPI can change it:
-        #  - app/**/*.py: FastAPI routes, models, dependencies
-        #  - scripts/**/*.py: tooling that may influence generation
+        #  - app/**/*.*: WeasyPrint Service application
+        #  - scripts/**/*.*: tooling that may influence generation
         #  - pyproject.toml: dependencies/entry-points that can affect startup and schema
         # This avoids running the generator on unrelated changes (e.g., docs, tests) for faster commits.
         files: ^(app/.*|scripts/.*|pyproject\.toml)$

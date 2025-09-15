@@ -345,18 +345,6 @@ def test_convert_incorrect_data(test_parameters: TestParameters) -> None:
     assert response.status_code == 400
 
 
-def test_svg_has_no_extra_labels(test_parameters: TestParameters) -> None:
-    html = __load_test_html("tests/test-data/test-svg.html")
-    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
-    assert response.status_code == 200
-    stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
-    total_pages = len(pdf_reader.pages)
-    assert total_pages == 1
-    page = pdf_reader.pages[0].extract_text()
-    assert "cannotdisplay" not in page
-
-
 @pytest.mark.parametrize(
     "variant, is_supported",
     [

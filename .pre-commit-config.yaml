@@ -48,6 +48,18 @@ repos:
         exclude: (^tests/)
         args: [--config-file, pyproject.toml]
         require_serial: true  # Serial processing is required for mypy (better performance and error reporting)
+      - id: generate-openapi
+        name: Generate OpenAPI (update app/static/openapi.json)
+        entry: scripts/precommit_generate_openapi.sh
+        language: script
+        pass_filenames: false
+        # Run this hook only when sources that affect the generated OpenAPI can change it:
+        #  - app/**/*.*: WeasyPrint Service application
+        #  - scripts/**/*.*: tooling that may influence generation
+        #  - pyproject.toml: dependencies/entry-points that can affect startup and schema
+        # This avoids running the generator on unrelated changes (e.g., docs, tests) for faster commits.
+        files: ^(app/.*|scripts/.*|pyproject\.toml)$
+        stages: [pre-commit]
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.13.0
     hooks:

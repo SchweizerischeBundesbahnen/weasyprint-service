@@ -144,7 +144,11 @@ def get_output_options(
 
 @app.post(
     "/convert/html",
-    responses={400: {"content": {"text/plain": {}}, "description": "Invalid Input"}, 500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"}},
+    responses={
+        200: {"content": {"application/pdf": {}}, "description": "PDF file generated from the provided HTML"},
+        400: {"content": {"text/plain": {}}, "description": "Invalid Input"},
+        500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"},
+    },
     summary="Convert HTML to PDF",
     description="Accepts raw HTML in the request body and returns a generated PDF.",
     operation_id="convert_html_post",
@@ -203,6 +207,7 @@ async def __get_encoding(request: Request, encoding: str | None) -> str:
 @app.post(
     "/convert/html-with-attachments",
     responses={
+        200: {"content": {"application/pdf": {}}, "description": "PDF file generated from the provided HTML (with optional attachments)"},
         400: {"content": {"text/plain": {}}, "description": "Invalid Input"},
         500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"},
     },
@@ -210,6 +215,28 @@ async def __get_encoding(request: Request, encoding: str | None) -> str:
     description="Accepts HTML as a form field and optional files to be embedded as PDF attachments.",
     operation_id="convert_html_with_attachments_post",
     tags=["convert"],
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "description": "multipart/form-data with form fields: html — a string containing HTML; files — one or more file attachments. The html field is required. The files field is optional.",
+            "content": {
+                "multipart/form-data": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "html": {"type": "string", "description": "HTML document content. Can be provided as a regular text form field.", "example": "<html><body><h1>Hello</h1></body></html>"},
+                            "files": {
+                                "type": "array",
+                                "description": "List of files to be embedded into the resulting PDF as attachments. Submit multiple form parts with the same name 'files'.",
+                                "items": {"type": "string", "format": "binary"},
+                            },
+                        },
+                        "required": ["html"],
+                    }
+                }
+            },
+        }
+    },
 )
 async def convert_html_with_attachments(
     request: Request,

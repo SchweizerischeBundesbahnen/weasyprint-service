@@ -39,7 +39,7 @@ html5lib = "^1.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "4.3.0"
-ruff = "0.13.0"
+ruff = "0.13.1"
 mypy = "1.18.1"
 types-defusedxml = "0.7.0.20250822"
 

@@ -18,6 +18,8 @@ from app.html_parser import HtmlParser
 from app.schemas import VersionSchema
 from app.svg_processor import SvgProcessor
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="WeasyPrint Service API",
     version="1.0.0",
@@ -39,13 +41,16 @@ async def version() -> dict[str, str | None]:
     """
     Get version information
     """
-    return {
+    logger.info("Version endpoint called")
+    version_info = {
         "python": platform.python_version(),
         "weasyprint": weasyprint.__version__,
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),
         "timestamp": os.environ.get("WEASYPRINT_SERVICE_BUILD_TIMESTAMP"),
         "chromium": os.environ.get("WEASYPRINT_SERVICE_CHROMIUM_VERSION"),
     }
+    logger.debug("Version info: %s", version_info)
+    return version_info
 
 
 class RenderOptions(BaseModel):
@@ -162,10 +167,15 @@ async def convert_html(
     """
     Convert HTML content from the request body to a PDF document.
     """
+    logger.info("HTML to PDF conversion requested")
     raw: bytes = await request.body()
+    logger.debug("Received HTML body of size: %d bytes", len(raw))
     encoding: str = await __get_encoding(request, render.encoding)
+    logger.debug("Using encoding: %s", encoding)
     try:
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
+        if base_url:
+            logger.debug("Using base URL: %s", base_url)
 
         html = raw.decode(encoding)
         html_parser = HtmlParser()
@@ -173,25 +183,32 @@ async def convert_html(
         parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
         processed_html = html_parser.serialize(parsed_html)
 
+        logger.debug("Creating WeasyPrint HTML object with media_type=%s", render.media_type)
         weasyprint_html = weasyprint.HTML(
             string=processed_html,
             base_url=base_url,
             media_type=render.media_type,
             encoding=render.encoding,
         )
+        logger.debug("Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s",
+                     output.pdf_variant, render.presentational_hints, output.custom_metadata)
         output_pdf = weasyprint_html.write_pdf(
             pdf_variant=output.pdf_variant,
             presentational_hints=render.presentational_hints,
             custom_metadata=output.custom_metadata,
         )
+        logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
+        logger.warning("Assertion error in HTML conversion: %s", str(e))
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
+        logger.warning("Encoding error in HTML conversion: %s", str(e))
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
+        logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Unexpected error due converting to PDF", 500)
 
 
@@ -250,7 +267,9 @@ async def convert_html_with_attachments(
       - field 'html' contains the HTML content
       - remaining file parts are treated as attachments
     """
+    logger.info("HTML to PDF with attachments conversion requested")
     tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
+    logger.debug("Created temporary directory: %s", tmpdir)
     try:
         encoding: str = await __get_encoding(request, render.encoding)
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
@@ -259,6 +278,7 @@ async def convert_html_with_attachments(
         form = await form_parser.parse(request)
         html = form_parser.html_from_form(form, encoding)
         files = form_parser.collect_files_from_form(form)
+        logger.debug("Parsed form with %d file attachments", len(files))
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
@@ -273,32 +293,41 @@ async def convert_html_with_attachments(
 
         processed_html = html_parser.serialize(parsed_html)
 
+        logger.debug("Creating WeasyPrint HTML object with media_type=%s", render.media_type)
         weasyprint_html = weasyprint.HTML(
             string=processed_html,
             base_url=base_url,
             media_type=render.media_type,
             encoding=render.encoding,
         )
+        logger.debug("Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s, attachments=%d",
+                     output.pdf_variant, render.presentational_hints, output.custom_metadata, len(attachments))
         output_pdf = weasyprint_html.write_pdf(
             pdf_variant=output.pdf_variant,
             presentational_hints=render.presentational_hints,
             custom_metadata=output.custom_metadata,
             attachments=attachments,
         )
+        logger.info("PDF with attachments generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
+        logger.warning("Assertion error in HTML conversion: %s", str(e))
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
+        logger.warning("Encoding error in HTML conversion: %s", str(e))
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
+        logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Unexpected error due converting to PDF", 500)
     finally:
+        logger.debug("Cleaning up temporary directory: %s", tmpdir)
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> Response:
+    logger.debug("Creating response with filename: %s", output.file_name)
     response = Response(output_pdf, media_type="application/pdf", status_code=200)
     response.headers.append("Content-Disposition", f"attachment; filename={output.file_name}")
     response.headers.append("Python-Version", platform.python_version())
@@ -308,5 +337,5 @@ async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> 
 
 
 def __process_error(e: Exception, err_msg: str, status: int) -> Response:
-    logging.exception(msg=err_msg + ": " + str(e))
+    logger.exception(msg=err_msg + ": " + str(e))
     return Response(err_msg + ": " + getattr(e, "message", repr(e)), media_type="plain/text", status_code=status)

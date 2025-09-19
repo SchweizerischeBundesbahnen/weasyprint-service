@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
 import weasyprint  # type: ignore
 from bs4 import BeautifulSoup, Tag
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # imports used only for type hints
     from collections.abc import Sequence
@@ -38,6 +41,7 @@ class AttachmentManager:
         Collect file names mentioned in <a|link rel="attachment" href="...">.
         Returns basenames (no path segments).
         """
+        logger.debug("Finding referenced attachment names in HTML")
         names: set[str] = set()
 
         for tag in soup.find_all(["a", "link"]):
@@ -48,7 +52,9 @@ class AttachmentManager:
             name = self._resolve_href_name(tag)
             if name:
                 names.add(name)
+                logger.debug("Found referenced attachment: %s", name)
 
+        logger.info("Found %d referenced attachments", len(names))
         return names
 
     def _has_attachment_rel(self, tag: Tag) -> bool:
@@ -77,6 +83,7 @@ class AttachmentManager:
         Rewrite href in <a|link rel="attachment"...> to absolute file:// URIs
         so that PDF viewers can click and open the embedded file.
         """
+        logger.debug("Rewriting attachment links to file URIs")
         # Build the set of referenced names using the existing helper to avoid duplication
         referenced_names = self.find_referenced_attachment_names(soup)
         if not referenced_names:
@@ -93,8 +100,11 @@ class AttachmentManager:
                 continue
             p = name_to_path.get(name)
             if not p:
+                logger.warning("Attachment file not found in saved files: %s", name)
                 continue
-            tag["href"] = p.resolve().as_uri()
+            file_uri = p.resolve().as_uri()
+            tag["href"] = file_uri
+            logger.debug("Rewrote attachment link %s to %s", name, file_uri)
         return soup
 
     # ---------- Upload handling ----------
@@ -110,7 +120,10 @@ class AttachmentManager:
         """
         mapping: dict[str, Path] = {}
         if not files:
+            logger.debug("No files to save")
             return mapping
+
+        logger.info("Saving %d uploaded files to temporary directory", len(files))
 
         target_dir = tmpdir or self.default_tmpdir
         if target_dir is None:
@@ -121,6 +134,7 @@ class AttachmentManager:
         for f in files:
             content = await f.read()
             name = Path(f.filename).name if f.filename and f.filename.strip() else "attachment.bin"
+            logger.debug("Processing file: %s, size: %d bytes", name, len(content))
 
             path = target_dir.joinpath(name)
             i = 1
@@ -131,8 +145,10 @@ class AttachmentManager:
             with path.open("wb") as out:
                 out.write(content)
 
+            logger.debug("Saved file %s to %s", name, path)
             mapping[name] = path
 
+        logger.info("Saved %d files successfully", len(mapping))
         return mapping
 
     # ---------- WeasyPrint attachments ----------
@@ -146,18 +162,23 @@ class AttachmentManager:
         Build a list of weasyprint.Attachment for files that are not referenced in HTML.
         Avoid duplicates by path.
         """
+        logger.debug("Building attachments for unreferenced files")
         attachments: list[weasyprint.Attachment] = []
         added: set[Path] = set()
 
         for name, path in name_to_path.items():
             if name in referenced:
+                logger.debug("Skipping referenced file: %s", name)
                 continue
             if path in added:
+                logger.debug("Skipping duplicate path: %s", path)
                 continue
 
             attachments.append(weasyprint.Attachment(filename=str(path)))
             added.add(path)
+            logger.debug("Added attachment for unreferenced file: %s", name)
 
+        logger.info("Built %d attachments for unreferenced files", len(attachments))
         return attachments
 
     # ---------- Orchestrator ----------
@@ -177,8 +198,10 @@ class AttachmentManager:
 
         Returns updated BeautifulSoup and a list of attachments.
         """
+        logger.info("Processing HTML and uploads for attachments")
         referenced: set[str] = self.find_referenced_attachment_names(parsed_html)
         name_to_path: dict[str, Path] = await self.save_uploads_to_tmpdir(files, tmpdir or self.default_tmpdir)
         attachments: list[weasyprint.Attachment] = self.build_attachments_for_unreferenced(name_to_path, referenced)
         updated_html = self.rewrite_attachment_links_to_file_uri(parsed_html, name_to_path)
+        logger.info("Completed processing with %d attachments", len(attachments))
         return updated_html, attachments

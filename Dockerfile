@@ -14,6 +14,7 @@ RUN apt-get update && \
     fonts-noto-cjk \
     fonts-noto-cjk-extra \
     fonts-noto-color-emoji \
+    fonts-freefont-ttf \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     python3-brotli \

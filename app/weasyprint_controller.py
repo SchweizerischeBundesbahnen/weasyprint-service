@@ -18,6 +18,8 @@ from app.html_parser import HtmlParser
 from app.schemas import VersionSchema
 from app.svg_processor import SvgProcessor
 
+logger = logging.getLogger(__name__)
+
 app = FastAPI(
     title="WeasyPrint Service API",
     version="1.0.0",
@@ -39,13 +41,16 @@ async def version() -> dict[str, str | None]:
     """
     Get version information
     """
-    return {
+    logger.info("Version endpoint called")
+    version_info = {
         "python": platform.python_version(),
         "weasyprint": weasyprint.__version__,
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),
         "timestamp": os.environ.get("WEASYPRINT_SERVICE_BUILD_TIMESTAMP"),
         "chromium": os.environ.get("WEASYPRINT_SERVICE_CHROMIUM_VERSION"),
     }
+    logger.debug("Version info: %s", version_info)
+    return version_info
 
 
 class RenderOptions(BaseModel):
@@ -162,16 +167,31 @@ async def convert_html(
     """
     Convert HTML content from the request body to a PDF document.
     """
+    logger.info("HTML to PDF conversion requested")
+    logger.debug("Render options: encoding=%s, media_type=%s, base_url=%s, scale_factor=%s",
+                 render.encoding, render.media_type, render.base_url, render.scale_factor)
+    logger.debug("Output options: file_name=%s, pdf_variant=%s, custom_metadata=%s",
+                 output.file_name, output.pdf_variant, output.custom_metadata)
+
     raw: bytes = await request.body()
+    logger.debug("Received HTML body of %d bytes", len(raw))
+
     encoding: str = await __get_encoding(request, render.encoding)
     try:
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
 
         html = raw.decode(encoding)
+        logger.debug("Successfully decoded HTML with encoding: %s", encoding)
+
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
+        logger.debug("HTML parsed successfully")
+
         parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
+        logger.debug("SVG processing completed")
+
         processed_html = html_parser.serialize(parsed_html)
+        logger.debug("HTML serialization completed")
 
         weasyprint_html = weasyprint.HTML(
             string=processed_html,
@@ -179,19 +199,25 @@ async def convert_html(
             media_type=render.media_type,
             encoding=render.encoding,
         )
+        logger.debug("WeasyPrint HTML object created")
+
         output_pdf = weasyprint_html.write_pdf(
             pdf_variant=output.pdf_variant,
             presentational_hints=render.presentational_hints,
             custom_metadata=output.custom_metadata,
         )
+        logger.info("PDF generation successful, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
+        logger.warning("Assertion error during HTML conversion: %s", str(e))
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
+        logger.warning("Encoding error during HTML conversion: %s", str(e))
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
+        logger.error("Unexpected error during HTML to PDF conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Unexpected error due converting to PDF", 500)
 
 
@@ -201,7 +227,10 @@ async def __get_encoding(request: Request, encoding: str | None) -> str:
     with contextlib.suppress(Exception):
         if "charset=" in ct:
             charset = ct.split("charset=", 1)[1].split(";", 1)[0].strip()
-    return charset or encoding or "utf-8"
+            logger.debug("Extracted charset from content-type header: %s", charset)
+    result_encoding = charset or encoding or "utf-8"
+    logger.debug("Using encoding: %s", result_encoding)
+    return result_encoding
 
 
 @app.post(
@@ -250,19 +279,34 @@ async def convert_html_with_attachments(
       - field 'html' contains the HTML content
       - remaining file parts are treated as attachments
     """
+    logger.info("HTML to PDF conversion with attachments requested")
+    logger.debug("Render options: encoding=%s, media_type=%s, base_url=%s, scale_factor=%s",
+                 render.encoding, render.media_type, render.base_url, render.scale_factor)
+    logger.debug("Output options: file_name=%s, pdf_variant=%s, custom_metadata=%s",
+                 output.file_name, output.pdf_variant, output.custom_metadata)
+
     tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
+    logger.debug("Created temporary directory: %s", tmpdir)
     try:
         encoding: str = await __get_encoding(request, render.encoding)
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
 
         form_parser = FormParser()
         form = await form_parser.parse(request)
+        logger.debug("Multipart form parsed successfully")
+
         html = form_parser.html_from_form(form, encoding)
+        logger.debug("Extracted HTML from form")
+
         files = form_parser.collect_files_from_form(form)
+        logger.debug("Collected %d file attachments from form", len(files))
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
+        logger.debug("HTML parsed successfully")
+
         parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
+        logger.debug("SVG processing completed")
 
         attachment_manager = AttachmentManager()
         parsed_html, attachments = await attachment_manager.process_html_and_uploads(
@@ -270,8 +314,10 @@ async def convert_html_with_attachments(
             files=files,
             tmpdir=Path(tmpdir),
         )
+        logger.debug("Processed %d attachments", len(attachments))
 
         processed_html = html_parser.serialize(parsed_html)
+        logger.debug("HTML serialization completed")
 
         weasyprint_html = weasyprint.HTML(
             string=processed_html,
@@ -279,23 +325,30 @@ async def convert_html_with_attachments(
             media_type=render.media_type,
             encoding=render.encoding,
         )
+        logger.debug("WeasyPrint HTML object created")
+
         output_pdf = weasyprint_html.write_pdf(
             pdf_variant=output.pdf_variant,
             presentational_hints=render.presentational_hints,
             custom_metadata=output.custom_metadata,
             attachments=attachments,
         )
+        logger.info("PDF with attachments generation successful, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
+        logger.warning("Assertion error during HTML with attachments conversion: %s", str(e))
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
+        logger.warning("Encoding error during HTML with attachments conversion: %s", str(e))
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
+        logger.error("Unexpected error during HTML to PDF with attachments conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Unexpected error due converting to PDF", 500)
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+        logger.debug("Cleaned up temporary directory: %s", tmpdir)
 
 
 async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> Response:
@@ -304,9 +357,10 @@ async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> 
     response.headers.append("Python-Version", platform.python_version())
     response.headers.append("Weasyprint-Version", weasyprint.__version__)
     response.headers.append("Weasyprint-Service-Version", os.environ.get("WEASYPRINT_SERVICE_VERSION", ""))
+    logger.debug("Response created with file name: %s", output.file_name)
     return response
 
 
 def __process_error(e: Exception, err_msg: str, status: int) -> Response:
-    logging.exception(msg=err_msg + ": " + str(e))
+    logger.exception(msg=err_msg + ": " + str(e))
     return Response(err_msg + ": " + getattr(e, "message", repr(e)), media_type="plain/text", status_code=status)

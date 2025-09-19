@@ -35,13 +35,11 @@ WORKDIR ${WORKING_DIR}
 RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
     echo "${BUILD_TIMESTAMP}" > "${WORKING_DIR}/.build_timestamp"
 
-COPY requirements.txt ${WORKING_DIR}/requirements.txt
-
 COPY ./app/*.py ${WORKING_DIR}/app/
 COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
-COPY ./poetry.lock ${WORKING_DIR}/poetry.lock
 
-RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && poetry install --no-root --only main
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system --no-cache .
 
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh

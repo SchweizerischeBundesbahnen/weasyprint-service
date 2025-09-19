@@ -5,57 +5,41 @@ description = "Service for https://github.com/Kozea/WeasyPrint"
 authors = [
     {name = "SBB Polarion Team", email = "polarion-opensource@sbb.ch"},
 ]
-license = "Apache License 2.0"
+license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.13"
-dynamic = ["dependencies"]
-# Dependencies moved back to [tool.poetry.dependencies] for Renovate compatibility
-# See: https://github.com/renovatebot/renovate/issues/33509
-# TODO: Migrate back to [project.dependencies] when Renovate adds Poetry v2 support
-# dependencies = [
-#     "weasyprint==65.1",
-#     "defusedxml==0.7.1",
-#     "fastapi==0.115.12",
-#     "uvicorn==0.34.3",
-#     "requests==2.32.4",
-# ]
+dependencies = [
+    "weasyprint==66.0",
+    "defusedxml==0.7.1",
+    "fastapi==0.116.2",
+    "uvicorn==0.35.0",
+    "requests==2.32.5",
+    "starlette>=0.47.2",
+    "python-multipart>=0.0.20",
+    "beautifulsoup4>=4.13.5",
+    "html5lib>=1.1",
+]
 
-[tool.poetry]
-packages = [{include = "app"}]
-
-# this duplication and legacy format must be kept until Renovate support is added for [project.dependencies] for poetry-lock updates
-# for more information check comments above
-[tool.poetry.dependencies]
-python = ">=3.13"
-weasyprint = "66.0"
-defusedxml = "0.7.1"
-fastapi = "0.116.2"
-uvicorn = "0.35.0"
-requests = "2.32.5"
-starlette = "^0.47.2"
-python-multipart = "^0.0.20"
-beautifulsoup4 = "^4.13.5"
-html5lib = "^1.1"
-
-[tool.poetry.group.dev.dependencies]
-pre-commit = "4.3.0"
-ruff = "0.13.1"
-mypy = "1.18.2"
-types-defusedxml = "0.7.0.20250822"
-
-[tool.poetry.group.test.dependencies]
-tox = "4.30.2"
-# for debug source code for pytest --> see tox.ini section [testenv]
-docker = "7.1.0"
-pytest = "8.4.2"
-pymupdf = "1.26.4"
-pypdf = "6.0.0"
-httpx = "0.28.1"
-coverage = "7.10.6"
+[project.optional-dependencies]
+dev = [
+    "pre-commit==4.3.0",
+    "ruff==0.13.1",
+    "mypy==1.18.2",
+    "types-defusedxml==0.7.0.20250822",
+]
+test = [
+    "tox==4.30.2",
+    "docker==7.1.0",
+    "pytest==8.4.2",
+    "pymupdf==1.26.4",
+    "pypdf==6.0.0",
+    "httpx==0.28.1",
+    "coverage==7.10.6",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 240

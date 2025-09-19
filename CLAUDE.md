@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Run complete test suite (optimized sequence, no redundancy)
 # 1. Run tox - handles linting, formatting, type checking, and tests with coverage
-poetry run tox
+tox
 
 # 2. Run pre-commit hooks - final validation including security checks and commit format
-poetry run pre-commit run --all
+pre-commit run --all
 ```
 
 ### Commit Convention
@@ -32,22 +32,25 @@ Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
 
 ### Development Environment Setup
 ```bash
-# Install dependencies using Poetry
-poetry install --with=dev,test
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies using uv
+uv pip install -e ".[dev,test]"
 ```
 
 ### Testing and Quality Assurance
 ```bash
 # Quick test during development
-poetry run pytest tests/test_specific_file.py -v
+pytest tests/test_specific_file.py -v
 
 # Run specific test within a file
-poetry run pytest tests/test_svg_processor.py::test_process_valid_svg -v
+pytest tests/test_svg_processor.py::test_process_valid_svg -v
 
 # Manual linting/formatting (if needed outside of tox/pre-commit)
-poetry run ruff format
-poetry run ruff check --fix
-poetry run mypy .
+ruff format
+ruff check --fix
+mypy .
 
 # Generate/update OpenAPI schema (auto-runs in pre-commit)
 scripts/precommit_generate_openapi.sh
@@ -56,7 +59,7 @@ scripts/precommit_generate_openapi.sh
 ### Local Development Server
 ```bash
 # Start FastAPI development server
-poetry run python -m app.weasyprint_service_application --port 9080
+python -m app.weasyprint_service_application --port 9080
 
 # Access API documentation
 # http://localhost:9080/api/docs
@@ -125,7 +128,6 @@ The repository uses extensive pre-commit hooks including:
 - OpenAPI schema auto-generation (`scripts/precommit_generate_openapi.sh`)
 - Security checks (gitleaks, sensitive data detection)
 - Docker security (hadolint for Dockerfile linting)
-- Poetry dependency management validation (lock file updates)
 - Commitizen (validates conventional commit format)
 - YAML/JSON/TOML validation and formatting
 
@@ -146,8 +148,8 @@ The repository uses extensive pre-commit hooks including:
 ## Important Notes
 
 ### Dependency Management
-- Uses Poetry for Python dependency management
-- Dependencies defined in both `pyproject.toml` and `[tool.poetry.dependencies]` due to Renovate compatibility requirements
+- Uses uv for fast Python dependency management
+- Dependencies defined in standard PEP 621 format in `[project.dependencies]`
 - Renovate handles automated dependency updates
 - Python 3.13+ required
 

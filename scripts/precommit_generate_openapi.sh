@@ -50,11 +50,18 @@ trap cleanup EXIT
 LOG_DIR_LOCAL="$(mktemp -d 2>/dev/null || mktemp -d -t weasyprint-logs)"
 export LOG_DIR="$LOG_DIR_LOCAL"
 
-# Enforce running from local virtual environment's python
+# Try to find Python in virtual environment or use system Python
 VENV_PYTHON="${ROOT_DIR}/.venv/bin/python"
 if [ ! -x "$VENV_PYTHON" ]; then
-  echo "Error: Local virtual environment python not found at $VENV_PYTHON. Please create and activate a local venv (.venv)." >&2
-  exit 1
+  # Try to find Python in PATH (for uv or system Python)
+  if command -v python3 >/dev/null 2>&1; then
+    VENV_PYTHON="python3"
+  elif command -v python >/dev/null 2>&1; then
+    VENV_PYTHON="python"
+  else
+    echo "Error: Python not found. Please ensure Python is installed and available." >&2
+    exit 1
+  fi
 fi
 
 # Ensure the selected port is free before starting

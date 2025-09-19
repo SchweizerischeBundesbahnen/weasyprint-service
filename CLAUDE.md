@@ -4,34 +4,62 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Essential Commands
 
+### Before Committing - Run Full Test Suite
+```bash
+# Run complete test suite (optimized sequence, no redundancy)
+# 1. Run tox - handles linting, formatting, type checking, and tests with coverage
+poetry run tox
+
+# 2. Run pre-commit hooks - final validation including security checks and commit format
+poetry run pre-commit run --all
+```
+
+### Commit Convention
+Use Conventional Commits format:
+```bash
+# Format: <type>(<scope>): <description>
+# Examples:
+git commit -m "feat(api): add PDF compression endpoint"
+git commit -m "fix(svg): handle malformed SVG input gracefully"
+git commit -m "docs: update API documentation"
+git commit -m "chore(deps): update weasyprint to 66.0"
+git commit -m "test(controller): add edge case tests for HTML parsing"
+git commit -m "refactor(parser): simplify attachment handling logic"
+git commit -m "perf(svg): optimize SVG to PNG conversion"
+```
+
+Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+
 ### Development Environment Setup
 ```bash
 # Install dependencies using Poetry
 poetry install --with=dev,test
-
-# Run all quality checks and tests
-poetry run tox
-
-# Run pre-commit hooks on all files
-poetry run pre-commit run --all
 ```
 
 ### Testing and Quality Assurance
 ```bash
-# Run all tests with coverage (requires 90% coverage to pass)
-poetry run coverage run -m pytest tests/ --junitxml="junittest.xml" -v
-poetry run coverage report -m --fail-under 90
+# Quick test during development
+poetry run pytest tests/test_specific_file.py -v
 
-# Run specific test file
-poetry run pytest tests/test_svg_processor.py -v
+# Run specific test within a file
+poetry run pytest tests/test_svg_processor.py::test_process_valid_svg -v
 
-# Run linting and formatting
+# Manual linting/formatting (if needed outside of tox/pre-commit)
 poetry run ruff format
 poetry run ruff check --fix
 poetry run mypy .
 
-# Generate/update OpenAPI schema
+# Generate/update OpenAPI schema (auto-runs in pre-commit)
 scripts/precommit_generate_openapi.sh
+```
+
+### Local Development Server
+```bash
+# Start FastAPI development server
+poetry run python -m app.weasyprint_service_application --port 9080
+
+# Access API documentation
+# http://localhost:9080/api/docs
 ```
 
 ### Docker Development
@@ -64,16 +92,22 @@ grype weasyprint-service:0.0.0
 - **Schemas** (`app/schemas.py`): Pydantic models for API request/response validation
 
 ### API Endpoints Architecture
-- `/health` - Health check endpoint
-- `/version` - Service version information
-- `/convert/html` - Basic HTML to PDF conversion
-- `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data)
+- `/health` - Health check endpoint (returns service status)
+- `/version` - Service version information (Python, WeasyPrint, service versions)
+- `/convert/html` - Basic HTML to PDF conversion (accepts HTML string, returns PDF binary)
+- `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data, for embedded resources)
 
 ### Configuration and Environment Variables
-- `LOG_LEVEL`: Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor
-- `FORM_MAX_FIELDS`, `FORM_MAX_FILES`, `FORM_MAX_PART_SIZE`: Multipart form parsing limits
+- `LOG_LEVEL`: Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) - defaults to INFO
+- `LOG_DIR`: Directory for log files (defaults to `/opt/weasyprint/logs`)
+- `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor (float, e.g., 2.0)
+- `FORM_MAX_FIELDS`: Maximum number of form fields (default: 1000)
+- `FORM_MAX_FILES`: Maximum number of file uploads (default: 1000)
+- `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)
 - `CHROMIUM_EXECUTABLE_PATH`: Path to Chromium executable (set in Docker)
+- `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
+- `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
+- `WEASYPRINT_SERVICE_CHROMIUM_VERSION`: Chromium version (set during build)
 
 ## Development Workflow
 
@@ -86,12 +120,16 @@ grype weasyprint-service:0.0.0
 
 ### Pre-commit Hook Integration
 The repository uses extensive pre-commit hooks including:
-- Ruff formatting and linting
-- MyPy type checking
+- Ruff formatting and linting (automatically fixes issues)
+- MyPy type checking (strict mode)
 - OpenAPI schema auto-generation (`scripts/precommit_generate_openapi.sh`)
 - Security checks (gitleaks, sensitive data detection)
 - Docker security (hadolint for Dockerfile linting)
-- Poetry dependency management validation
+- Poetry dependency management validation (lock file updates)
+- Commitizen (validates conventional commit format)
+- YAML/JSON/TOML validation and formatting
+
+**Note**: Pre-commit runs all these checks automatically, no need to run them individually before committing.
 
 ### Testing Strategy
 - **Unit Tests**: All components have corresponding test files in `tests/`
@@ -111,14 +149,24 @@ The repository uses extensive pre-commit hooks including:
 - Uses Poetry for Python dependency management
 - Dependencies defined in both `pyproject.toml` and `[tool.poetry.dependencies]` due to Renovate compatibility requirements
 - Renovate handles automated dependency updates
+- Python 3.13+ required
 
 ### Docker Considerations
 - Multi-architecture support (amd64/arm64)
 - Uses `--init` flag for proper signal handling and zombie process reaping
 - Includes fonts and Chromium for complete PDF rendering capabilities
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
+- Custom fonts can be mounted via `/usr/share/fonts/custom`
 
 ### Security and Compliance
 - Follows security practices with comprehensive pre-commit hooks
 - Git commit signing required (`--gpg-sign`)
 - Sensitive data leak prevention (URLs, ticket numbers, UE numbers)
+- No secrets or credentials should be committed
+- Vulnerability scanning via Grype
+- Static analysis via MyPy with strict typing
+
+### Request/Response Flow
+1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → WeasyPrint renders → PDF returned
+2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → WeasyPrint renders → PDF returned
+3. **SVG Processing**: SVG detected → SvgProcessor converts to PNG using Chromium → Embedded in PDF

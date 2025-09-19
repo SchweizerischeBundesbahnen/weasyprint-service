@@ -96,3 +96,13 @@ repos:
     rev: v1.7.7
     hooks:
       - id: actionlint
+  - repo: local
+    hooks:
+      - id: grype
+        name: Grype vulnerability scan (Docker image)
+        entry: scripts/precommit_grype_scan.sh
+        language: script
+        pass_filenames: false
+        # Run grype when Docker-related files change
+        files: ^(Dockerfile|poetry\.lock|pyproject\.toml)$
+        stages: [pre-commit]

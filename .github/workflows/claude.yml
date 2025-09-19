@@ -12,31 +12,44 @@ on:
 jobs:
   claude:
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      github.actor != 'renovate[bot]' && (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      )
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+      contents: write  # Required for Claude to create branches and push changes
+      pull-requests: write  # Required for Claude to comment on PRs
+      issues: write  # Required for Claude to comment on issues
       id-token: write
       actions: read  # Required for Claude to read CI results on PRs
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
           fetch-depth: 1
-          persist-credentials: false
+          persist-credentials: true
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@738d95884b633748912ad70a5eb33a45f5bfb8e0  # v1
+        uses: anthropics/claude-code-action@7ed3b616d54fd445625b77b219342949146bae9e  # v1.0.8
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-    # Optional: Uncomment and customize as needed
-    # trigger_phrase: "@claude"  # Custom trigger phrase instead of @claude
-    # assignee_trigger: true  # Trigger when assigned to issues/PRs
-    # claude_args: "--model claude-3-5-sonnet-20241022"  # Custom Claude arguments
-    # project_context: "This is a Python web service"  # Additional project context
+          # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)
+          # model: "claude-opus-4-20250514"
+
+          # Optional: Customize the trigger phrase (default: @claude)
+          # trigger_phrase: "/claude"
+
+          # Optional: Trigger when specific user is assigned to an issue
+          # assignee_trigger: "claude-bot"
+
+          # Custom instructions for Claude to customize its behavior for your project
+          custom_instructions: |
+            Follow our coding standards and ensure all new code has tests.
+
+          # Optional: Custom environment variables for Claude
+          # claude_env: |
+          #   NODE_ENV: test

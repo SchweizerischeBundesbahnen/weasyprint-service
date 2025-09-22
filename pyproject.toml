@@ -29,8 +29,8 @@ packages = [{include = "app"}]
 python = ">=3.13"
 weasyprint = "66.0"
 defusedxml = "0.7.1"
-fastapi = "0.116.2"
-uvicorn = "0.35.0"
+fastapi = "0.117.1"
+uvicorn = "0.36.0"
 requests = "2.32.5"
 starlette = "^0.47.2"
 python-multipart = "^0.0.20"
@@ -49,9 +49,9 @@ tox = "4.30.2"
 docker = "7.1.0"
 pytest = "8.4.2"
 pymupdf = "1.26.4"
-pypdf = "6.0.0"
+pypdf = "6.1.0"
 httpx = "0.28.1"
-coverage = "7.10.6"
+coverage = "7.10.7"
 
 [build-system]
 requires = ["poetry-core"]

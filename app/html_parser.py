@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import TypedDict
 from weakref import WeakKeyDictionary
 
 from bs4 import BeautifulSoup, Comment
+
+logger = logging.getLogger(__name__)
 
 
 class _Meta(TypedDict):
@@ -44,13 +47,18 @@ class HtmlParser:
         - was it a full document?
         - original XML declaration (<?xml ...?>)
         """
+        logger.debug("Parsing HTML string, size: %d characters", len(string))
         xml_decl = self._extract_xml_decl(string)
+        if xml_decl:
+            logger.debug("Found XML declaration: %s", xml_decl[:50] + "..." if len(xml_decl) > 50 else xml_decl)
         is_full_document = self._is_full_document(string)
+        logger.debug("Document type: %s", "full document" if is_full_document else "fragment")
 
         html = BeautifulSoup(string, self.parser)
         html = self._clear_leading_comment(html)
 
         self._set_meta(html, was_full_document=is_full_document, xml_decl=xml_decl)
+        logger.info("HTML parsed successfully using %s parser", self.parser)
         return html
 
     def serialize(self, html: BeautifulSoup) -> str:
@@ -59,12 +67,14 @@ class HtmlParser:
         - If it was a full document: return as-is (+ restored XML declaration).
         - If it was a fragment: return only inner body contents (fallback: whole soup).
         """
+        logger.debug("Serializing HTML back to string")
         meta = self._get_meta(html)
         if meta is None:
             # Fallback: infer document type directly from soup structure
             inferred_full = html.find("html") is not None
             xml_decl = ""
             was_full = inferred_full
+            logger.debug("No metadata found, inferring document type: %s", "full document" if was_full else "fragment")
         else:
             xml_decl = meta["xml_decl"]
             was_full = meta["was_full_document"]
@@ -73,12 +83,17 @@ class HtmlParser:
             result = html.decode(formatter=self.formatter)
             if xml_decl:
                 result = f"{xml_decl}{result}"
+            logger.info("Serialized full document, size: %d characters", len(result))
             return result
 
         body = html.body
         if body is None:
-            return html.decode(formatter=self.formatter)
-        return body.decode_contents(formatter=self.formatter)
+            result = html.decode(formatter=self.formatter)
+            logger.info("Serialized HTML (no body found), size: %d characters", len(result))
+            return result
+        result = body.decode_contents(formatter=self.formatter)
+        logger.info("Serialized fragment (body contents only), size: %d characters", len(result))
+        return result
 
     # -------- Internal helpers --------
 
@@ -165,6 +180,7 @@ class HtmlParser:
     def _clear_leading_comment(html: BeautifulSoup) -> BeautifulSoup:
         """Removes comment like <!--?xml ... ?--> left by some parsers."""
         if html.contents and isinstance(html.contents[0], Comment) and str(html.contents[0]).strip().startswith("?xml"):
+            logger.debug("Removing leading XML comment artifact")
             html.contents[0].extract()
         return html
 

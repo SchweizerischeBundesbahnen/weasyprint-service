@@ -1,5 +1,15 @@
 # Changelog
 
+## [66.0.5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.4...v66.0.5) (2025-09-27)
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.116.2 ([60dc568](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/60dc568611785dc41f16f57b2e763bb40803b6af))
+* **deps:** update dependency fastapi to v0.117.1 ([f90647f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f90647f709291c561b08ec8ed447d37f1ade92cf))
+* **deps:** update dependency uvicorn to v0.36.0 ([70b7910](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/70b79107027da9ac436e5e665ed590b2059ead61))
+* **deps:** update dependency uvicorn to v0.37.0 ([f0e51fc](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f0e51fca5830199685e53e9c555b1b759897e76b))
+
 ## [66.0.4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.3...v66.0.4) (2025-09-15)
 
 

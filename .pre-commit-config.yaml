@@ -61,7 +61,7 @@ repos:
         files: ^(app/.*|scripts/.*|pyproject\.toml)$
         stages: [pre-commit]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.13.1
+    rev: v0.13.2
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -85,11 +85,11 @@ repos:
     hooks:
       - id: commitizen
   - repo: https://github.com/hadolint/hadolint
-    rev: v2.13.1-beta
+    rev: v2.14.0
     hooks:
       - id: hadolint
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.13.0
+    rev: v1.14.2
     hooks:
       - id: zizmor
   - repo: https://github.com/rhysd/actionlint

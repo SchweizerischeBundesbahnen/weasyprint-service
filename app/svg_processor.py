@@ -154,7 +154,7 @@ class SvgProcessor:
 
         except Exception as e:  # noqa: BLE001
             # Log at debug level to avoid noise but prevent silent pass
-            logging.getLogger(__name__).debug("Failed to apply img width from SVG: %s", e)
+            logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
     # ---------------- Core helpers ----------------
 

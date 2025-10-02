@@ -54,7 +54,6 @@ class AttachmentManager:
             name = self._resolve_href_name(tag)
             if name:
                 names.add(name)
-                logger.debug("Found referenced attachment: %s", sanitize_for_logging(name, max_length=100))
 
         logger.info("Found %d referenced attachments", len(names))
         return names
@@ -106,7 +105,8 @@ class AttachmentManager:
                 continue
             file_uri = p.resolve().as_uri()
             tag["href"] = file_uri
-            logger.debug("Rewrote attachment link %s to %s", name, file_uri)
+
+        logger.debug("Rewrote %d attachment links to file URIs", len(referenced_names))
         return soup
 
     # ---------- Upload handling ----------
@@ -133,10 +133,11 @@ class AttachmentManager:
 
         target_dir.mkdir(parents=True, exist_ok=True)
 
+        total_size = 0
         for f in files:
             content = await f.read()
+            total_size += len(content)
             name = Path(f.filename).name if f.filename and f.filename.strip() else "attachment.bin"
-            logger.debug("Processing file: %s, size: %d bytes", sanitize_for_logging(name, max_length=100), len(content))
 
             path = target_dir.joinpath(name)
             i = 1
@@ -147,10 +148,9 @@ class AttachmentManager:
             with path.open("wb") as out:
                 out.write(content)
 
-            logger.debug("Saved file %s to %s", sanitize_for_logging(name, max_length=100), path)
             mapping[name] = path
 
-        logger.info("Saved %d files successfully", len(mapping))
+        logger.info("Saved %d files successfully, total size: %d bytes", len(mapping), total_size)
         return mapping
 
     # ---------- WeasyPrint attachments ----------
@@ -168,19 +168,20 @@ class AttachmentManager:
         attachments: list[weasyprint.Attachment] = []
         added: set[Path] = set()
 
+        skipped_referenced = 0
+        skipped_duplicate = 0
         for name, path in name_to_path.items():
             if name in referenced:
-                logger.debug("Skipping referenced file: %s", sanitize_for_logging(name, max_length=100))
+                skipped_referenced += 1
                 continue
             if path in added:
-                logger.debug("Skipping duplicate path: %s", path)
+                skipped_duplicate += 1
                 continue
 
             attachments.append(weasyprint.Attachment(filename=str(path)))
             added.add(path)
-            logger.debug("Added attachment for unreferenced file: %s", sanitize_for_logging(name, max_length=100))
 
-        logger.info("Built %d attachments for unreferenced files", len(attachments))
+        logger.info("Built %d attachments for unreferenced files (skipped %d referenced, %d duplicates)", len(attachments), skipped_referenced, skipped_duplicate)
         return attachments
 
     # ---------- Orchestrator ----------

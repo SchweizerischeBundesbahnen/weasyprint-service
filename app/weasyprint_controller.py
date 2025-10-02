@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from app.attachment_manager import AttachmentManager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
+from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import VersionSchema
 from app.svg_processor import SvgProcessor
 
@@ -177,7 +178,7 @@ async def convert_html(
     try:
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
         if base_url:
-            logger.debug("Using base URL: %s", base_url)
+            logger.debug("Using base URL: %s", sanitize_url_for_logging(base_url))
 
         html = raw.decode(encoding)
         html_parser = HtmlParser()
@@ -203,10 +204,10 @@ async def convert_html(
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
-        logger.warning("Assertion error in HTML conversion: %s", str(e))
+        logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
-        logger.warning("Encoding error in HTML conversion: %s", str(e))
+        logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
         logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
@@ -270,7 +271,7 @@ async def convert_html_with_attachments(
     """
     logger.info("HTML to PDF with attachments conversion requested")
     tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
-    logger.debug("Created temporary directory: %s", tmpdir)
+    logger.debug("Created temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))
     try:
         encoding: str = await __get_encoding(request, render.encoding)
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
@@ -313,16 +314,16 @@ async def convert_html_with_attachments(
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
-        logger.warning("Assertion error in HTML conversion: %s", str(e))
+        logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
-        logger.warning("Encoding error in HTML conversion: %s", str(e))
+        logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
         logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
         return __process_error(e, "Unexpected error due converting to PDF", 500)
     finally:
-        logger.debug("Cleaning up temporary directory: %s", tmpdir)
+        logger.debug("Cleaning up temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
@@ -337,5 +338,5 @@ async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> 
 
 
 def __process_error(e: Exception, err_msg: str, status: int) -> Response:
-    logger.exception(msg=err_msg + ": " + str(e))
+    logger.exception("%s: %s", err_msg, str(e))
     return Response(err_msg + ": " + getattr(e, "message", repr(e)), media_type="plain/text", status_code=status)

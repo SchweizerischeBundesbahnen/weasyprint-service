@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.sanitization import sanitize_for_logging
+from app.sanitization import sanitize_for_logging, sanitize_path_for_logging, sanitize_url_for_logging
 
 
 class TestSanitizeForLogging:
@@ -123,3 +123,101 @@ def test_sanitize_for_logging_truncation_parametrized(input_text: str, max_lengt
     """Parametrized tests for truncation behavior."""
     result = sanitize_for_logging(input_text, max_length=max_length)
     assert len(result) == expected_length
+
+
+class TestSanitizeUrlForLogging:
+    """Test cases for sanitize_url_for_logging function."""
+
+    def test_none_input(self) -> None:
+        """Test that None input returns 'None'."""
+        assert sanitize_url_for_logging(None) == "None"
+
+    def test_simple_url(self) -> None:
+        """Test that simple URLs are preserved."""
+        assert sanitize_url_for_logging("https://example.com/path") == "https://example.com/path"
+
+    def test_url_with_query_parameters(self) -> None:
+        """Test that query parameters are removed for security."""
+        url = "https://example.com/path?token=secret123&api_key=sensitive"
+        result = sanitize_url_for_logging(url)
+        assert "token" not in result
+        assert "secret123" not in result
+        assert "api_key" not in result
+        assert "example.com" in result
+        assert "/path" in result
+
+    def test_url_with_credentials(self) -> None:
+        """Test that user credentials are removed."""
+        url = "https://user:password@example.com/path"
+        result = sanitize_url_for_logging(url)
+        assert "user" not in result
+        assert "password" not in result
+        assert "example.com" in result
+
+    def test_url_with_port(self) -> None:
+        """Test that port numbers are preserved."""
+        url = "https://example.com:8080/path"
+        result = sanitize_url_for_logging(url)
+        assert "8080" in result
+        assert "example.com" in result
+
+    def test_malformed_url(self) -> None:
+        """Test that malformed URLs don't cause crashes."""
+        result = sanitize_url_for_logging("not a valid url")
+        assert result is not None
+        assert len(result) > 0
+
+    def test_url_with_newlines(self) -> None:
+        """Test that URLs with newlines are sanitized."""
+        url = "https://example.com/path\nwith\nnewlines"
+        result = sanitize_url_for_logging(url)
+        assert "\n" not in result
+
+
+class TestSanitizePathForLogging:
+    """Test cases for sanitize_path_for_logging function."""
+
+    def test_none_input(self) -> None:
+        """Test that None input returns 'None'."""
+        assert sanitize_path_for_logging(None) == "None"
+
+    def test_basename_only_default(self) -> None:
+        """Test that only basename is shown by default."""
+        path = "/var/tmp/weasyprint-attach-abc123/file.pdf"
+        result = sanitize_path_for_logging(path)
+        assert result == "file.pdf"
+        assert "/var/tmp" not in result
+
+    def test_show_full_path(self) -> None:
+        """Test showing full path when requested."""
+        path = "/home/user/document.pdf"
+        result = sanitize_path_for_logging(path, show_basename_only=False)
+        assert "document.pdf" in result
+
+    def test_temp_directory_indication(self) -> None:
+        """Test that temp directories are indicated as such."""
+        path = "/tmp/weasyprint-attach-xyz/file.pdf"
+        result = sanitize_path_for_logging(path, show_basename_only=False)
+        assert "<temp>" in result
+        assert "file.pdf" in result
+        assert "/tmp/" not in result  # Full path should be hidden
+
+    def test_windows_temp_directory(self) -> None:
+        """Test Windows temp directory handling."""
+        path = "C:\\Temp\\weasyprint\\file.pdf"
+        result = sanitize_path_for_logging(path, show_basename_only=False)
+        assert "<temp>" in result
+        assert "file.pdf" in result
+
+    def test_path_with_newlines(self) -> None:
+        """Test that paths with newlines are sanitized."""
+        path = "/path/to/file\nwith\nnewlines.pdf"
+        result = sanitize_path_for_logging(path)
+        assert "\n" not in result
+
+    def test_malformed_path(self) -> None:
+        """Test that malformed paths don't cause crashes."""
+        result = sanitize_path_for_logging("not\x00a\x01valid\x02path")
+        assert result is not None
+        assert "\x00" not in result
+        assert "\x01" not in result

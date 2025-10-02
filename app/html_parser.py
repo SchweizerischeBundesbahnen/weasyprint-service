@@ -6,8 +6,6 @@ from weakref import WeakKeyDictionary
 
 from bs4 import BeautifulSoup, Comment
 
-from app.sanitization import sanitize_for_logging
-
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +50,7 @@ class HtmlParser:
         logger.debug("Parsing HTML string, size: %d characters", len(string))
         xml_decl = self._extract_xml_decl(string)
         if xml_decl:
-            logger.debug("Found XML declaration: %s", sanitize_for_logging(xml_decl, max_length=50))
+            logger.debug("Found XML declaration (length: %d characters)", len(xml_decl))
         is_full_document = self._is_full_document(string)
         logger.debug("Document type: %s", "full document" if is_full_document else "fragment")
 

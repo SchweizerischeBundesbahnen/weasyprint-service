@@ -46,11 +46,11 @@ class TestAttachmentManagerLogging:
             result = asyncio.run(manager.save_uploads_to_tmpdir([mock_file1, mock_file2], tmp_path))
 
         assert len(result) == 2
-        # Should have summary log, not per-file logs
+        # Should have summary logs (start + completion), not per-file logs
         info_logs = [record for record in caplog.records if record.levelname == "INFO"]
-        assert len(info_logs) == 1
-        assert "Saved 2 files successfully" in info_logs[0].message
-        assert "total size:" in info_logs[0].message.lower()
+        assert len(info_logs) == 2  # "Saving X files" + "Saved X files successfully"
+        assert any("Saved 2 files successfully" in log.message for log in info_logs)
+        assert any("total size:" in log.message.lower() for log in info_logs)
 
     def test_build_attachments_logs_summary(self, caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
         """Test that building attachments logs a summary."""

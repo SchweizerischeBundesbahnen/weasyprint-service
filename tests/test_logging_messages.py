@@ -27,9 +27,10 @@ class TestAttachmentManagerLogging:
         assert len(result) == 2
         assert any("Found 2 referenced attachments" in record.message for record in caplog.records)
 
-    @pytest.mark.asyncio
-    async def test_save_uploads_logs_summary(self, caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
+    def test_save_uploads_logs_summary(self, caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
         """Test that saving uploads logs a summary instead of per-file logs."""
+        import asyncio
+
         manager = AttachmentManager()
 
         # Create mock upload files
@@ -42,7 +43,7 @@ class TestAttachmentManagerLogging:
         mock_file2.read = AsyncMock(return_value=b"content2")
 
         with caplog.at_level(logging.INFO):
-            result = await manager.save_uploads_to_tmpdir([mock_file1, mock_file2], tmp_path)
+            result = asyncio.run(manager.save_uploads_to_tmpdir([mock_file1, mock_file2], tmp_path))
 
         assert len(result) == 2
         # Should have summary log, not per-file logs

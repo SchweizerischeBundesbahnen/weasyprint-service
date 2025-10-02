@@ -227,7 +227,8 @@ class SvgProcessor:
             return self.without_changes(svg)
 
         if not self.crop_png(png_filepath, max(1, round(self.chromium_height_adjustment * self.device_scale_factor))):
-            self.log.warning("Failed to crop PNG, using uncropped image")
+            self.log.warning("Failed to crop PNG")
+            return self.without_changes(svg)
 
         png_content = self.read_and_cleanup_png(png_filepath)
         if not png_content:

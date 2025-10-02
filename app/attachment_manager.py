@@ -34,6 +34,14 @@ class AttachmentManager:
     def __init__(self, default_tmpdir: Path | None = None) -> None:
         self.default_tmpdir = default_tmpdir
 
+    @staticmethod
+    def _sanitize_filename_for_logging(filename: str | None) -> str:
+        """Sanitize filename for safe logging by removing control characters."""
+        if not filename:
+            return "unknown"
+        # Remove control characters and newlines that could break log parsing
+        return "".join(c if c.isprintable() and c not in "\n\r" else "_" for c in filename)
+
     # ---------- HTML parsing helpers ----------
 
     def find_referenced_attachment_names(self, soup: BeautifulSoup) -> set[str]:
@@ -52,7 +60,7 @@ class AttachmentManager:
             name = self._resolve_href_name(tag)
             if name:
                 names.add(name)
-                logger.debug("Found referenced attachment: %s", name)
+                logger.debug("Found referenced attachment: %s", self._sanitize_filename_for_logging(name))
 
         logger.info("Found %d referenced attachments", len(names))
         return names
@@ -100,7 +108,7 @@ class AttachmentManager:
                 continue
             p = name_to_path.get(name)
             if not p:
-                logger.warning("Attachment file not found in saved files: %s", name)
+                logger.warning("Attachment file not found in saved files: %s", self._sanitize_filename_for_logging(name))
                 continue
             file_uri = p.resolve().as_uri()
             tag["href"] = file_uri
@@ -134,7 +142,7 @@ class AttachmentManager:
         for f in files:
             content = await f.read()
             name = Path(f.filename).name if f.filename and f.filename.strip() else "attachment.bin"
-            logger.debug("Processing file: %s, size: %d bytes", name, len(content))
+            logger.debug("Processing file: %s, size: %d bytes", self._sanitize_filename_for_logging(name), len(content))
 
             path = target_dir.joinpath(name)
             i = 1
@@ -145,7 +153,7 @@ class AttachmentManager:
             with path.open("wb") as out:
                 out.write(content)
 
-            logger.debug("Saved file %s to %s", name, path)
+            logger.debug("Saved file %s to %s", self._sanitize_filename_for_logging(name), path)
             mapping[name] = path
 
         logger.info("Saved %d files successfully", len(mapping))
@@ -168,7 +176,7 @@ class AttachmentManager:
 
         for name, path in name_to_path.items():
             if name in referenced:
-                logger.debug("Skipping referenced file: %s", name)
+                logger.debug("Skipping referenced file: %s", self._sanitize_filename_for_logging(name))
                 continue
             if path in added:
                 logger.debug("Skipping duplicate path: %s", path)
@@ -176,7 +184,7 @@ class AttachmentManager:
 
             attachments.append(weasyprint.Attachment(filename=str(path)))
             added.add(path)
-            logger.debug("Added attachment for unreferenced file: %s", name)
+            logger.debug("Added attachment for unreferenced file: %s", self._sanitize_filename_for_logging(name))
 
         logger.info("Built %d attachments for unreferenced files", len(attachments))
         return attachments

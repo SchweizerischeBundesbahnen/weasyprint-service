@@ -60,11 +60,19 @@ class FormParser:
         logger.debug("Extracting HTML field from form with encoding: %s", encoding)
         html_field = form.get("html")
         if html_field is None:
-            logger.error("Missing html form field")
-            raise AssertionError(400, "Missing html form field")
+            logger.error('Required form field "html" is missing from multipart request')
+            raise AssertionError('Required form field "html" is missing from multipart request')
         html_content = html_field.decode(encoding) if isinstance(html_field, bytes) else str(html_field)
         logger.debug("Extracted HTML content, size: %d characters", len(html_content))
         return html_content
+
+    @staticmethod
+    def _sanitize_filename_for_logging(filename: str | None) -> str:
+        """Sanitize filename for safe logging by removing control characters."""
+        if not filename:
+            return "unknown"
+        # Remove control characters and newlines that could break log parsing
+        return "".join(c if c.isprintable() and c not in "\n\r" else "_" for c in filename)
 
     @staticmethod
     def collect_files_from_form(form: FormData) -> list[UploadFile]:
@@ -79,6 +87,6 @@ class FormParser:
                     v.filename = "attachment.bin"
                     logger.debug("Assigned default filename: attachment.bin")
                 files.append(v)
-                logger.debug("Collected file: %s", v.filename)
+                logger.debug("Collected file: %s", FormParser._sanitize_filename_for_logging(v.filename))
         logger.info("Collected %d files from form", len(files))
         return files

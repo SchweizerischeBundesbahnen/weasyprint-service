@@ -50,7 +50,9 @@ class HtmlParser:
         logger.debug("Parsing HTML string, size: %d characters", len(string))
         xml_decl = self._extract_xml_decl(string)
         if xml_decl:
-            logger.debug("Found XML declaration: %s", xml_decl[:50] + "..." if len(xml_decl) > 50 else xml_decl)
+            # Sanitize XML declaration for logging - remove control characters
+            safe_xml_decl = "".join(c if c.isprintable() and c not in "\n\r" else "_" for c in xml_decl)
+            logger.debug("Found XML declaration: %s", safe_xml_decl[:50] + "..." if len(safe_xml_decl) > 50 else safe_xml_decl)
         is_full_document = self._is_full_document(string)
         logger.debug("Document type: %s", "full document" if is_full_document else "fragment")
 

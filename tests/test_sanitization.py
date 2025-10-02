@@ -1,7 +1,7 @@
 """Tests for the sanitization module."""
 
 import pytest
-
+from urllib.parse import urlparse
 from app.sanitization import sanitize_for_logging, sanitize_path_for_logging, sanitize_url_for_logging
 
 
@@ -159,7 +159,7 @@ class TestSanitizeUrlForLogging:
         url = "https://example.com:8080/path"
         result = sanitize_url_for_logging(url)
         assert "8080" in result
-        assert "example.com" in result
+        assert urlparse(result).hostname == "example.com"
 
     def test_malformed_url(self) -> None:
         """Test that malformed URLs don't cause crashes."""

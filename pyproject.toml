@@ -101,6 +101,6 @@ max-args = 7
 [tool.mypy]
 explicit_package_bases = true
 disallow_untyped_defs = true
-exclude = "tests/.*"
+exclude = ["tests/.*", "examples/.*"]
 install_types = true
 non_interactive = true

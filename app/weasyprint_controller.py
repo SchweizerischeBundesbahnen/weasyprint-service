@@ -63,6 +63,7 @@ class RenderOptions(BaseModel):
         presentational_hints: Whether to honor presentational HTML attributes as CSS hints.
         base_url: Base URL used to resolve relative links (e.g., stylesheets, images).
         scale_factor: Device scale factor used for SVG/PNG rendering. If not provided, falls back to DEVICE_SCALE_FACTOR env var.
+
     """
 
     encoding: str = "utf-8"
@@ -80,6 +81,7 @@ class OutputOptions(BaseModel):
         file_name: The filename suggested in the Content-Disposition header.
         pdf_variant: PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b'); None for default.
         custom_metadata: Whether to include custom metadata in the generated PDF.
+
     """
 
     file_name: str = "converted-document.pdf"

@@ -66,14 +66,6 @@ class FormParser:
         return html_content
 
     @staticmethod
-    def _sanitize_filename_for_logging(filename: str | None) -> str:
-        """Sanitize filename for safe logging by removing control characters."""
-        if not filename:
-            return "unknown"
-        # Remove control characters and newlines that could break log parsing
-        return "".join(c if c.isprintable() and c not in "\n\r" else "_" for c in filename)
-
-    @staticmethod
     def collect_files_from_form(form: FormData) -> list[UploadFile]:
         """
         Collect files from the "files" field.
@@ -86,6 +78,6 @@ class FormParser:
                     v.filename = "attachment.bin"
                     logger.debug("Assigned default filename: attachment.bin")
                 files.append(v)
-                logger.debug("Collected file: %s", FormParser._sanitize_filename_for_logging(v.filename))
+                logger.debug("Collected file: %s", sanitize_for_logging(v.filename or "unknown", max_length=100))
         logger.info("Collected %d files from form", len(files))
         return files

@@ -163,7 +163,7 @@ class SvgProcessor:
             if style_parts:
                 node["style"] = "; ".join(style_parts)
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # Log at debug level to avoid noise but prevent silent pass
             logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
@@ -198,7 +198,7 @@ class SvgProcessor:
 
             possible_svg_content = decoded_content.decode("utf-8")
             return self.svg_from_string(possible_svg_content)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("Failed to decode base64 content: %s", e)
             return None
 
@@ -272,7 +272,7 @@ class SvgProcessor:
                 cropped = img.crop((0, 0, img_width, img_height - bottom_pixels_to_crop))
                 cropped.save(file_path)
                 return True
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("PNG file to crop not found or crop failed: %s", e)
             return False
 
@@ -382,7 +382,7 @@ class SvgProcessor:
             with svg_filepath.open("w", encoding="utf-8") as f:
                 f.write(content)
             return svg_filepath, png_filepath
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("Failed to save SVG to temp file: %s", e)
             return None, None
 
@@ -400,7 +400,7 @@ class SvgProcessor:
                 return False
             self.log.debug("Chromium screenshot command completed successfully")
             return True
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("Failed to run Chromium screenshot command: %s", e)
             return False
         finally:
@@ -414,7 +414,7 @@ class SvgProcessor:
                 img_data = img_file.read()
             png_filepath.unlink(missing_ok=True)
             return img_data
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("Failed to read or clean up PNG file: %s", e)
             return None
 
@@ -457,7 +457,7 @@ class SvgProcessor:
     def convert_to_px(self, value: str | None, unit: str | None) -> int | None:
         try:
             if value is None:
-                raise ValueError()
+                raise ValueError
             value_f64 = float(value)
 
             if unit in self.SPECIAL_UNITS:

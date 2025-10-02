@@ -4,8 +4,7 @@ import re
 
 
 def sanitize_for_logging(text: str, max_length: int = 1000) -> str:
-    """
-    Sanitize text for safe logging by:
+    """Sanitize text for safe logging by:
     - Converting non-string input to string
     - Removing all control characters
     - Replacing newlines with spaces
@@ -17,6 +16,7 @@ def sanitize_for_logging(text: str, max_length: int = 1000) -> str:
 
     Returns:
         str: The sanitized text safe for logging.
+
     """
     if not isinstance(text, str):
         text = str(text)

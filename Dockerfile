@@ -26,7 +26,7 @@ ARG APP_IMAGE_VERSION=0.0.0
 ENV WORKING_DIR="/opt/weasyprint" \
     CHROMIUM_EXECUTABLE_PATH="/usr/bin/chromium" \
     WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION} \
-    PORT=9083 \
+    PORT=9080 \
     LOG_LEVEL=INFO
 
 # Create and configure logging directory

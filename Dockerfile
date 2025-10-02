@@ -8,6 +8,7 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
     chromium \
+    curl \
     dbus \
     fonts-dejavu \
     fonts-liberation \
@@ -18,7 +19,6 @@ RUN apt-get update && \
     libpangoft2-1.0-0 \
     python3-brotli \
     python3-cffi && \
-    curl \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*

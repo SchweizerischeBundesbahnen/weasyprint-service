@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from starlette.datastructures import FormData, UploadFile
 
+from app.sanitization import sanitize_for_logging
+
 if TYPE_CHECKING:
     from fastapi import Request
 

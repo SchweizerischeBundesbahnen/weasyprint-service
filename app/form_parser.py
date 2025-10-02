@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 
 from starlette.datastructures import FormData, UploadFile
 
-logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:  # ruff: noqa: TCH004
+if TYPE_CHECKING:
     from fastapi import Request
+
+logger = logging.getLogger(__name__)
 
 
 class FormParser:
@@ -27,8 +27,7 @@ class FormParser:
         self.max_files = max_files or self._get_int_env("FORM_MAX_FILES", 1000)
         self.max_fields = max_fields or self._get_int_env("FORM_MAX_FIELDS", 1000)
         self.max_part_size = max_part_size or self._get_int_env("FORM_MAX_PART_SIZE", 10 * 1024 * 1024)
-        logger.debug("FormParser initialized with limits - max_files: %d, max_fields: %d, max_part_size: %d",
-                     self.max_files, self.max_fields, self.max_part_size)
+        logger.debug("FormParser initialized with limits - max_files: %d, max_fields: %d, max_part_size: %d", self.max_files, self.max_fields, self.max_part_size)
 
     @staticmethod
     def _get_int_env(name: str, default: int) -> int:

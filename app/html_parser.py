@@ -8,6 +8,9 @@ from bs4 import BeautifulSoup, Comment
 
 logger = logging.getLogger(__name__)
 
+# Maximum length for truncated log messages
+MAX_LOG_MESSAGE_LENGTH = 50
+
 
 class _Meta(TypedDict):
     was_full_document: bool
@@ -52,7 +55,8 @@ class HtmlParser:
         if xml_decl:
             # Sanitize XML declaration for logging - remove control characters
             safe_xml_decl = "".join(c if c.isprintable() and c not in "\n\r" else "_" for c in xml_decl)
-            logger.debug("Found XML declaration: %s", safe_xml_decl[:50] + "..." if len(safe_xml_decl) > 50 else safe_xml_decl)
+            truncated = safe_xml_decl[:MAX_LOG_MESSAGE_LENGTH]
+            logger.debug("Found XML declaration: %s", truncated + "..." if len(safe_xml_decl) > len(truncated) else safe_xml_decl)
         is_full_document = self._is_full_document(string)
         logger.debug("Document type: %s", "full document" if is_full_document else "fragment")
 

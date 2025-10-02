@@ -71,7 +71,7 @@ def test_html_from_form_missing_raises():
     form = FormData([])
     with pytest.raises(AssertionError) as ei:
         FormParser.html_from_form(form)
-    assert ei.value.args == (400, "Missing html form field")
+    assert ei.value.args == ('Required form field "html" is missing from multipart request',)
 
 
 # ---------- Unit: collect_files_from_form ----------

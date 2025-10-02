@@ -46,4 +46,8 @@ RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && poetry in
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh
 
+# Add healthcheck
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:${PORT}/version || exit 1
+
 ENTRYPOINT [ "./entrypoint.sh" ]

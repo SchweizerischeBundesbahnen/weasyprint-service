@@ -190,8 +190,7 @@ async def convert_html(
             media_type=render.media_type,
             encoding=render.encoding,
         )
-        logger.debug("Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s",
-                     output.pdf_variant, render.presentational_hints, output.custom_metadata)
+        logger.debug("Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s", output.pdf_variant, render.presentational_hints, output.custom_metadata)
         output_pdf = weasyprint_html.write_pdf(
             pdf_variant=output.pdf_variant,
             presentational_hints=render.presentational_hints,
@@ -300,8 +299,7 @@ async def convert_html_with_attachments(
             media_type=render.media_type,
             encoding=render.encoding,
         )
-        logger.debug("Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s, attachments=%d",
-                     output.pdf_variant, render.presentational_hints, output.custom_metadata, len(attachments))
+        logger.debug("Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s, attachments=%d", output.pdf_variant, render.presentational_hints, output.custom_metadata, len(attachments))
         output_pdf = weasyprint_html.write_pdf(
             pdf_variant=output.pdf_variant,
             presentational_hints=render.presentational_hints,

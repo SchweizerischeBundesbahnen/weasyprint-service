@@ -6,10 +6,9 @@ from weakref import WeakKeyDictionary
 
 from bs4 import BeautifulSoup, Comment
 
-logger = logging.getLogger(__name__)
+from app.sanitization import sanitize_for_logging
 
-# Maximum length for truncated log messages
-MAX_LOG_MESSAGE_LENGTH = 50
+logger = logging.getLogger(__name__)
 
 
 class _Meta(TypedDict):
@@ -53,10 +52,7 @@ class HtmlParser:
         logger.debug("Parsing HTML string, size: %d characters", len(string))
         xml_decl = self._extract_xml_decl(string)
         if xml_decl:
-            # Sanitize XML declaration for logging - remove control characters
-            safe_xml_decl = "".join(c if c.isprintable() and c not in "\n\r" else "_" for c in xml_decl)
-            truncated = safe_xml_decl[:MAX_LOG_MESSAGE_LENGTH]
-            logger.debug("Found XML declaration: %s", truncated + "..." if len(safe_xml_decl) > len(truncated) else safe_xml_decl)
+            logger.debug("Found XML declaration: %s", sanitize_for_logging(xml_decl, max_length=50))
         is_full_document = self._is_full_document(string)
         logger.debug("Document type: %s", "full document" if is_full_document else "fragment")
 

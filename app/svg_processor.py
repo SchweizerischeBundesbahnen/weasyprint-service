@@ -457,7 +457,7 @@ class SvgProcessor:
     def convert_to_px(self, value: str | None, unit: str | None) -> int | None:
         try:
             if value is None:
-                raise ValueError("Value cannot be None")
+                raise ValueError()
             value_f64 = float(value)
 
             if unit in self.SPECIAL_UNITS:

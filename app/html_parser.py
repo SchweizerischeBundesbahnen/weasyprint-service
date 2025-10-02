@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import TypedDict
 from weakref import WeakKeyDictionary
 
 from bs4 import BeautifulSoup, Comment
+
+logger = logging.getLogger(__name__)
 
 
 class _Meta(TypedDict):
@@ -44,13 +47,16 @@ class HtmlParser:
         - was it a full document?
         - original XML declaration (<?xml ...?>)
         """
+        logger.debug("Parsing HTML: %d characters, parser=%s", len(string), self.parser)
         xml_decl = self._extract_xml_decl(string)
         is_full_document = self._is_full_document(string)
+        logger.debug("Detected document type: full_document=%s, has_xml_decl=%s", is_full_document, bool(xml_decl))
 
         html = BeautifulSoup(string, self.parser)
         html = self._clear_leading_comment(html)
 
         self._set_meta(html, was_full_document=is_full_document, xml_decl=xml_decl)
+        logger.debug("Successfully parsed HTML")
         return html
 
     def serialize(self, html: BeautifulSoup) -> str:
@@ -65,6 +71,7 @@ class HtmlParser:
             inferred_full = html.find("html") is not None
             xml_decl = ""
             was_full = inferred_full
+            logger.debug("No metadata found, inferred document type: full=%s", inferred_full)
         else:
             xml_decl = meta["xml_decl"]
             was_full = meta["was_full_document"]
@@ -73,12 +80,17 @@ class HtmlParser:
             result = html.decode(formatter=self.formatter)
             if xml_decl:
                 result = f"{xml_decl}{result}"
+            logger.debug("Serialized full document: %d characters", len(result))
             return result
 
         body = html.body
         if body is None:
-            return html.decode(formatter=self.formatter)
-        return body.decode_contents(formatter=self.formatter)
+            result = html.decode(formatter=self.formatter)
+            logger.debug("Serialized fragment (no body): %d characters", len(result))
+            return result
+        result = body.decode_contents(formatter=self.formatter)
+        logger.debug("Serialized fragment (body contents): %d characters", len(result))
+        return result
 
     # -------- Internal helpers --------
 

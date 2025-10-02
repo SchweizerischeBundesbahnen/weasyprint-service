@@ -26,6 +26,8 @@ app = FastAPI(
     openapi_version="3.1.0",
 )
 
+logger = logging.getLogger(__name__)
+
 
 @app.get(
     "/version",
@@ -164,6 +166,8 @@ async def convert_html(
     """
     raw: bytes = await request.body()
     encoding: str = await __get_encoding(request, render.encoding)
+    logger.info("Received HTML conversion request, size: %d bytes, encoding: %s", len(raw), encoding)
+    logger.debug("Render options: media_type=%s, base_url=%s, scale_factor=%s", render.media_type, render.base_url, render.scale_factor)
     try:
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
 
@@ -185,6 +189,7 @@ async def convert_html(
             custom_metadata=output.custom_metadata,
         )
 
+        logger.info("Successfully converted HTML to PDF, output size: %d bytes", len(output_pdf) if output_pdf else 0)
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
@@ -251,14 +256,17 @@ async def convert_html_with_attachments(
       - remaining file parts are treated as attachments
     """
     tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
+    logger.info("Received HTML with attachments conversion request, tmpdir: %s", tmpdir)
     try:
         encoding: str = await __get_encoding(request, render.encoding)
         base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
+        logger.debug("Render options: encoding=%s, media_type=%s, base_url=%s", encoding, render.media_type, render.base_url)
 
         form_parser = FormParser()
         form = await form_parser.parse(request)
         html = form_parser.html_from_form(form, encoding)
         files = form_parser.collect_files_from_form(form)
+        logger.debug("Parsed form: HTML size=%d bytes, files count=%d", len(html), len(files))
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
@@ -270,6 +278,7 @@ async def convert_html_with_attachments(
             files=files,
             tmpdir=Path(tmpdir),
         )
+        logger.debug("Processed attachments: %d PDF attachments created", len(attachments))
 
         processed_html = html_parser.serialize(parsed_html)
 
@@ -286,6 +295,7 @@ async def convert_html_with_attachments(
             attachments=attachments,
         )
 
+        logger.info("Successfully converted HTML with attachments to PDF, output size: %d bytes", len(output_pdf) if output_pdf else 0)
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
@@ -296,6 +306,7 @@ async def convert_html_with_attachments(
         return __process_error(e, "Unexpected error due converting to PDF", 500)
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+        logger.debug("Cleaned up tmpdir: %s", tmpdir)
 
 
 async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> Response:

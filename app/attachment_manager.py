@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
@@ -11,6 +12,8 @@ if TYPE_CHECKING:  # imports used only for type hints
     from collections.abc import Sequence
 
     from starlette.datastructures import UploadFile
+
+logger = logging.getLogger(__name__)
 
 
 class AttachmentManager:
@@ -49,6 +52,7 @@ class AttachmentManager:
             if name:
                 names.add(name)
 
+        logger.debug("Found %d referenced attachment names in HTML", len(names))
         return names
 
     def _has_attachment_rel(self, tag: Tag) -> bool:
@@ -110,6 +114,7 @@ class AttachmentManager:
         """
         mapping: dict[str, Path] = {}
         if not files:
+            logger.debug("No files to save")
             return mapping
 
         target_dir = tmpdir or self.default_tmpdir
@@ -117,6 +122,7 @@ class AttachmentManager:
             raise ValueError("tmpdir is required (not provided and no default_tmpdir set)")
 
         target_dir.mkdir(parents=True, exist_ok=True)
+        logger.debug("Saving %d uploaded files to %s", len(files), target_dir)
 
         for f in files:
             content = await f.read()
@@ -131,8 +137,10 @@ class AttachmentManager:
             with path.open("wb") as out:
                 out.write(content)
 
+            logger.debug("Saved file: %s (%d bytes) to %s", name, len(content), path)
             mapping[name] = path
 
+        logger.info("Successfully saved %d uploaded files", len(mapping))
         return mapping
 
     # ---------- WeasyPrint attachments ----------
@@ -158,6 +166,7 @@ class AttachmentManager:
             attachments.append(weasyprint.Attachment(filename=str(path)))
             added.add(path)
 
+        logger.debug("Built %d PDF attachments for unreferenced files", len(attachments))
         return attachments
 
     # ---------- Orchestrator ----------
@@ -177,8 +186,10 @@ class AttachmentManager:
 
         Returns updated BeautifulSoup and a list of attachments.
         """
+        logger.info("Processing HTML and uploads, files count: %d", len(files) if files else 0)
         referenced: set[str] = self.find_referenced_attachment_names(parsed_html)
         name_to_path: dict[str, Path] = await self.save_uploads_to_tmpdir(files, tmpdir or self.default_tmpdir)
         attachments: list[weasyprint.Attachment] = self.build_attachments_for_unreferenced(name_to_path, referenced)
         updated_html = self.rewrite_attachment_links_to_file_uri(parsed_html, name_to_path)
+        logger.info("Completed processing: %d referenced, %d saved, %d PDF attachments", len(referenced), len(name_to_path), len(attachments))
         return updated_html, attachments

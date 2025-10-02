@@ -71,8 +71,11 @@ class SvgProcessor:
         - Replace only top-level <svg> with <img data:image/svg+xml;base64,...>
         - Convert base64 SVG images inside <img> to base64 PNG via Chromium
         """
+        self.log.info("Starting SVG processing")
         parsed_html = self.replace_inline_svgs_with_img(input_html)
-        return self.replace_img_base64(parsed_html)
+        parsed_html = self.replace_img_base64(parsed_html)
+        self.log.info("Completed SVG processing")
+        return parsed_html
 
     def replace_inline_svgs_with_img(self, parsed_html: BeautifulSoup) -> BeautifulSoup:
         """
@@ -83,6 +86,8 @@ class SvgProcessor:
         for node in parsed_html.find_all("svg"):
             if isinstance(node, Tag) and node.find_parent("svg") is None:
                 top_level_svgs.append(node)
+
+        self.log.debug("Found %d top-level SVG elements to convert", len(top_level_svgs))
 
         for svg in top_level_svgs:
             svg_str = str(svg)
@@ -102,16 +107,19 @@ class SvgProcessor:
 
             svg.replace_with(img)
 
+        if top_level_svgs:
+            self.log.info("Converted %d inline SVG elements to base64 img tags", len(top_level_svgs))
         return parsed_html
 
     def replace_img_base64(self, parsed_html: BeautifulSoup) -> BeautifulSoup:
         """
         Replace base64 SVG images with PNG equivalents in HTML <img> tags.
         """
-        for node in parsed_html.find_all("img"):
-            if not isinstance(node, Tag):
-                continue
+        img_tags = [node for node in parsed_html.find_all("img") if isinstance(node, Tag)]
+        self.log.debug("Processing %d img tags for SVG to PNG conversion", len(img_tags))
 
+        converted_count = 0
+        for node in img_tags:
             src = self._get_attr_str(node, "src")
             parsed = self._parse_data_url_base64(src) if src else None
             if not parsed:
@@ -134,7 +142,10 @@ class SvgProcessor:
             self._apply_img_dimensions_from_svg(node, svg)
 
             node["src"] = f"data:{image_type};base64,{replaced_content_base64}"
+            converted_count += 1
 
+        if converted_count > 0:
+            self.log.info("Converted %d SVG images to PNG using Chromium", converted_count)
         return parsed_html
 
     def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element) -> None:
@@ -200,8 +211,10 @@ class SvgProcessor:
 
         width, height, updated_svg = self.extract_svg_dimensions_as_px(updated_svg)
         if not width or not height:
+            self.log.debug("Cannot convert SVG to PNG: missing dimensions")
             return self.without_changes(svg)
 
+        self.log.debug("Converting SVG to PNG: %dx%d px, scale_factor=%s", width, height, self.device_scale_factor)
         svg_content = self.svg_to_string(updated_svg)
         svg_filepath, png_filepath = self.prepare_temp_files(svg_content)
         if not svg_filepath or not png_filepath:
@@ -218,6 +231,7 @@ class SvgProcessor:
         if not png_content:
             return self.without_changes(svg)
 
+        self.log.debug("Successfully converted SVG to PNG: %d bytes", len(png_content))
         return self.IMAGE_PNG, png_content
 
     def ensure_mandatory_attributes(self, svg: Element) -> Element:

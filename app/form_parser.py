@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import TYPE_CHECKING
 
@@ -7,6 +8,8 @@ from starlette.datastructures import FormData, UploadFile
 
 if TYPE_CHECKING:  # ruff: noqa: TCH004
     from fastapi import Request
+
+logger = logging.getLogger(__name__)
 
 
 class FormParser:
@@ -24,6 +27,7 @@ class FormParser:
         self.max_files = max_files or self._get_int_env("FORM_MAX_FILES", 1000)
         self.max_fields = max_fields or self._get_int_env("FORM_MAX_FIELDS", 1000)
         self.max_part_size = max_part_size or self._get_int_env("FORM_MAX_PART_SIZE", 10 * 1024 * 1024)
+        logger.debug("FormParser initialized: max_files=%d, max_fields=%d, max_part_size=%d", self.max_files, self.max_fields, self.max_part_size)
 
     @staticmethod
     def _get_int_env(name: str, default: int) -> int:
@@ -38,11 +42,14 @@ class FormParser:
         """
         Parse the form with configured limits.
         """
-        return await request.form(
+        logger.debug("Parsing multipart form data")
+        form = await request.form(
             max_files=self.max_files,
             max_fields=self.max_fields,
             max_part_size=self.max_part_size,
         )
+        logger.debug("Successfully parsed form data")
+        return form
 
     @staticmethod
     def html_from_form(form: FormData, encoding: str = "utf-8") -> str:
@@ -51,8 +58,11 @@ class FormParser:
         """
         html_field = form.get("html")
         if html_field is None:
+            logger.error("Missing html form field")
             raise AssertionError(400, "Missing html form field")
-        return html_field.decode(encoding) if isinstance(html_field, bytes) else str(html_field)
+        html = html_field.decode(encoding) if isinstance(html_field, bytes) else str(html_field)
+        logger.debug("Extracted HTML from form: %d characters", len(html))
+        return html
 
     @staticmethod
     def collect_files_from_form(form: FormData) -> list[UploadFile]:
@@ -65,4 +75,5 @@ class FormParser:
                 if not v.filename:
                     v.filename = "attachment.bin"
                 files.append(v)
+        logger.debug("Collected %d files from form", len(files))
         return files

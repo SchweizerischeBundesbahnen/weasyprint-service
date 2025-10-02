@@ -104,14 +104,26 @@ def test_convert_complex_html(test_parameters: TestParameters) -> None:
     assert "Test Specification" in page
 
 
+def test_convert_html_with_svg_and_png_in_tables(test_parameters: TestParameters) -> None:
+    html = __load_test_html("tests/test-data/html-with-svg-and-png-in-tables.html")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    assert response.status_code == 200
+
+    # Render all pages to PNGs and compare all pages to references
+    pages_png = utils_pdf.pdf_bytes_to_png_pages(response.content, zoom=5)
+
+    ref_base = Path("tests/test-data/expected/html-with-svg-and-png-in-tables.png")
+    try:
+        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
+    except utils_pdf.ReferenceGenerated:
+        pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
+    except utils_pdf.ReferenceMissing as e:
+        pytest.skip(str(e))
+
+
 def test_convert_complex_html_without_embedded_attachments(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/test-specification.html")
-    response = __call_convert_html_with_attachments(
-        base_url=test_parameters.base_url,
-        request_session=test_parameters.request_session,
-        data=html,
-        print_error=True
-    )
+    response = __call_convert_html_with_attachments(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     stream = io.BytesIO(response.content)
     pdf_reader = PyPDF.PdfReader(stream)
@@ -202,12 +214,12 @@ def test_convert_html_with_embedded_attachments(test_parameters: TestParameters)
     attachments = utils_pdf.extract_all_attachments(pdf_reader)
 
     expected = [
-        (file1_path.name, 'NamesTree'),
-        (file2_path.name, 'NamesTree'),
-        (file3_path.name, 'NamesTree'),
-        (file1_path.name, 'Annot:p0'),
-        (file2_path.name, 'Annot:p0'),
-        (file1_path.name, 'Annot:p0'),
+        (file1_path.name, "NamesTree"),
+        (file2_path.name, "NamesTree"),
+        (file3_path.name, "NamesTree"),
+        (file1_path.name, "Annot:p0"),
+        (file2_path.name, "Annot:p0"),
+        (file1_path.name, "Annot:p0"),
     ]
     assert Counter(attachments) == Counter(expected)
 
@@ -220,14 +232,11 @@ def test_convert_svg(test_parameters: TestParameters) -> None:
     # Render all pages to PNGs and compare all pages to references
     pages_png = utils_pdf.pdf_bytes_to_png_pages(response.content)
 
-
     ref_base = Path("tests/test-data/expected/svg-image-ref.png")
     try:
-        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base)
+        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
     except utils_pdf.ReferenceGenerated:
-        pytest.skip(
-            f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests."
-        )
+        pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
     except utils_pdf.ReferenceMissing as e:
         pytest.skip(str(e))
 
@@ -240,14 +249,11 @@ def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
     # Render all pages to PNGs and compare all pages to references
     pages_png = utils_pdf.pdf_bytes_to_png_pages(response.content)
 
-
     ref_base = Path("tests/test-data/expected/svg-image-as-base64-ref.png")
     try:
-        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base)
+        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
     except utils_pdf.ReferenceGenerated:
-        pytest.skip(
-            f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests."
-        )
+        pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
     except utils_pdf.ReferenceMissing as e:
         pytest.skip(str(e))
 
@@ -260,14 +266,11 @@ def test_convert_svg_without_xmlns(test_parameters: TestParameters) -> None:
     # Render all pages to PNGs and compare all pages to references
     pages_png = utils_pdf.pdf_bytes_to_png_pages(response.content)
 
-
     ref_base = Path("tests/test-data/expected/svg-image-ref.png")
     try:
-        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base)
+        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
     except utils_pdf.ReferenceGenerated:
-        pytest.skip(
-            f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests."
-        )
+        pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
     except utils_pdf.ReferenceMissing as e:
         pytest.skip(str(e))
 
@@ -311,27 +314,21 @@ def test_convert_svg_with_scale_factor(scale: float, test_parameters: TestParame
 
     if not ref_path.exists():
         import os
+
         if os.environ.get("UPDATE_EXPECTED_REFS", "0") == "1":
             # Generate the missing reference files: hi-res PNG (10x) and matching PDF next to it
             ref_path.parent.mkdir(parents=True, exist_ok=True)
             ref_path.write_bytes(page_png_bytes)
             pdf_ref_path = ref_path.with_suffix(".pdf")
             pdf_ref_path.write_bytes(response.content)
-            pytest.skip(
-                f"Reference {ref_path} (and {pdf_ref_path}) was missing and has been generated at 10x raster scale. Re-run tests."
-            )
+            pytest.skip(f"Reference {ref_path} (and {pdf_ref_path}) was missing and has been generated at 10x raster scale. Re-run tests.")
         else:
-            pytest.skip(
-                f"Missing reference image {ref_path}. Set UPDATE_EXPECTED_REFS=1 to generate references (PNG and PDF), "
-                f"then commit them under tests/test-data/expected."
-            )
+            pytest.skip(f"Missing reference image {ref_path}. Set UPDATE_EXPECTED_REFS=1 to generate references (PNG and PDF), then commit them under tests/test-data/expected.")
 
     ref_image = Image.open(ref_path)
     # Basic sanity: mode and size should match
     assert produced_img.mode == ref_image.mode and produced_img.size == ref_image.size, (
-        f"Image mode/size mismatch for scale={scale}. "
-        f"Got mode={produced_img.mode}, size={produced_img.size}; "
-        f"expected mode={ref_image.mode}, size={ref_image.size} from {ref_path}"
+        f"Image mode/size mismatch for scale={scale}. Got mode={produced_img.mode}, size={produced_img.size}; expected mode={ref_image.mode}, size={ref_image.size} from {ref_path}"
     )
 
     # Pixel-by-pixel comparison
@@ -416,20 +413,18 @@ def test_convert_html_with_custom_metadata(test_parameters: TestParameters) -> N
     assert producer.startswith("WeasyPrint")
 
 
-
-
 def __load_test_html(file_path: str) -> str:
     with Path(file_path).open(encoding="utf-8") as html_file:
         html = html_file.read()
         return html
+
 
 def __call_convert_html_with_attachments(base_url: str, request_session: requests.Session, data, print_error, parameters=None, files: list[tuple[str, tuple[str, bytes, str | None]]] | None = None) -> requests.Response:
     url = f"{base_url}/convert/html-with-attachments"
     headers = {"Accept": "*/*"}
     payload = {"html": data}
     try:
-        response = request_session.request(method="POST", url=url, headers=headers, data=payload, files=files,
-                                           verify=True, params=parameters)
+        response = request_session.request(method="POST", url=url, headers=headers, data=payload, files=files, verify=True, params=parameters)
         if response.status_code // 100 != 2 and print_error:
             logging.error(f"Error: Unexpected response: '{response}'")
             logging.error(f"Error: Response content: '{response.content}'")

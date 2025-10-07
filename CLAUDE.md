@@ -101,6 +101,7 @@ grype weasyprint-service:0.0.0
 - `LOG_LEVEL`: Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) - defaults to INFO
 - `LOG_DIR`: Directory for log files (defaults to `/opt/weasyprint/logs`)
 - `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor (float, e.g., 2.0)
+- `SUBPROCESS_TIMEOUT`: Timeout for subprocess calls (Chromium) in seconds (default: 30)
 - `FORM_MAX_FIELDS`: Maximum number of form fields (default: 1000)
 - `FORM_MAX_FILES`: Maximum number of file uploads (default: 1000)
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)

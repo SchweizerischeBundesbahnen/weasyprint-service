@@ -49,6 +49,7 @@ class SvgProcessor:
         chromium_executable: str | None = None,
         device_scale_factor: float | None = None,
         chromium_height_adjustment: int = 100,
+        subprocess_timeout: int | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """
@@ -56,11 +57,13 @@ class SvgProcessor:
             chromium_executable: Path to Chromium/Chrome executable. If None, reads CHROMIUM_EXECUTABLE_PATH.
             device_scale_factor: Device scale factor for rendering. If None, reads DEVICE_SCALE_FACTOR (default 1.0).
             chromium_height_adjustment: Extra height (px) added to window to avoid clipping; later cropped.
+            subprocess_timeout: Timeout for subprocess calls in seconds. If None, reads SUBPROCESS_TIMEOUT (default 30).
             logger: Optional logger; if None, a module-level logger is used.
         """
         self.chromium_executable = chromium_executable or os.environ.get("CHROMIUM_EXECUTABLE_PATH")
         self.device_scale_factor = self._parse_float(os.environ.get("DEVICE_SCALE_FACTOR"), 1.0) if device_scale_factor is None else float(device_scale_factor)
         self.chromium_height_adjustment = int(chromium_height_adjustment)
+        self.subprocess_timeout = self._parse_int(os.environ.get("SUBPROCESS_TIMEOUT"), 30) if subprocess_timeout is None else int(subprocess_timeout)
         self.log = logger or logging.getLogger(__name__)
 
     # ---------------- Public API ----------------
@@ -373,14 +376,27 @@ class SvgProcessor:
         if not command:
             return False
 
+        process = None
         try:
-            result = subprocess.run(command, check=False)  # noqa: S603
-            if result.returncode != 0:
-                self.log.error("Error converting SVG to PNG, return code = %s", result.returncode)
+            # Use Popen to have control over process termination
+            process = subprocess.Popen(command)  # noqa: S603
+            process.wait(timeout=self.subprocess_timeout)
+            if process.returncode != 0:
+                self.log.error("Error converting SVG to PNG, return code = %s", process.returncode)
                 return False
             return True
+        except subprocess.TimeoutExpired:
+            self.log.error("SVG to PNG conversion timed out after %s seconds", self.subprocess_timeout)
+            if process:
+                process.kill()  # Forcefully terminate the process
+                process.wait()  # Wait for process to fully terminate
+            return False
         except Exception as e:  # noqa: BLE001
             self.log.error("Failed to convert SVG to PNG: %s", e)
+            if process:
+                process.kill()
+                with contextlib.suppress(Exception):
+                    process.wait()
             return False
         finally:
             # Remove the temporary SVG file regardless of success
@@ -473,5 +489,12 @@ class SvgProcessor:
     def _parse_float(value: str | None, default: float) -> float:
         try:
             return float(value) if value is not None else default
+        except ValueError:
+            return default
+
+    @staticmethod
+    def _parse_int(value: str | None, default: int) -> int:
+        try:
+            return int(value) if value is not None else default
         except ValueError:
             return default

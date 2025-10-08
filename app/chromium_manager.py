@@ -15,7 +15,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-from playwright.async_api import async_playwright
+from playwright.async_api import ViewportSize, async_playwright
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -151,7 +151,7 @@ class ChromiumManager:
         await self.stop()
         await self.start()
 
-    async def convert_svg_to_png(self, svg_content: str, width: int, height: int) -> bytes:
+    async def convert_svg_to_png(self, svg_content: str, width: int, height: int, device_scale_factor: float | None = None) -> bytes:
         """
         Convert SVG content to PNG using the persistent Chromium instance.
 
@@ -159,6 +159,7 @@ class ChromiumManager:
             svg_content: SVG content as a string (XML).
             width: Target width in pixels.
             height: Target height in pixels.
+            device_scale_factor: Device scale factor for this conversion. If None, uses instance default.
 
         Returns:
             PNG image data as bytes.
@@ -168,6 +169,9 @@ class ChromiumManager:
         """
         if not await self.is_running():
             raise RuntimeError("Chromium not started. Call start() first.")
+
+        # Use provided scale factor or fall back to instance default
+        scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
 
         # Encode SVG as base64 for data URL
         svg_base64 = base64.b64encode(svg_content.encode("utf-8")).decode("ascii")
@@ -189,9 +193,9 @@ class ChromiumManager:
 </body>
 </html>"""
 
-        async with self._get_page() as page:
+        async with self._get_page(scale_factor) as page:
             # Set viewport to exact dimensions
-            await page.set_viewport_size({"width": width, "height": height})
+            await page.set_viewport_size(ViewportSize(width=width, height=height))
 
             # Load HTML content
             await page.set_content(html_content, wait_until="networkidle", timeout=10000)
@@ -206,9 +210,12 @@ class ChromiumManager:
             return png_bytes
 
     @asynccontextmanager
-    async def _get_page(self) -> AsyncGenerator[Page]:
+    async def _get_page(self, device_scale_factor: float | None = None) -> AsyncGenerator[Page]:
         """
         Context manager to get a new browser page (tab).
+
+        Args:
+            device_scale_factor: Device scale factor for this page. If None, uses instance default.
 
         Yields:
             A Playwright Page object.
@@ -222,11 +229,14 @@ class ChromiumManager:
         context: BrowserContext | None = None
         page: Page | None = None
 
+        # Use provided scale factor or fall back to instance default
+        scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
+
         try:
             # Create new context with device scale factor
             context = await self._browser.new_context(
-                device_scale_factor=self.device_scale_factor,
-                viewport={"width": 800, "height": 600},  # Default, will be overridden
+                device_scale_factor=scale_factor,
+                viewport=ViewportSize(width=800, height=600),  # Default, will be overridden
             )
 
             page = await context.new_page()

@@ -202,7 +202,7 @@ class SvgProcessor:
         # Convert via CDP
         if self.chromium_manager:
             try:
-                png_bytes = await self.chromium_manager.convert_svg_to_png(svg_content, width, height)
+                png_bytes = await self.chromium_manager.convert_svg_to_png(svg_content, width, height, self.device_scale_factor)
                 self.log.debug("SVG converted via CDP successfully")
                 return self.IMAGE_PNG, png_bytes
             except Exception as e:  # noqa: BLE001

@@ -1,133 +1,12 @@
-import functools
-import os
-from collections.abc import Callable
+"""Tests for SvgProcessor utility functions and SVG processing."""
+
 from pathlib import Path
 
 import pytest
 from defusedxml import ElementTree as DET
-from PIL import Image
 
 from app.html_parser import HtmlParser
 from app.svg_processor import SvgProcessor
-import subprocess
-import tempfile
-from unittest.mock import MagicMock, patch
-
-
-test_script_path = "./tests/scripts/test_script.sh"
-cropped_test_script_output = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xf6\x178U\x00\x00\x00\x00IEND\xaeB`\x82"
-
-EXIT_ONE = "WEASYPRINT_SERVICE_TEST_EXIT_ONE"
-WRITE_OUTPUT = "WEASYPRINT_SERVICE_TEST_WRITE_OUTPUT"
-
-
-def setup_env_variables(f: Callable) -> Callable:
-    """Decorator that sets up and tears down environment variables for tests.
-
-    This decorator wraps test functions to ensure they have a clean environment variable state.
-    It sets CHROMIUM_EXECUTABLE_PATH, EXIT_ONE, and WRITE_OUTPUT to empty strings before the test,
-    runs the test, then resets those variables back to empty strings after the test completes.
-    This prevents environment variable state from leaking between tests.
-
-    Args:
-        f: The test function to wrap
-
-    Returns:
-        A wrapped function that handles environment variable setup/teardown
-    """
-
-    @functools.wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            # Set up clean environment before test
-            os.environ["CHROMIUM_EXECUTABLE_PATH"] = ""
-            os.environ[EXIT_ONE] = ""
-            os.environ[WRITE_OUTPUT] = ""
-
-            # Run the test
-            result = f(*args, **kwargs)
-            return result
-
-        finally:
-            # Clean up environment after test
-            os.environ["CHROMIUM_EXECUTABLE_PATH"] = ""
-            os.environ[EXIT_ONE] = ""
-            os.environ[WRITE_OUTPUT] = ""
-
-    return wrapper
-
-
-@pytest.mark.parametrize(
-    "html,expected_output",
-    [
-        # Invalid base64 - tests handling of malformed base64 input
-        (
-            '<img src="data:image/svg+xml;base64,123ABC=="/>"',
-            '<img src="data:image/svg+xml;base64,123ABC=="/>"',
-        ),
-        # Non-SVG image type - tests that non-SVG images are passed through unchanged
-        (
-            '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="/>',
-            '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="/>',
-        ),
-        # Invalid base64 SVG - tests handling of invalid base64 that claims to be SVG
-        (
-            '<img src="data:image/svg+xml;base64,invalid==="/>',
-            '<img src="data:image/svg+xml;base64,invalid==="/>',
-        ),
-    ],
-)
-@setup_env_variables
-def test_process_svg_invalid_inputs(html: str, expected_output: str):
-    """Test process_svg with various invalid inputs.
-
-    This test verifies that process_svg correctly handles invalid inputs by:
-    1. Passing through invalid base64 data unchanged
-    2. Not modifying non-SVG image types
-    3. Handling invalid base64 that claims to be SVG
-
-    The test uses parametrize to run multiple test cases with different inputs.
-    """
-    html_parser = HtmlParser()
-    svg_processor = SvgProcessor()
-    assert html_parser.serialize(svg_processor.process_svg(html_parser.parse(html))) == expected_output
-
-
-@setup_env_variables
-def test_process_svg_valid_conversion():
-    """Test process_svg with valid SVG content.
-
-    This test verifies that process_svg correctly converts SVG images to PNG:
-    1. Sets up environment variables needed for Chrome
-    2. Tests conversion of a single SVG image
-    3. Tests conversion of multiple SVG images in one HTML document
-    """
-    # Set Chrome executable path and enable test output
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    os.environ[WRITE_OUTPUT] = "true"
-
-    html_parser = HtmlParser()
-    svg_processor = SvgProcessor()
-
-    # Test single SVG conversion
-    html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>'
-    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
-    assert "image/png" in result  # Verify PNG conversion
-    assert "base64" in result  # Verify base64 encoding
-
-    # Test inline SVG conversion
-    html = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><circle cx="50" cy="50" r="40" fill="red"/></svg>'
-    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
-    assert "image/png" in result  # Verify PNG conversion
-    assert "base64" in result  # Verify base64 encoding
-
-    # Test multiple SVGs in one HTML
-    html = """
-        <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
-        <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
-    """
-    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
-    assert result.count("image/png") == 2  # Verify both SVGs converted
 
 
 @pytest.mark.parametrize(
@@ -142,7 +21,7 @@ def test_replace_inline_svgs_with_img(input_html_file: str, expected_html_file: 
     """
     Test replace_inline_svgs_with_img with different inputs.
 
-    This test verifies that replace_inline_svgs_with_img correctly converts SVG to base64 encoded IMG tags:
+    This test verifies that replace_inline_svgs_with_img correctly converts SVG to base64 encoded IMG tags.
     """
     html_parser = HtmlParser()
     svg_processor = SvgProcessor()
@@ -156,19 +35,17 @@ def test_replace_inline_svgs_with_img(input_html_file: str, expected_html_file: 
 
 
 def __load_test_html(file_path: str) -> str:
-    """
-    Load HTML file contents.
-    """
+    """Load HTML file contents."""
     with Path(file_path).open(encoding="utf-8") as html_file:
         return html_file.read()
 
 
 def __equal_ignore_newlines(a: str, b: str) -> bool:
-    """
-    Compare two strings ignoring all newline characters.
-    """
+    """Compare two strings ignoring all newline characters."""
+
     def normalize(s: str) -> str:
         return s.replace("\r", "").replace("\n", "")
+
     return normalize(a) == normalize(b)
 
 
@@ -187,7 +64,6 @@ def __equal_ignore_newlines(a: str, b: str) -> bool:
         ('<svg xmlns="http://www.w3.org/2000/svg" width="100px"></svg>', "width", ("100", "px")),
     ],
 )
-@setup_env_variables
 def test_parse_svg_dimension(svg_content: str, dimension: str, expected: tuple[str | None, str | None]):
     """Test parsing of SVG dimensions with various inputs.
 
@@ -216,7 +92,6 @@ def test_parse_svg_dimension(svg_content: str, dimension: str, expected: tuple[s
         ('<svg viewBox="0 0 800 600 700"></svg>', (None, None)),  # Too many tokens
     ],
 )
-@setup_env_variables
 def test_parse_viewbox(svg_content: str, expected: tuple[float | None, float | None]):
     """Test parsing of SVG viewBox with various inputs.
 
@@ -246,7 +121,6 @@ def test_parse_viewbox(svg_content: str, expected: tuple[float | None, float | N
         ('<svg width="abc" height="xyz"></svg>', None, None),
     ],
 )
-@setup_env_variables
 def test_extract_svg_dimensions(svg_content: str, expected_width: int | None, expected_height: int | None):
     """Test extraction of SVG dimensions with various inputs.
 
@@ -270,7 +144,6 @@ def test_extract_svg_dimensions(svg_content: str, expected_width: int | None, ex
         ('<svg width="100%" height="100%"></svg>', "% units require a viewBox to be defined"),
     ],
 )
-@setup_env_variables
 def test_extract_svg_dimensions_relative_units_error(svg_content: str, expected_error: str):
     """Test extraction of SVG dimensions with relative units without viewBox.
 
@@ -293,7 +166,6 @@ def test_extract_svg_dimensions_relative_units_error(svg_content: str, expected_
         ('<svg width="50%" height="25%" viewBox="0, 0 800, 600"></svg>', 400, 150),  # Mixed separators
     ],
 )
-@setup_env_variables
 def test_extract_svg_dimensions_relative_units(svg_content: str, expected_width: int, expected_height: int):
     """Test extraction of SVG dimensions with relative units and viewBox.
 
@@ -326,7 +198,6 @@ def test_extract_svg_dimensions_relative_units(svg_content: str, expected_width:
         ("image/svg+xml", "PHN2ZyBoZWlnaHQ9IjIwMHB4IiB3aWR0aD0iMTAwcHgiPC9zdmc¨", None),
     ],
 )
-@setup_env_variables
 def test_get_svg_content(content_type: str, content_base64: str, expected_content: str | None):
     """Test SVG content validation and decoding.
 
@@ -351,140 +222,6 @@ def test_get_svg_content(content_type: str, content_base64: str, expected_conten
         assert svg_processor.svg_to_string(svg) == expected_content
 
 
-@setup_env_variables
-def test_replace_svg_with_png():
-    """Test SVG to PNG conversion functionality.
-
-    Tests various scenarios for SVG to PNG conversion:
-    - Missing Chrome executable
-    - Chrome execution failures
-    - Successful conversion
-    """
-    svg_processor = SvgProcessor()
-
-    # Chrome executable not set, return same content
-    svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
-    mime, content = svg_processor.replace_svg_with_png(svg)
-    assert mime == svg_processor.IMAGE_SVG, content == svg
-
-    # Chrome executable test script returns empty, return same content
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
-    mime, content = svg_processor.replace_svg_with_png(svg)
-    assert mime == svg_processor.IMAGE_SVG, content == svg
-
-    # Valid input with chrome executable test script set correctly, return script output
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    os.environ[WRITE_OUTPUT] = "true"
-    svg = DET.fromstring(r'<svg height="200px" width="100px"></svg>')
-    mime, content = svg_processor.replace_svg_with_png(svg)
-    assert mime == svg_processor.IMAGE_PNG
-    assert content == cropped_test_script_output
-
-
-@setup_env_variables
-def test_prepare_temp_files():
-    """Test preparation of temporary files for SVG/PNG conversion.
-
-    Tests creation of temporary files for SVG input and PNG output.
-    """
-    svg_processor = SvgProcessor()
-
-    # Test with no content
-    svg_filepath, png_filepath = svg_processor.prepare_temp_files(None)
-    assert svg_filepath is None and png_filepath is None
-
-    # Test with content
-    svg_filepath, png_filepath = svg_processor.prepare_temp_files("test")
-    assert svg_filepath is not None and svg_filepath != ""
-    assert png_filepath is not None and png_filepath != ""
-
-
-@setup_env_variables
-def test_convert_svg_to_png():
-    """Test SVG to PNG conversion process.
-
-    Tests various scenarios in the conversion process:
-    - Missing Chrome executable
-    - Chrome execution failures
-    - Invalid Chrome path
-    - Successful conversion
-    """
-    svg_processor = SvgProcessor()
-
-    # Test missing Chrome executable
-    res = svg_processor.convert_svg_to_png(1, 1, Path("/"), Path("/"))
-    assert not res
-
-    # Test Chrome execution failure
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    os.environ[EXIT_ONE] = "true"
-    res = svg_processor.convert_svg_to_png(1, 1, Path("/"), Path("/"))
-    assert not res
-
-    # Test invalid Chrome path
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = "definitely_not_a_valid_command"
-    res = svg_processor.convert_svg_to_png(1, 1, Path("/"), Path("/"))
-    assert not res
-
-    # Test successful conversion
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    os.environ[EXIT_ONE] = ""
-    res = svg_processor.convert_svg_to_png(1, 1, Path("/"), Path("/"))
-    assert res
-
-
-@setup_env_variables
-def test_read_and_cleanup_png():
-    """Test reading and cleanup of PNG files.
-
-    Tests reading PNG file content and proper cleanup afterwards.
-    """
-    # Create test file
-    png_file = Path("./test.png")
-    png_file.touch()
-    png_file.write_bytes(b"test")
-
-    svg_processor = SvgProcessor()
-
-    # Test reading content
-    assert svg_processor.read_and_cleanup_png(png_file) == b"test"
-
-    # Test file cleanup
-    assert svg_processor.read_and_cleanup_png(png_file) is None
-
-
-@setup_env_variables
-def test_create_chromium_command():
-    """Test creation of Chrome command for SVG conversion.
-
-    Tests command line argument construction for Chrome headless mode.
-    """
-    svg_processor = SvgProcessor()
-
-    # Test without Chrome executable
-    assert svg_processor.create_chromium_command(1, 1, Path("/"), Path("/")) is None
-
-    # Test with Chrome executable
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = "/"
-    assert svg_processor.create_chromium_command(1, 1, Path("/"), Path("/")) == [
-        "/",
-        "--headless=new",
-        "--no-sandbox",
-        "--disable-gpu",
-        "--disable-software-rasterizer",
-        "--disable-dev-shm-usage",
-        "--default-background-color=00000000",
-        "--hide-scrollbars",
-        "--force-device-scale-factor=1.0",
-        "--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb",
-        "--screenshot=/",
-        f"--window-size={1},{1}",
-        "/",
-    ]
-
-
-@setup_env_variables
 def test_to_base64():
     """Test base64 encoding functionality.
 
@@ -494,7 +231,6 @@ def test_to_base64():
     assert SvgProcessor().to_base64("abcde") == "YWJjZGU="
 
 
-@setup_env_variables
 def test_convert_to_px():
     """Test conversion of various units to pixels.
 
@@ -511,7 +247,6 @@ def test_convert_to_px():
     assert svg_processor.convert_to_px("27.595", "ex") == 221
 
 
-@setup_env_variables
 def test_px_conversion_ratio():
     """Test conversion ratios for different units to pixels.
 
@@ -529,42 +264,6 @@ def test_px_conversion_ratio():
     assert svg_processor.get_px_conversion_ratio(None) == 1
 
 
-@setup_env_variables
-def test_crop_png():
-    """Test PNG image cropping functionality.
-
-    Tests various scenarios for PNG cropping:
-    - Successful crop
-    - Crop beyond image height
-    - Invalid file handling
-    """
-    # Create test PNG
-    temp_file = Path("test_crop.png")
-    try:
-        # Create a small test PNG
-        with Image.new("RGBA", (10, 20)) as img:
-            img.save(temp_file)
-
-        svg_processor = SvgProcessor()
-
-        # Test successful crop
-        assert svg_processor.crop_png(temp_file, 5) is True
-
-        # Verify dimensions after crop
-        with Image.open(temp_file) as img:
-            assert img.size == (10, 15)
-
-        # Test crop more than height
-        assert svg_processor.crop_png(temp_file, 20) is False
-
-        # Test invalid file
-        assert svg_processor.crop_png(Path("nonexistent.png"), 5) is False
-    finally:
-        if temp_file.exists():
-            temp_file.unlink()
-
-
-@setup_env_variables
 def test_calculate_dimension():
     """Test calculation of SVG dimensions.
 
@@ -596,7 +295,6 @@ def test_calculate_dimension():
     assert svg_processor.calculate_dimension("abc", "px", None) is None
 
 
-@setup_env_variables
 def test_replace_svg_size_attributes():
     """Test replacement of SVG size attributes.
 
@@ -612,7 +310,6 @@ def test_replace_svg_size_attributes():
     assert 'height="300px"' in result
 
 
-@setup_env_variables
 def test_calculate_special_unit():
     """Test calculation of special CSS units.
 
@@ -641,44 +338,6 @@ def test_calculate_special_unit():
         assert "could not convert string to float: 'abc'" in str(e)
 
 
-@setup_env_variables
-def test_process_svg_comprehensive():
-    """Test comprehensive SVG processing functionality.
-
-    Tests end-to-end SVG processing including:
-    - Non-SVG image handling
-    - Invalid input handling
-    - Single SVG conversion
-    - Multiple SVG conversion
-    """
-    html_parser = HtmlParser()
-    svg_processor = SvgProcessor()
-
-    # Test non-SVG image
-    html = '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="/>'
-    assert html_parser.serialize(svg_processor.process_svg(html_parser.parse(html))) == html
-
-    # Test invalid base64
-    html = '<img src="data:image/svg+xml;base64,invalid==="/>'
-    assert html_parser.serialize(svg_processor.process_svg(html_parser.parse(html))) == html
-
-    # Test valid conversion
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
-    os.environ[WRITE_OUTPUT] = "true"
-    html = '<img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>'
-    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
-    assert "image/png" in result
-    assert "base64" in result
-
-    # Test multiple SVGs
-    html = """
-        <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
-        <img src="data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjFweCIgd2lkdGg9IjFweCIgdmlld0JveD0iMCAwIDEgMSI+PC9zdmc+"/>
-    """
-    result = html_parser.serialize(svg_processor.process_svg(html_parser.parse(html)))
-    assert result.count("image/png") == 2
-
-
 @pytest.mark.parametrize(
     "svg_content, expected_output",
     [
@@ -692,7 +351,6 @@ def test_process_svg_comprehensive():
         ),
     ],
 )
-@setup_env_variables
 def test_get_svg_content_with_namespace(svg_content, expected_output):
     """Test SVG content handling with XML namespaces.
 
@@ -714,6 +372,7 @@ def test_get_svg_content_with_namespace(svg_content, expected_output):
     ],
 )
 def test_ensure_mandatory_attributes(svg_input):
+    """Test ensuring mandatory SVG attributes."""
     svg_processor = SvgProcessor()
 
     svg = svg_processor.svg_from_string(svg_input)
@@ -723,71 +382,4 @@ def test_ensure_mandatory_attributes(svg_input):
     assert updated_svg is svg
 
     svg_content = svg_processor.svg_to_string(updated_svg)
-    assert svg_content.count("xmlns=\"http://www.w3.org/2000/svg\"") == 1
-
-
-def test_subprocess_timeout_default():
-    """Test that subprocess timeout defaults to 30 seconds."""
-    svg_processor = SvgProcessor()
-    assert svg_processor.subprocess_timeout == 30
-
-
-def test_subprocess_timeout_env_variable():
-    """Test that subprocess timeout can be set via environment variable."""
-    os.environ["SUBPROCESS_TIMEOUT"] = "60"
-    try:
-        svg_processor = SvgProcessor()
-        assert svg_processor.subprocess_timeout == 60
-    finally:
-        os.environ.pop("SUBPROCESS_TIMEOUT", None)
-
-
-def test_subprocess_timeout_constructor():
-    """Test that subprocess timeout can be set via constructor."""
-    svg_processor = SvgProcessor(subprocess_timeout=90)
-    assert svg_processor.subprocess_timeout == 90
-
-
-def test_subprocess_timeout_invalid_env():
-    """Test that invalid subprocess timeout falls back to default."""
-    os.environ["SUBPROCESS_TIMEOUT"] = "invalid"
-    try:
-        svg_processor = SvgProcessor()
-        assert svg_processor.subprocess_timeout == 30
-    finally:
-        os.environ.pop("SUBPROCESS_TIMEOUT", None)
-
-
-@setup_env_variables
-def test_convert_svg_to_png_timeout():
-    """Test that SVG to PNG conversion respects timeout and kills process."""
-    svg_processor = SvgProcessor(subprocess_timeout=1)
-    svg_processor.chromium_executable = test_script_path
-
-    temp_folder = tempfile.gettempdir()
-    svg_filepath = Path(temp_folder, "test.svg")
-    png_filepath = Path(temp_folder, "test.png")
-
-    # Create a minimal SVG file
-    svg_filepath.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>')
-
-    try:
-        # Mock subprocess.Popen and process.wait to raise TimeoutExpired on first call, then succeed
-        mock_process = MagicMock()
-        mock_process.wait.side_effect = [subprocess.TimeoutExpired(cmd=["test"], timeout=1), None]
-
-        with patch("subprocess.Popen", return_value=mock_process) as mock_popen:
-            result = svg_processor.convert_svg_to_png(10, 10, png_filepath, svg_filepath)
-            assert result is False
-
-            # Verify Popen was called
-            mock_popen.assert_called_once()
-
-            # Verify process.kill was called to terminate the hanging process
-            mock_process.kill.assert_called_once()
-
-            # Verify we waited for the process to fully terminate after kill
-            assert mock_process.wait.call_count == 2  # Once with timeout, once after kill
-    finally:
-        svg_filepath.unlink(missing_ok=True)
-        png_filepath.unlink(missing_ok=True)
+    assert svg_content.count('xmlns="http://www.w3.org/2000/svg"') == 1

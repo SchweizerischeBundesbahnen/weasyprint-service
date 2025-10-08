@@ -50,6 +50,7 @@ class SvgProcessor:
         device_scale_factor: float | None = None,
         chromium_height_adjustment: int = 100,
         subprocess_timeout: int | None = None,
+        cpu_nice_level: int | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """
@@ -58,12 +59,15 @@ class SvgProcessor:
             device_scale_factor: Device scale factor for rendering. If None, reads DEVICE_SCALE_FACTOR (default 1.0).
             chromium_height_adjustment: Extra height (px) added to window to avoid clipping; later cropped.
             subprocess_timeout: Timeout for subprocess calls in seconds. If None, reads SUBPROCESS_TIMEOUT (default 30).
+            cpu_nice_level: CPU priority (nice level) for Chromium subprocess. If None, reads CPU_NICE_LEVEL (default 10).
+                           Range: -20 (highest priority) to 19 (lowest priority). Higher values = lower CPU priority.
             logger: Optional logger; if None, a module-level logger is used.
         """
         self.chromium_executable = chromium_executable or os.environ.get("CHROMIUM_EXECUTABLE_PATH")
         self.device_scale_factor = self._parse_float(os.environ.get("DEVICE_SCALE_FACTOR"), 1.0) if device_scale_factor is None else float(device_scale_factor)
         self.chromium_height_adjustment = int(chromium_height_adjustment)
         self.subprocess_timeout = self._parse_int(os.environ.get("SUBPROCESS_TIMEOUT"), 30) if subprocess_timeout is None else int(subprocess_timeout)
+        self.cpu_nice_level = self._parse_int(os.environ.get("CPU_NICE_LEVEL"), 10) if cpu_nice_level is None else int(cpu_nice_level)
         self.log = logger or logging.getLogger(__name__)
 
     # ---------------- Public API ----------------
@@ -358,13 +362,22 @@ class SvgProcessor:
 
     # ---------------- Files / Chromium ----------------
 
+    def _set_low_cpu_priority(self) -> None:
+        """Set low CPU priority for the subprocess using nice (Unix-like systems only)."""
+        try:
+            os.nice(self.cpu_nice_level)
+        except (OSError, AttributeError) as e:
+            # OSError: permission denied or invalid value
+            # AttributeError: os.nice not available on this platform (e.g., Windows)
+            self.log.warning("Failed to set CPU priority (nice=%s): %s", self.cpu_nice_level, e)
+
     @staticmethod
     def _cleanup_process(process: subprocess.Popen[bytes] | None) -> None:
         """Helper method to cleanup subprocess by killing and waiting for termination."""
         if process:
             process.kill()
             with contextlib.suppress(Exception):
-                process.wait()
+                process.wait(timeout=5)
 
     def prepare_temp_files(self, content: str) -> tuple[Path | None, Path | None]:
         try:
@@ -387,7 +400,8 @@ class SvgProcessor:
         process = None
         try:
             # Use Popen to have control over process termination
-            process = subprocess.Popen(command, shell=False)  # noqa: S603
+            # Set low CPU priority to keep system responsive
+            process = subprocess.Popen(command, shell=False, preexec_fn=self._set_low_cpu_priority)  # noqa: S603, PLW1509
             process.wait(timeout=self.subprocess_timeout)
             if process.returncode != 0:
                 self.log.error("Error converting SVG to PNG, return code = %s", process.returncode)

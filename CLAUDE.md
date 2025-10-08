@@ -102,6 +102,7 @@ grype weasyprint-service:0.0.0
 - `LOG_DIR`: Directory for log files (defaults to `/opt/weasyprint/logs`)
 - `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor (float, e.g., 2.0)
 - `SUBPROCESS_TIMEOUT`: Timeout for subprocess calls (Chromium) in seconds (default: 30)
+- `CPU_NICE_LEVEL`: CPU priority (nice level) for Chromium subprocess (default: 10). Range: -20 (highest priority) to 19 (lowest priority). Higher values mean lower CPU priority, keeping the system more responsive.
 - `FORM_MAX_FIELDS`: Maximum number of form fields (default: 1000)
 - `FORM_MAX_FILES`: Maximum number of file uploads (default: 1000)
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)

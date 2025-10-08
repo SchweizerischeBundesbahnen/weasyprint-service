@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import warnings
 from typing import TypedDict
 from weakref import WeakKeyDictionary
 
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup, Comment, XMLParsedAsHTMLWarning
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 
 class _Meta(TypedDict):

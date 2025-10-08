@@ -49,6 +49,39 @@ docker run --detach \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
+### CPU Priority Configuration
+
+The service can control CPU priority for Chromium subprocess (used for SVG to PNG conversion) via the `CPU_NICE_LEVEL` environment variable. This helps keep the system responsive during heavy processing.
+
+- **CPU_NICE_LEVEL**: CPU priority (nice level) for Chromium subprocess (default: 10)
+  - Range: -20 (highest priority) to 19 (lowest priority)
+  - Higher values mean lower CPU priority, keeping the system more responsive
+  - Only works on Unix-like systems (Linux, macOS)
+
+To customize CPU priority when running the container:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env CPU_NICE_LEVEL=15 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+### Subprocess Timeout Configuration
+
+The timeout for Chromium subprocess calls can be configured via the `SUBPROCESS_TIMEOUT` environment variable (default: 30 seconds).
+
+To customize subprocess timeout when running the container:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env SUBPROCESS_TIMEOUT=60 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
 ### Logging Configuration
 
 The service includes a robust logging system with the following features:

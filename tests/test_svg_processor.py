@@ -9,6 +9,10 @@ from PIL import Image
 
 from app.html_parser import HtmlParser
 from app.svg_processor import SvgProcessor
+import subprocess
+import tempfile
+from unittest.mock import MagicMock, patch
+
 
 test_script_path = "./tests/scripts/test_script.sh"
 cropped_test_script_output = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xf6\x178U\x00\x00\x00\x00IEND\xaeB`\x82"
@@ -720,3 +724,70 @@ def test_ensure_mandatory_attributes(svg_input):
 
     svg_content = svg_processor.svg_to_string(updated_svg)
     assert svg_content.count("xmlns=\"http://www.w3.org/2000/svg\"") == 1
+
+
+def test_subprocess_timeout_default():
+    """Test that subprocess timeout defaults to 30 seconds."""
+    svg_processor = SvgProcessor()
+    assert svg_processor.subprocess_timeout == 30
+
+
+def test_subprocess_timeout_env_variable():
+    """Test that subprocess timeout can be set via environment variable."""
+    os.environ["SUBPROCESS_TIMEOUT"] = "60"
+    try:
+        svg_processor = SvgProcessor()
+        assert svg_processor.subprocess_timeout == 60
+    finally:
+        os.environ.pop("SUBPROCESS_TIMEOUT", None)
+
+
+def test_subprocess_timeout_constructor():
+    """Test that subprocess timeout can be set via constructor."""
+    svg_processor = SvgProcessor(subprocess_timeout=90)
+    assert svg_processor.subprocess_timeout == 90
+
+
+def test_subprocess_timeout_invalid_env():
+    """Test that invalid subprocess timeout falls back to default."""
+    os.environ["SUBPROCESS_TIMEOUT"] = "invalid"
+    try:
+        svg_processor = SvgProcessor()
+        assert svg_processor.subprocess_timeout == 30
+    finally:
+        os.environ.pop("SUBPROCESS_TIMEOUT", None)
+
+
+@setup_env_variables
+def test_convert_svg_to_png_timeout():
+    """Test that SVG to PNG conversion respects timeout and kills process."""
+    svg_processor = SvgProcessor(subprocess_timeout=1)
+    svg_processor.chromium_executable = test_script_path
+
+    temp_folder = tempfile.gettempdir()
+    svg_filepath = Path(temp_folder, "test.svg")
+    png_filepath = Path(temp_folder, "test.png")
+
+    # Create a minimal SVG file
+    svg_filepath.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>')
+
+    try:
+        # Mock subprocess.Popen and process.wait to raise TimeoutExpired on first call, then succeed
+        mock_process = MagicMock()
+        mock_process.wait.side_effect = [subprocess.TimeoutExpired(cmd=["test"], timeout=1), None]
+
+        with patch("subprocess.Popen", return_value=mock_process) as mock_popen:
+            result = svg_processor.convert_svg_to_png(10, 10, png_filepath, svg_filepath)
+            assert result is False
+
+            # Verify Popen was called
+            mock_popen.assert_called_once()
+
+            # Verify process.kill was called to terminate the hanging process
+            mock_process.kill.assert_called_once()
+
+            # Verify we waited for the process to fully terminate after kill
+            assert mock_process.wait.call_count == 2  # Once with timeout, once after kill
+    finally:
+        svg_filepath.unlink(missing_ok=True)
+        png_filepath.unlink(missing_ok=True)

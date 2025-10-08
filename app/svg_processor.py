@@ -358,6 +358,14 @@ class SvgProcessor:
 
     # ---------------- Files / Chromium ----------------
 
+    @staticmethod
+    def _cleanup_process(process: subprocess.Popen[bytes] | None) -> None:
+        """Helper method to cleanup subprocess by killing and waiting for termination."""
+        if process:
+            process.kill()
+            with contextlib.suppress(Exception):
+                process.wait()
+
     def prepare_temp_files(self, content: str) -> tuple[Path | None, Path | None]:
         try:
             temp_folder = tempfile.gettempdir()
@@ -387,16 +395,11 @@ class SvgProcessor:
             return True
         except subprocess.TimeoutExpired:
             self.log.error("SVG to PNG conversion timed out after %s seconds", self.subprocess_timeout)
-            if process:
-                process.kill()  # Forcefully terminate the process
-                process.wait()  # Wait for process to fully terminate
+            self._cleanup_process(process)
             return False
         except Exception as e:  # noqa: BLE001
             self.log.error("Failed to convert SVG to PNG: %s", e)
-            if process:
-                process.kill()
-                with contextlib.suppress(Exception):
-                    process.wait()
+            self._cleanup_process(process)
             return False
         finally:
             # Remove the temporary SVG file regardless of success

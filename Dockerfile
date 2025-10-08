@@ -7,6 +7,8 @@ ARG APP_IMAGE_VERSION=0.0.0
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
+    curl \
+    js \
     dbus \
     procps \
     fonts-dejavu \
@@ -59,5 +61,8 @@ RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && \
 
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:9080/health | jq -e '.chromium == true and .status == "healthy"' > /dev/null || exit 1
 
 ENTRYPOINT [ "./entrypoint.sh" ]

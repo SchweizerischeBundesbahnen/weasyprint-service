@@ -107,7 +107,6 @@ grype weasyprint-service:0.0.0
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)
 - `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
 - `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
-- `WEASYPRINT_SERVICE_CHROMIUM_VERSION`: Chromium version (set during build via Playwright)
 
 ## Development Workflow
 

@@ -125,6 +125,26 @@ class ChromiumManager:
             self.log.error("Health check failed: %s", e)
             return False
 
+    async def get_version(self) -> str | None:
+        """
+        Get the Chromium browser version.
+
+        Returns:
+            Chromium version string (e.g., "131.0.6778.69") or None if browser is not running.
+        """
+        try:
+            if not await self.is_running() or not self._browser:
+                return None
+
+            version_string = self._browser.version
+            # Extract version number from "HeadlessChrome/131.0.6778.69" format
+            if "/" in version_string:
+                return version_string.split("/")[1]
+            return version_string
+        except Exception as e:  # noqa: BLE001
+            self.log.error("Failed to get Chromium version: %s", e)
+            return None
+
     async def restart(self) -> None:
         """Restart the Chromium browser (useful for recovering from errors)."""
         self.log.info("Restarting Chromium browser...")

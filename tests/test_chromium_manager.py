@@ -119,6 +119,28 @@ async def test_chromium_manager_restart():
 
 
 @pytest.mark.asyncio
+async def test_chromium_manager_get_version():
+    """Test getting Chromium version."""
+    manager = ChromiumManager()
+
+    # Version should be None when not running
+    version = await manager.get_version()
+    assert version is None
+
+    # Start browser
+    await manager.start()
+
+    # Version should be a string when running
+    version = await manager.get_version()
+    assert isinstance(version, str)
+    assert len(version) > 0
+    # Version format: major.minor.build.patch (e.g., "131.0.6778.69")
+    assert "." in version
+
+    await manager.stop()
+
+
+@pytest.mark.asyncio
 async def test_chromium_manager_concurrent_conversions():
     """Test that concurrent SVG conversions work correctly."""
     import asyncio

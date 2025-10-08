@@ -86,7 +86,7 @@ async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromi
     operation_id="getVersion",
     tags=["meta"],
 )
-async def version() -> dict[str, str | None]:
+async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | None]:
     """
     Get version information
     """
@@ -95,7 +95,7 @@ async def version() -> dict[str, str | None]:
         "weasyprint": weasyprint.__version__,
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),
         "timestamp": os.environ.get("WEASYPRINT_SERVICE_BUILD_TIMESTAMP"),
-        "chromium": os.environ.get("WEASYPRINT_SERVICE_CHROMIUM_VERSION"),
+        "chromium": await chromium_manager.get_version(),
     }
 
 

@@ -6,13 +6,10 @@ from fastapi.testclient import TestClient
 
 from app.weasyprint_controller import app
 
-test_script_path = "./tests/scripts/test_script.sh"
-
 
 def test_version():
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
     os.environ["WEASYPRINT_SERVICE_BUILD_TIMESTAMP"] = "test2"
-    os.environ["WEASYPRINT_SERVICE_CHROMIUM_VERSION"] = "test3"
     with TestClient(app) as test_client:
         version = test_client.get("/version").json()
 
@@ -20,11 +17,11 @@ def test_version():
         assert version["weasyprint"] is not None
         assert version["weasyprintService"] == "test1"
         assert version["timestamp"] == "test2"
-        assert version["chromium"] == "test3"
+        # Chromium version is fetched from ChromiumManager, can be None if browser not started or a version string
+        assert version["chromium"] is None or isinstance(version["chromium"], str)
 
 
 def test_convert_html():
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
     with TestClient(app) as test_client:
         result = test_client.post(
@@ -40,7 +37,6 @@ def test_convert_html():
 
 
 def test_convert_html_with_attachments():
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
     with TestClient(app) as test_client:
         result = test_client.post(
@@ -56,7 +52,6 @@ def test_convert_html_with_attachments():
 
 
 def test_convert_html_with_attachments_files():
-    os.environ["CHROMIUM_EXECUTABLE_PATH"] = test_script_path
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
 
     file1_path = Path("tests/test-data/html-with-attachments/attachment1.pdf")

@@ -9,6 +9,10 @@ from PIL import Image
 
 from app.html_parser import HtmlParser
 from app.svg_processor import SvgProcessor
+import subprocess
+import tempfile
+from unittest.mock import MagicMock, patch
+
 
 test_script_path = "./tests/scripts/test_script.sh"
 cropped_test_script_output = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc```\x00\x00\x00\x04\x00\x01\xf6\x178U\x00\x00\x00\x00IEND\xaeB`\x82"
@@ -757,10 +761,6 @@ def test_subprocess_timeout_invalid_env():
 @setup_env_variables
 def test_convert_svg_to_png_timeout():
     """Test that SVG to PNG conversion respects timeout and kills process."""
-    import subprocess
-    import tempfile
-    from unittest.mock import MagicMock, patch
-
     svg_processor = SvgProcessor(subprocess_timeout=1)
     svg_processor.chromium_executable = test_script_path
 

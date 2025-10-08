@@ -43,7 +43,7 @@ def weasyprint_container():
         auto_remove=True,  # Ensure container is automatically removed after it stops
         labels={"test-suite": "weasyprint-service"},
     )
-    time.sleep(5)
+    time.sleep(10)  # Wait for Chromium to start in CI environment
 
     yield container
 

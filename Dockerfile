@@ -8,6 +8,7 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
     dbus \
+    procps \
     fonts-dejavu \
     fonts-liberation \
     fonts-noto-cjk \

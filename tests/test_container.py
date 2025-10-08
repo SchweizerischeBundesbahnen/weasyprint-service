@@ -72,9 +72,35 @@ def test_parameters(weasyprint_container: Container):
 
 
 def test_container_no_error_logs(test_parameters: TestParameters) -> None:
-    logs = test_parameters.container.logs()
+    """Verify container logs contain expected startup messages and no errors."""
+    logs = test_parameters.container.logs().decode("utf-8")
+    log_lines = logs.splitlines()
 
-    assert len(logs.splitlines()) == 7
+    # Check line count is as expected (11 lines for startup sequence)
+    assert len(log_lines) == 11, f"Expected 11 log lines, got {len(log_lines)}:\n{logs}"
+
+    # Check for critical errors (should not contain ERROR or CRITICAL level messages)
+    errors = [line for line in log_lines if " - ERROR - " in line or " - CRITICAL - " in line]
+    assert not errors, f"Found error logs: {errors}"
+
+    # Check for expected startup messages (ignore timestamps and specific details)
+    expected_patterns = [
+        "Logging initialized with level: INFO",
+        "Log file: /opt/weasyprint/logs/weasyprint-service_",
+        "Weasyprint service listening port: 9080",
+        "Started server process",
+        "Waiting for application startup",
+        "Starting Chromium browser for SVG conversion",
+        "Starting Chromium browser process via Playwright",
+        "Chromium browser started successfully (PID: running)",
+        "Chromium browser started successfully",
+        "Application startup complete",
+        "Uvicorn running on http://:9080",
+    ]
+
+    log_text = "\n".join(log_lines)
+    for pattern in expected_patterns:
+        assert any(pattern in line for line in log_lines), f"Expected log pattern not found: '{pattern}'\nLogs:\n{log_text}"
 
 
 def test_convert_simple_html(test_parameters: TestParameters) -> None:

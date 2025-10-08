@@ -379,7 +379,7 @@ class SvgProcessor:
         process = None
         try:
             # Use Popen to have control over process termination
-            process = subprocess.Popen(command)  # noqa: S603
+            process = subprocess.Popen(command, shell=False)  # noqa: S603
             process.wait(timeout=self.subprocess_timeout)
             if process.returncode != 0:
                 self.log.error("Error converting SVG to PNG, return code = %s", process.returncode)

@@ -8,31 +8,31 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
     curl \
-    js \
     dbus \
-    procps \
     fonts-dejavu \
     fonts-liberation \
     fonts-noto-cjk \
     fonts-noto-cjk-extra \
     fonts-noto-color-emoji \
-    libpango-1.0-0 \
-    libpangoft2-1.0-0 \
-    python3-brotli \
-    python3-cffi \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
+    jq \
+    libasound2 \
     libatk-bridge2.0-0 \
+    libatk1.0-0 \
     libcups2 \
     libdrm2 \
-    libxkbcommon0 \
+    libgbm1 \
+    libnspr4 \
+    libnss3 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
     libxcomposite1 \
     libxdamage1 \
     libxfixes3 \
+    libxkbcommon0 \
     libxrandr2 \
-    libgbm1 \
-    libasound2 && \
+    procps \
+    python3-brotli \
+    python3-cffi && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*

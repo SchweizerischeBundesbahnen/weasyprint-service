@@ -23,6 +23,30 @@ class TestParameters(NamedTuple):
     __test__ = False
 
 
+def wait_for_container_healthy(container: Container, max_wait_time: int = 60) -> None:
+    """
+    Wait for container to become healthy based on Docker healthcheck.
+
+    Args:
+        container: Docker container to wait for
+        max_wait_time: Maximum time to wait in seconds (default: 60)
+
+    Raises:
+        TimeoutError: If container does not become healthy within max_wait_time
+    """
+    start_time = time.time()
+    while time.time() - start_time < max_wait_time:
+        container.reload()
+        health_status = container.attrs.get("State", {}).get("Health", {}).get("Status")
+        if health_status == "healthy":
+            return
+        time.sleep(1)
+
+    # Timeout reached, print logs for debugging
+    logs = container.logs().decode("utf-8")
+    raise TimeoutError(f"Container did not become healthy within {max_wait_time} seconds. Logs:\n{logs}")
+
+
 @pytest.fixture(scope="module")
 def weasyprint_container():
     """
@@ -43,7 +67,8 @@ def weasyprint_container():
         auto_remove=True,  # Ensure container is automatically removed after it stops
         labels={"test-suite": "weasyprint-service"},
     )
-    time.sleep(10)  # Wait for Chromium to start in CI environment
+
+    wait_for_container_healthy(container)
 
     yield container
 
@@ -76,8 +101,8 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
     logs = test_parameters.container.logs().decode("utf-8")
     log_lines = logs.splitlines()
 
-    # Check line count is as expected (11 lines for startup sequence)
-    assert len(log_lines) == 11, f"Expected 11 log lines, got {len(log_lines)}:\n{logs}"
+    # Check line count is as expected
+    assert len(log_lines) == 12, f"Expected 11 log lines, got {len(log_lines)}:\n{logs}"
 
     # Check for critical errors (should not contain ERROR or CRITICAL level messages)
     errors = [line for line in log_lines if " - ERROR - " in line or " - CRITICAL - " in line]
@@ -96,6 +121,7 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
         "Chromium browser started successfully",
         "Application startup complete",
         "Uvicorn running on http://:9080",
+        "\"GET /health HTTP/1.1\" 200 OK",
     ]
 
     log_text = "\n".join(log_lines)

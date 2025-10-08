@@ -3,36 +3,32 @@ SVG processing utilities for WeasyPrint service.
 
 Features:
 - Convert SVG <svg> to <img src="data:image/svg+xml;base64,...">
-- Replace base64 SVG <img> with base64 PNG using Chromium headless
+- Replace base64 SVG <img> with base64 PNG using Chromium via CDP (Chrome DevTools Protocol)
 - Handle SVG dimensions, including vw/vh/% via viewBox
 """
 
 from __future__ import annotations
 
 import base64
-import contextlib
 import logging
 import math
 import os
 import re
-import subprocess
-import tempfile
 import xml.etree.ElementTree as ET
-from pathlib import Path
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from bs4 import BeautifulSoup, Tag
 from defusedxml import ElementTree as DET
-from PIL import Image
 
 if TYPE_CHECKING:  # used only for type hints
     from xml.etree.ElementTree import Element
 
+    from app.chromium_manager import ChromiumManager
+
 
 class SvgProcessor:
     """
-    Class for processing SVG images in HTML and converting them to PNG via Chromium.
+    Class for processing SVG images in HTML and converting them to PNG via CDP.
     """
 
     # MIME/constants
@@ -46,40 +42,32 @@ class SvgProcessor:
 
     def __init__(
         self,
-        chromium_executable: str | None = None,
+        chromium_manager: ChromiumManager | None = None,
         device_scale_factor: float | None = None,
-        chromium_height_adjustment: int = 100,
-        subprocess_timeout: int | None = None,
-        cpu_nice_level: int | None = None,
         logger: logging.Logger | None = None,
     ) -> None:
         """
+        Initialize SvgProcessor with CDP-based conversion.
+
         Args:
-            chromium_executable: Path to Chromium/Chrome executable. If None, reads CHROMIUM_EXECUTABLE_PATH.
+            chromium_manager: ChromiumManager instance for CDP-based conversion.
             device_scale_factor: Device scale factor for rendering. If None, reads DEVICE_SCALE_FACTOR (default 1.0).
-            chromium_height_adjustment: Extra height (px) added to window to avoid clipping; later cropped.
-            subprocess_timeout: Timeout for subprocess calls in seconds. If None, reads SUBPROCESS_TIMEOUT (default 30).
-            cpu_nice_level: CPU priority (nice level) for Chromium subprocess. If None, reads CPU_NICE_LEVEL (default 10).
-                           Range: -20 (highest priority) to 19 (lowest priority). Higher values = lower CPU priority.
             logger: Optional logger; if None, a module-level logger is used.
         """
-        self.chromium_executable = chromium_executable or os.environ.get("CHROMIUM_EXECUTABLE_PATH")
+        self.chromium_manager = chromium_manager
         self.device_scale_factor = self._parse_float(os.environ.get("DEVICE_SCALE_FACTOR"), 1.0) if device_scale_factor is None else float(device_scale_factor)
-        self.chromium_height_adjustment = int(chromium_height_adjustment)
-        self.subprocess_timeout = self._parse_int(os.environ.get("SUBPROCESS_TIMEOUT"), 30) if subprocess_timeout is None else int(subprocess_timeout)
-        self.cpu_nice_level = self._parse_int(os.environ.get("CPU_NICE_LEVEL"), 10) if cpu_nice_level is None else int(cpu_nice_level)
         self.log = logger or logging.getLogger(__name__)
 
     # ---------------- Public API ----------------
 
-    def process_svg(self, input_html: BeautifulSoup) -> BeautifulSoup:
+    async def process_svg(self, input_html: BeautifulSoup) -> BeautifulSoup:
         """
-        Process <svg> and <img src="data:..."> in the HTML:
+        Process <svg> and <img src="data:..."> in the HTML.
         - Replace only top-level <svg> with <img data:image/svg+xml;base64,...>
-        - Convert base64 SVG images inside <img> to base64 PNG via Chromium
+        - Convert base64 SVG images inside <img> to base64 PNG via CDP
         """
         parsed_html = self.replace_inline_svgs_with_img(input_html)
-        return self.replace_img_base64(parsed_html)
+        return await self.replace_img_base64(parsed_html)
 
     def replace_inline_svgs_with_img(self, parsed_html: BeautifulSoup) -> BeautifulSoup:
         """
@@ -111,9 +99,9 @@ class SvgProcessor:
 
         return parsed_html
 
-    def replace_img_base64(self, parsed_html: BeautifulSoup) -> BeautifulSoup:
+    async def replace_img_base64(self, parsed_html: BeautifulSoup) -> BeautifulSoup:
         """
-        Replace base64 SVG images with PNG equivalents in HTML <img> tags.
+        Replace base64 SVG images with PNG equivalents in HTML <img> tags via CDP.
         """
         for node in parsed_html.find_all("img"):
             if not isinstance(node, Tag):
@@ -130,7 +118,7 @@ class SvgProcessor:
             if svg is None:
                 continue
 
-            image_type, image_content = self.replace_svg_with_png(svg)
+            image_type, image_content = await self.replace_svg_with_png(svg)
             replaced_content_base64 = self.to_base64(image_content)
 
             # Skip if nothing changed
@@ -198,9 +186,9 @@ class SvgProcessor:
             self.log.error("Failed to decode base64 content: %s", e)
             return None
 
-    def replace_svg_with_png(self, svg: Element) -> tuple[str, str | bytes]:
+    async def replace_svg_with_png(self, svg: Element) -> tuple[str, str | bytes]:
         """
-        Convert SVG Element to PNG bytes using headless Chromium.
+        Convert SVG Element to PNG bytes using CDP.
         Returns tuple of (mime, content). If conversion fails, returns original SVG.
         """
         updated_svg = self.ensure_mandatory_attributes(svg)
@@ -210,22 +198,19 @@ class SvgProcessor:
             return self.without_changes(svg)
 
         svg_content = self.svg_to_string(updated_svg)
-        svg_filepath, png_filepath = self.prepare_temp_files(svg_content)
-        if not svg_filepath or not png_filepath:
-            return self.without_changes(svg)
 
-        # Add extra height to prevent clipping, then crop later
-        if not self.convert_svg_to_png(width, height + self.chromium_height_adjustment, png_filepath, svg_filepath):
+        # Convert via CDP
+        if self.chromium_manager:
+            try:
+                png_bytes = await self.chromium_manager.convert_svg_to_png(svg_content, width, height)
+                self.log.debug("SVG converted via CDP successfully")
+                return self.IMAGE_PNG, png_bytes
+            except Exception as e:  # noqa: BLE001
+                self.log.error("CDP conversion failed: %s", e)
+                return self.without_changes(svg)
+        else:
+            self.log.warning("No ChromiumManager available, returning original SVG")
             return self.without_changes(svg)
-
-        if not self.crop_png(png_filepath, max(1, round(self.chromium_height_adjustment * self.device_scale_factor))):
-            return self.without_changes(svg)
-
-        png_content = self.read_and_cleanup_png(png_filepath)
-        if not png_content:
-            return self.without_changes(svg)
-
-        return self.IMAGE_PNG, png_content
 
     def ensure_mandatory_attributes(self, svg: Element) -> Element:
         # Ensure required XML namespace exists and non-empty
@@ -249,21 +234,6 @@ class SvgProcessor:
     def svg_to_string(svg: Element) -> str:
         ET.register_namespace("", SvgProcessor.SVG_NS)  # NOSONAR
         return ET.tostring(svg, encoding="unicode")
-
-    # ---------------- Image utilities ----------------
-
-    def crop_png(self, file_path: Path, bottom_pixels_to_crop: int) -> bool:
-        try:
-            with Image.open(file_path) as img:
-                img_width, img_height = img.size
-                if bottom_pixels_to_crop >= img_height:
-                    raise ValueError("Not possible to crop more than the height of the picture")
-                cropped = img.crop((0, 0, img_width, img_height - bottom_pixels_to_crop))
-                cropped.save(file_path)
-                return True
-        except Exception as e:  # noqa: BLE001
-            self.log.error("PNG file to crop not found or crop failed: %s", e)
-            return False
 
     # ---------------- Dimension parsing/conversion ----------------
 
@@ -360,104 +330,6 @@ class SvgProcessor:
             raise ValueError(f"Cannot convert unit '{unit}' to px")
         return fallback
 
-    # ---------------- Files / Chromium ----------------
-
-    def _set_low_cpu_priority(self) -> None:
-        """Set low CPU priority for the subprocess using nice (Unix-like systems only)."""
-        try:
-            os.nice(self.cpu_nice_level)
-        except (OSError, AttributeError) as e:
-            # OSError: permission denied or invalid value
-            # AttributeError: os.nice not available on this platform (e.g., Windows)
-            self.log.warning("Failed to set CPU priority (nice=%s): %s", self.cpu_nice_level, e)
-
-    @staticmethod
-    def _cleanup_process(process: subprocess.Popen[bytes] | None) -> None:
-        """Helper method to cleanup subprocess by killing and waiting for termination."""
-        if process:
-            process.kill()
-            with contextlib.suppress(Exception):
-                process.wait(timeout=5)
-
-    def prepare_temp_files(self, content: str) -> tuple[Path | None, Path | None]:
-        try:
-            temp_folder = tempfile.gettempdir()
-            uuid = str(uuid4())
-            svg_filepath = Path(temp_folder, f"{uuid}.svg")
-            png_filepath = Path(temp_folder, f"{uuid}.png")
-            with svg_filepath.open("w", encoding="utf-8") as f:
-                f.write(content)
-            return svg_filepath, png_filepath
-        except Exception as e:  # noqa: BLE001
-            self.log.error("Failed to save SVG to temp file: %s", e)
-            return None, None
-
-    def convert_svg_to_png(self, width: int, height: int, png_filepath: Path, svg_filepath: Path) -> bool:
-        command = self.create_chromium_command(width, height, png_filepath, svg_filepath)
-        if not command:
-            return False
-
-        process = None
-        try:
-            # Use Popen to have control over process termination
-            # Set low CPU priority to keep system responsive
-            process = subprocess.Popen(command, shell=False, preexec_fn=self._set_low_cpu_priority)  # noqa: S603, PLW1509
-            process.wait(timeout=self.subprocess_timeout)
-            if process.returncode != 0:
-                self.log.error("Error converting SVG to PNG, return code = %s", process.returncode)
-                return False
-            return True
-        except subprocess.TimeoutExpired:
-            self.log.error("SVG to PNG conversion timed out after %s seconds", self.subprocess_timeout)
-            self._cleanup_process(process)
-            return False
-        except Exception as e:  # noqa: BLE001
-            self.log.error("Failed to convert SVG to PNG: %s", e)
-            self._cleanup_process(process)
-            return False
-        finally:
-            # Remove the temporary SVG file regardless of success
-            with contextlib.suppress(Exception):
-                svg_filepath.unlink(missing_ok=True)
-
-    def read_and_cleanup_png(self, png_filepath: Path) -> bytes | None:
-        try:
-            with png_filepath.open("rb") as img_file:
-                img_data = img_file.read()
-            png_filepath.unlink(missing_ok=True)
-            return img_data
-        except Exception as e:  # noqa: BLE001
-            self.log.error("Failed to read or clean up PNG file: %s", e)
-            return None
-
-    def create_chromium_command(
-        self,
-        width: int,
-        height: int,
-        png_filepath: Path,
-        svg_filepath: Path,
-    ) -> list[str] | None:
-        executable = self.chromium_executable or os.environ.get("CHROMIUM_EXECUTABLE_PATH")
-        if not executable:
-            self.log.error("CHROMIUM_EXECUTABLE_PATH is not set.")
-            return None
-
-        return [
-            executable,
-            "--headless=new",
-            "--no-sandbox",
-            "--disable-gpu",
-            "--disable-software-rasterizer",
-            "--disable-dev-shm-usage",
-            "--default-background-color=00000000",
-            "--hide-scrollbars",
-            f"--force-device-scale-factor={self.device_scale_factor}",
-            "--enable-features=ConversionMeasurement,AttributionReportingCrossAppWeb",
-            f"--screenshot={png_filepath}",
-            f"--window-size={width},{height}",
-            str(svg_filepath),
-        ]
-
     # ---------------- Generic helpers ----------------
 
     @staticmethod
@@ -480,7 +352,8 @@ class SvgProcessor:
             self.log.error("Invalid value for conversion: %s", value)
             return None
 
-    def get_px_conversion_ratio(self, unit: str | None) -> float:
+    @staticmethod
+    def get_px_conversion_ratio(unit: str | None) -> float:
         """
         Convert CSS units to px at 96 DPI.
         Note: Device scale factor should NOT affect layout dimensions; it only controls rasterization DPI.
@@ -506,12 +379,5 @@ class SvgProcessor:
     def _parse_float(value: str | None, default: float) -> float:
         try:
             return float(value) if value is not None else default
-        except ValueError:
-            return default
-
-    @staticmethod
-    def _parse_int(value: str | None, default: int) -> int:
-        try:
-            return int(value) if value is not None else default
         except ValueError:
             return default

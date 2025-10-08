@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 import tempfile
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import unquote
@@ -13,10 +14,41 @@ from fastapi import Depends, FastAPI, Query, Request, Response
 from pydantic import BaseModel
 
 from app.attachment_manager import AttachmentManager
+from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.schemas import VersionSchema
 from app.svg_processor import SvgProcessor
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG001
+    """
+    Manage the lifecycle of the Chromium browser for SVG to PNG conversion.
+
+    This ensures a single persistent Chromium instance is started when the
+    FastAPI application starts and properly cleaned up on shutdown.
+    """
+    chromium_manager = get_chromium_manager()
+    logger = logging.getLogger(__name__)
+
+    try:
+        logger.info("Starting Chromium browser for SVG conversion...")
+        await chromium_manager.start()
+        logger.info("Chromium browser started successfully")
+    except Exception as e:
+        logger.error("Failed to start Chromium browser: %s", e)
+        logger.warning("SVG conversion will fall back to subprocess mode")
+
+    yield  # Application runs here
+
+    try:
+        logger.info("Stopping Chromium browser...")
+        await chromium_manager.stop()
+        logger.info("Chromium browser stopped successfully")
+    except Exception as e:  # noqa: BLE001
+        logger.error("Error stopping Chromium browser: %s", e)
+
 
 app = FastAPI(
     title="WeasyPrint Service API",
@@ -24,7 +56,26 @@ app = FastAPI(
     openapi_url="/static/openapi.json",
     docs_url="/api/docs",
     openapi_version="3.1.0",
+    lifespan=lifespan,
 )
+
+
+@app.get(
+    "/health",
+    summary="Health check",
+    description="Returns the health status of the service and Chromium browser.",
+    operation_id="getHealth",
+    tags=["meta"],
+)
+async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | bool]:
+    """
+    Health check endpoint that verifies service and Chromium browser status.
+    """
+    chromium_healthy = await chromium_manager.health_check()
+    return {
+        "status": "healthy" if chromium_healthy else "degraded",
+        "chromium": chromium_healthy,
+    }
 
 
 @app.get(
@@ -158,6 +209,7 @@ async def convert_html(
     request: Request,
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
+    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
 ) -> Response:
     """
     Convert HTML content from the request body to a PDF document.
@@ -170,7 +222,11 @@ async def convert_html(
         html = raw.decode(encoding)
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-        parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
+
+        # Use CDP-based async SVG processing
+        svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
+        parsed_html = await svg_processor.process_svg(parsed_html)
+
         processed_html = html_parser.serialize(parsed_html)
 
         weasyprint_html = weasyprint.HTML(
@@ -242,6 +298,7 @@ async def convert_html_with_attachments(
     request: Request,
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
+    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
 ) -> Response:
     """
     Convert HTML to PDF and embed provided files as PDF attachments.
@@ -262,7 +319,10 @@ async def convert_html_with_attachments(
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-        parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
+
+        # Use CDP-based async SVG processing
+        svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
+        parsed_html = await svg_processor.process_svg(parsed_html)
 
         attachment_manager = AttachmentManager()
         parsed_html, attachments = await attachment_manager.process_html_and_uploads(

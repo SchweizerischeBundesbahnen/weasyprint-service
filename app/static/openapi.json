@@ -5,6 +5,39 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Health check",
+        "description": "Returns the health status of the service and Chromium browser.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "boolean"
+                      }
+                    ]
+                  },
+                  "type": "object",
+                  "title": "Response Gethealth"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/version": {
       "get": {
         "tags": [

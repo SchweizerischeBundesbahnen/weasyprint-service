@@ -7,7 +7,6 @@ ARG APP_IMAGE_VERSION=0.0.0
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
-    chromium \
     dbus \
     fonts-dejavu \
     fonts-liberation \
@@ -17,13 +16,25 @@ RUN apt-get update && \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     python3-brotli \
-    python3-cffi && \
+    python3-cffi \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libasound2 && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*
 
 ENV WORKING_DIR="/opt/weasyprint"
-ENV CHROMIUM_EXECUTABLE_PATH="/usr/bin/chromium"
 ENV WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION}
 
 # Create and configure logging directory
@@ -42,6 +53,9 @@ COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
 COPY ./poetry.lock ${WORKING_DIR}/poetry.lock
 
 RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && poetry install --no-root --only main
+
+# Install Playwright Chromium browser
+RUN poetry run playwright install chromium --with-deps
 
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh

@@ -36,6 +36,8 @@ starlette = "^0.47.2"
 python-multipart = "^0.0.20"
 beautifulsoup4 = "^4.13.5"
 html5lib = "^1.1"
+playwright = "^1.49.0"
+pillow = "^11.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "4.3.0"
@@ -48,6 +50,7 @@ tox = "4.30.3"
 # for debug source code for pytest --> see tox.ini section [testenv]
 docker = "7.1.0"
 pytest = "8.4.2"
+pytest-asyncio = "^0.25.3"
 pymupdf = "1.26.4"
 pypdf = "6.1.1"
 httpx = "0.28.1"

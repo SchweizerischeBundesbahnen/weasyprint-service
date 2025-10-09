@@ -96,10 +96,12 @@ class ChromiumManager:
                     await self._playwright.stop()
                     self._playwright = None
 
-                self._started = False
                 self.log.info("Chromium browser stopped successfully")
             except Exception as e:  # noqa: BLE001
                 self.log.error("Error stopping Chromium: %s", e)
+            finally:
+                # Always mark as stopped, even if cleanup fails
+                self._started = False
 
     async def is_running(self) -> bool:
         """Check if the Chromium browser is running."""

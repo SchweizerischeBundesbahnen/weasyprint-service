@@ -84,15 +84,36 @@ docker run --detach \
 - Set to 0 (default) to disable automatic restarts
 - Useful for long-running services with high conversion volumes
 
-### Chromium Requirements
+### Chromium Requirements and Recovery
 
-The service requires a persistent Chromium browser instance for SVG to PNG conversion. **If Chromium fails to start, the service will not start** (fail-fast behavior):
+The service requires a persistent Chromium browser instance for SVG to PNG conversion.
 
-- **Startup Behavior**: The service will terminate if Chromium cannot be initialized during startup
-- **Common Causes**: Missing dependencies, insufficient memory, or missing Chromium binaries
-- **Docker Requirements**: `--shm-size` should be configured if running many concurrent conversions
-- **Health Check**: The `/health` endpoint verifies Chromium is running and healthy at runtime
-- **Monitoring**: Use Docker healthcheck or the `/health` endpoint to monitor service availability
+**Startup Behavior (Fail-Fast):**
+- The service will terminate if Chromium cannot be initialized during startup
+- Common causes: Missing dependencies, insufficient memory, or missing Chromium binaries
+- Docker requirements: `--shm-size` should be configured if running many concurrent conversions
+- Health check: The `/health` endpoint verifies Chromium is running and healthy at runtime
+
+**Automatic Recovery:**
+- If a conversion fails due to Chromium crash or error, the service automatically restarts Chromium and retries
+- Default: 2 attempts (configurable via `CHROMIUM_MAX_CONVERSION_RETRIES` environment variable)
+- This provides resilience against transient Chromium failures during operation
+- If restart fails or all retry attempts are exhausted, the conversion request will fail with an error
+- Recovery attempts are logged for monitoring and troubleshooting
+
+To customize the number of retry attempts:
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env CHROMIUM_MAX_CONVERSION_RETRIES=3 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+**Monitoring:**
+- Use Docker healthcheck or the `/health` endpoint to monitor service availability
+- Check service logs for automatic recovery events and conversion failures
+- Failed conversions are logged with WARNING level, recovery attempts with INFO level
 
 To diagnose Chromium startup issues, check the service logs for error messages during initialization. The container will exit if Chromium fails to start.
 

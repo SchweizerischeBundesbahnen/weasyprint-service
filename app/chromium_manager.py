@@ -31,7 +31,14 @@ class ChromiumManager:
     SVG images to PNG using Chrome DevTools Protocol via Playwright.
     """
 
-    def __init__(self, device_scale_factor: float | None = None, logger: logging.Logger | None = None, max_concurrent_conversions: int | None = None, restart_after_n_conversions: int | None = None) -> None:
+    def __init__(
+        self,
+        device_scale_factor: float | None = None,
+        logger: logging.Logger | None = None,
+        max_concurrent_conversions: int | None = None,
+        restart_after_n_conversions: int | None = None,
+        max_conversion_retries: int | None = None,
+    ) -> None:
         """
         Initialize ChromiumManager.
 
@@ -40,6 +47,7 @@ class ChromiumManager:
             logger: Optional logger; if None, a module-level logger is used.
             max_concurrent_conversions: Maximum concurrent SVG conversions. If None, reads MAX_CONCURRENT_CONVERSIONS (default 10).
             restart_after_n_conversions: Restart Chromium after N conversions. If None, reads CHROMIUM_RESTART_AFTER_N_CONVERSIONS (default 0 = disabled).
+            max_conversion_retries: Maximum retry attempts on conversion failure. If None, reads CHROMIUM_MAX_CONVERSION_RETRIES (default 2).
         """
         self.device_scale_factor = self._parse_float(os.environ.get("DEVICE_SCALE_FACTOR"), 1.0) if device_scale_factor is None else float(device_scale_factor)
         self.log = logger or logging.getLogger(__name__)
@@ -53,6 +61,11 @@ class ChromiumManager:
         if restart_after_n_conversions is None:
             restart_after_n_conversions = int(os.environ.get("CHROMIUM_RESTART_AFTER_N_CONVERSIONS", "0"))
         self.restart_after_n_conversions = restart_after_n_conversions
+
+        # Parse max retry attempts from env or use provided value
+        if max_conversion_retries is None:
+            max_conversion_retries = int(os.environ.get("CHROMIUM_MAX_CONVERSION_RETRIES", "2"))
+        self.max_conversion_retries = max_conversion_retries
 
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
@@ -211,7 +224,7 @@ class ChromiumManager:
             PNG image data as bytes.
 
         Raises:
-            RuntimeError: If Chromium is not started or conversion fails.
+            RuntimeError: If Chromium is not started or conversion fails after retry attempts.
         """
         if not self.is_running():
             raise RuntimeError("Chromium not started. Call start() first.")
@@ -222,6 +235,38 @@ class ChromiumManager:
         # Check if restart is needed (after incrementing counter)
         await self._check_and_restart_if_needed()
 
+        # Try conversion with automatic recovery on failure
+        last_error: Exception | None = None
+
+        for attempt in range(self.max_conversion_retries):
+            try:
+                return await self._perform_conversion(svg_content, width, height, device_scale_factor)
+            except Exception as e:
+                last_error = e
+                if attempt < self.max_conversion_retries - 1:
+                    self.log.warning(
+                        "SVG conversion failed (attempt %d/%d): %s. Attempting to restart Chromium...",
+                        attempt + 1,
+                        self.max_conversion_retries,
+                        str(e),
+                    )
+                    try:
+                        await self.restart()
+                        self.log.info("Chromium restarted successfully after conversion failure")
+                    except Exception as restart_error:
+                        self.log.error("Failed to restart Chromium: %s", restart_error)
+                        raise RuntimeError(f"Chromium restart failed after conversion error: {restart_error}") from e
+
+        # If we get here, all retries failed
+        self.log.error("SVG conversion failed after %d attempts: %s", self.max_conversion_retries, str(last_error))
+        raise RuntimeError(f"SVG to PNG conversion failed after {self.max_conversion_retries} attempts") from last_error
+
+    async def _perform_conversion(self, svg_content: str, width: int, height: int, device_scale_factor: float | None = None) -> bytes:
+        """
+        Perform the actual SVG to PNG conversion.
+
+        This method is separated to allow retry logic in convert_svg_to_png().
+        """
         # Use provided scale factor or fall back to instance default
         scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
 

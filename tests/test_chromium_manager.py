@@ -621,6 +621,112 @@ async def test_chromium_manager_restart_from_env():
 
 
 @pytest.mark.asyncio
+async def test_chromium_manager_auto_recovery_on_failure():
+    """Test that Chromium automatically restarts and retries on conversion failure."""
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Mock _perform_conversion to fail once, then succeed
+        original_perform = manager._perform_conversion
+        call_count = 0
+
+        async def mock_perform_conversion(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Simulated Chromium crash")
+            return await original_perform(*args, **kwargs)
+
+        manager._perform_conversion = mock_perform_conversion
+
+        # Should succeed after automatic restart
+        png_bytes = await manager.convert_svg_to_png(svg_content, 50, 50)
+        assert png_bytes.startswith(b"\x89PNG")
+        assert call_count == 2  # Failed once, succeeded on retry
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_auto_recovery_fails_after_retries():
+    """Test that conversion fails after max retry attempts."""
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Mock _perform_conversion to always fail
+        async def mock_perform_conversion(*args, **kwargs):
+            raise Exception("Persistent Chromium failure")
+
+        manager._perform_conversion = mock_perform_conversion
+
+        # Should raise RuntimeError after retries
+        with pytest.raises(RuntimeError, match="SVG to PNG conversion failed after 2 attempts"):
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_auto_recovery_restart_failure():
+    """Test that conversion fails if restart itself fails."""
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Mock _perform_conversion to fail
+        async def mock_perform_conversion(*args, **kwargs):
+            raise Exception("Simulated Chromium crash")
+
+        manager._perform_conversion = mock_perform_conversion
+
+        # Mock restart to fail
+        original_restart = manager.restart
+
+        async def mock_restart():
+            raise Exception("Restart failed")
+
+        manager.restart = mock_restart
+
+        # Should raise RuntimeError about restart failure
+        with pytest.raises(RuntimeError, match="Chromium restart failed after conversion error"):
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        # Restore original restart for cleanup
+        manager.restart = original_restart
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_max_retries_from_env():
+    """Test that CHROMIUM_MAX_CONVERSION_RETRIES env var is respected."""
+    os.environ["CHROMIUM_MAX_CONVERSION_RETRIES"] = "5"
+
+    try:
+        manager = ChromiumManager()
+        assert manager.max_conversion_retries == 5
+    finally:
+        del os.environ["CHROMIUM_MAX_CONVERSION_RETRIES"]
+
+    # Test default value
+    if "CHROMIUM_MAX_CONVERSION_RETRIES" in os.environ:
+        del os.environ["CHROMIUM_MAX_CONVERSION_RETRIES"]
+    manager = ChromiumManager()
+    assert manager.max_conversion_retries == 2
+
+
+@pytest.mark.asyncio
 async def test_chromium_manager_get_page_cleanup_errors():
     """Test _get_page cleanup when page/context close fails."""
     manager = ChromiumManager()

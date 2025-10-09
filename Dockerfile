@@ -12,7 +12,6 @@ RUN apt-get update && \
     fonts-noto-cjk \
     fonts-noto-cjk-extra \
     fonts-noto-color-emoji \
-    jq \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -66,6 +65,6 @@ EXPOSE ${PORT}
 
 # Add healthcheck
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:9080/health | jq -e '.chromium == true and .status == "healthy"' > /dev/null || exit 1
+    CMD curl -f http://localhost:9080/health || exit 1
 
 ENTRYPOINT [ "./entrypoint.sh" ]

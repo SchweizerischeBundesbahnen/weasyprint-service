@@ -13,7 +13,7 @@ import base64
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, overload
+from typing import TYPE_CHECKING, cast, overload
 
 from playwright.async_api import ViewportSize, async_playwright
 
@@ -38,6 +38,7 @@ class ChromiumManager:
         max_concurrent_conversions: int | None = None,
         restart_after_n_conversions: int | None = None,
         max_conversion_retries: int | None = None,
+        conversion_timeout: int | None = None,
     ) -> None:
         """
         Initialize ChromiumManager.
@@ -48,6 +49,7 @@ class ChromiumManager:
             max_concurrent_conversions: Maximum concurrent SVG conversions (1-100). If None, reads MAX_CONCURRENT_CONVERSIONS (default 10).
             restart_after_n_conversions: Restart Chromium after N conversions (0-10000). If None, reads CHROMIUM_RESTART_AFTER_N_CONVERSIONS (default 0 = disabled).
             max_conversion_retries: Maximum retry attempts on conversion failure (1-10). If None, reads CHROMIUM_MAX_CONVERSION_RETRIES (default 2).
+            conversion_timeout: Timeout in seconds for each conversion (5-300). If None, reads CHROMIUM_CONVERSION_TIMEOUT (default 30).
 
         Raises:
             ValueError: If any configuration parameter is out of valid range.
@@ -59,10 +61,12 @@ class ChromiumManager:
         self.max_concurrent_conversions = self._validate_max_concurrent_conversions(max_concurrent_conversions)
         self.restart_after_n_conversions = self._validate_restart_after_n_conversions(restart_after_n_conversions)
         self.max_conversion_retries = self._validate_max_conversion_retries(max_conversion_retries)
+        self.conversion_timeout = self._validate_conversion_timeout(conversion_timeout)
 
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._lock = asyncio.Lock()
+        self._counter_lock = asyncio.Lock()  # Separate lock for conversion counter
         self._semaphore = asyncio.Semaphore(self.max_concurrent_conversions)
         self._started = False
         self._conversion_count = 0
@@ -216,18 +220,32 @@ class ChromiumManager:
         if not self.is_running():
             raise RuntimeError("Chromium not started. Call start() first.")
 
-        # Increment conversion counter BEFORE performing conversion
-        self._conversion_count += 1
-
-        # Check if restart is needed (after incrementing counter)
-        await self._check_and_restart_if_needed()
+        # Atomically increment counter and check restart (prevent race condition)
+        async with self._counter_lock:
+            self._conversion_count += 1
+            # Check if restart is needed (after incrementing counter)
+            await self._check_and_restart_if_needed()
 
         # Try conversion with automatic recovery on failure
         last_error: Exception | None = None
 
         for attempt in range(self.max_conversion_retries):
             try:
-                return await self._perform_conversion(svg_content, width, height, device_scale_factor)
+                # Apply timeout to prevent hanging conversions
+                return await asyncio.wait_for(
+                    self._perform_conversion(svg_content, width, height, device_scale_factor),
+                    timeout=self.conversion_timeout,
+                )
+            except TimeoutError:
+                last_error = TimeoutError(f"Conversion timed out after {self.conversion_timeout} seconds")
+                self.log.error("SVG conversion timed out (attempt %d/%d): %d seconds", attempt + 1, self.max_conversion_retries, self.conversion_timeout)
+                if attempt < self.max_conversion_retries - 1:
+                    try:
+                        await self.restart()
+                        self.log.info("Chromium restarted successfully after timeout")
+                    except Exception as restart_error:
+                        self.log.error("Failed to restart Chromium: %s", restart_error)
+                        raise RuntimeError(f"Chromium restart failed after timeout: {restart_error}") from last_error
             except Exception as e:
                 last_error = e
                 if attempt < self.max_conversion_retries - 1:
@@ -391,7 +409,7 @@ class ChromiumManager:
         # Parse value from environment variable or use provided value
         if value is None:
             env_value = os.environ.get(env_var)
-            value = self._parse_float(env_value, default) if value_type is float else self._parse_int(env_value, default)  # type: ignore[arg-type]
+            value = self._parse_float(env_value, cast("float", default)) if value_type is float else self._parse_int(env_value, cast("int", default))
         else:
             value = value_type(value)
 
@@ -475,6 +493,24 @@ class ChromiumManager:
             default=2,
             min_value=1,
             max_value=10,
+        )
+
+    def _validate_conversion_timeout(self, value: int | None) -> int:
+        """
+        Validate conversion timeout.
+
+        Args:
+            value: Timeout in seconds or None to read from env.
+
+        Returns:
+            Validated timeout in seconds (5 - 300).
+        """
+        return self._validate_config_value(
+            value=value,
+            env_var="CHROMIUM_CONVERSION_TIMEOUT",
+            default=30,
+            min_value=5,
+            max_value=300,
         )
 
     @staticmethod

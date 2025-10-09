@@ -207,8 +207,8 @@ class ChromiumManager:
             # Set viewport to exact dimensions
             await page.set_viewport_size(ViewportSize(width=width, height=height))
 
-            # Load HTML content
-            await page.set_content(html_content, wait_until="networkidle", timeout=10000)
+            # Load HTML content with data URL (no network requests, so domcontentloaded is sufficient)
+            await page.set_content(html_content, wait_until="domcontentloaded", timeout=5000)
 
             # Take screenshot with transparent background
             png_bytes = await page.screenshot(

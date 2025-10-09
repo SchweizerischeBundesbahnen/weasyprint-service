@@ -65,14 +65,14 @@ class ChromiumManager:
                         "--disable-gpu",
                         "--disable-software-rasterizer",
                         "--disable-dev-shm-usage",
-                        "--disable-web-security",  # Allow data URLs
-                        "--disable-features=IsolateOrigins,site-per-process",
+                        "--disable-web-security",  # Allow rendering of local and data URLs without CORS restrictions
+                        "--disable-features=IsolateOrigins,site-per-process",  # Disable strict site isolation (needed for local/data URLs to access embedded resources)
                         "--hide-scrollbars",
                     ],
                 )
 
                 self._started = True
-                self.log.info("Chromium browser started successfully (PID: %s)", self._browser and "running")
+                self.log.info("Chromium browser started successfully")
             except ImportError as e:
                 self.log.error("Playwright not installed: %s", e)
                 raise RuntimeError("Playwright library is required for ChromiumManager") from e

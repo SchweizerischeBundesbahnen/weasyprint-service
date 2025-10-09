@@ -127,14 +127,14 @@ async def test_chromium_manager_get_version():
     manager = ChromiumManager()
 
     # Version should be None when not running
-    version = await manager.get_version()
+    version = manager.get_version()
     assert version is None
 
     # Start browser
     await manager.start()
 
     # Version should be a string when running
-    version = await manager.get_version()
+    version = manager.get_version()
     assert isinstance(version, str)
     assert len(version) > 0
     # Version format: major.minor.build.patch (e.g., "131.0.6778.69")
@@ -350,7 +350,7 @@ async def test_chromium_manager_get_version_extraction():
     await manager.start()
 
     try:
-        version = await manager.get_version()
+        version = manager.get_version()
         # Version should be extracted from "HeadlessChrome/131.0.6778.69" format
         assert version is not None
         assert "/" not in version  # Should be extracted, not the full string
@@ -375,7 +375,7 @@ async def test_chromium_manager_get_version_without_slash():
         with patch.object(type(manager._browser), "version", new_callable=PropertyMock) as mock_version:
             mock_version.return_value = "131.0.6778.69"
 
-            version = await manager.get_version()
+            version = manager.get_version()
             # Should return the version string as-is when no "/" present
             assert version == "131.0.6778.69"
 
@@ -484,7 +484,7 @@ async def test_chromium_manager_get_version_with_error():
         # Mock browser.version to raise an exception
         with patch.object(type(manager._browser), "version", new_callable=lambda: property(lambda self: (_ for _ in ()).throw(Exception("Version error")))):
             # get_version should return None, not raise exception
-            version = await manager.get_version()
+            version = manager.get_version()
             assert version is None
 
     finally:

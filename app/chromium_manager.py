@@ -155,7 +155,7 @@ class ChromiumManager:
             self.log.error("Health check failed: %s", e)
             return False
 
-    async def get_version(self) -> str | None:
+    def get_version(self) -> str | None:
         """
         Get the Chromium browser version.
 

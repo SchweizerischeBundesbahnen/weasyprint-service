@@ -66,8 +66,11 @@ class SvgProcessor:
         - Replace only top-level <svg> with <img data:image/svg+xml;base64,...>
         - Convert base64 SVG images inside <img> to base64 PNG via CDP
         """
+        self.log.info("Starting SVG processing in HTML")
         parsed_html = self.replace_inline_svgs_with_img(input_html)
-        return await self.replace_img_base64(parsed_html)
+        result = await self.replace_img_base64(parsed_html)
+        self.log.info("Completed SVG processing")
+        return result
 
     def replace_inline_svgs_with_img(self, parsed_html: BeautifulSoup) -> BeautifulSoup:
         """
@@ -79,8 +82,10 @@ class SvgProcessor:
             if isinstance(node, Tag) and node.find_parent("svg") is None:
                 top_level_svgs.append(node)
 
+        self.log.debug("Found %d top-level SVG tags to replace with img tags", len(top_level_svgs))
         for svg in top_level_svgs:
             svg_str = str(svg)
+            self.log.debug("Converting inline SVG to data URL, size: %d characters", len(svg_str))
             b64 = base64.b64encode(svg_str.encode("utf-8")).decode("ascii")
             img: Tag = parsed_html.new_tag("img")
 
@@ -103,7 +108,10 @@ class SvgProcessor:
         """
         Replace base64 SVG images with PNG equivalents in HTML <img> tags via CDP.
         """
-        for node in parsed_html.find_all("img"):
+        img_nodes = parsed_html.find_all("img")
+        self.log.debug("Found %d img tags to check for SVG data URLs", len(img_nodes))
+        converted_count = 0
+        for node in img_nodes:
             if not isinstance(node, Tag):
                 continue
 
@@ -129,7 +137,10 @@ class SvgProcessor:
             self._apply_img_dimensions_from_svg(node, svg)
 
             node["src"] = f"data:{image_type};base64,{replaced_content_base64}"
+            converted_count += 1
 
+        if converted_count > 0:
+            self.log.info("Converted %d SVG data URLs to PNG", converted_count)
         return parsed_html
 
     def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element) -> None:
@@ -147,7 +158,7 @@ class SvgProcessor:
             if style_parts:
                 node["style"] = "; ".join(style_parts)
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # Log at debug level to avoid noise but prevent silent pass
             logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
@@ -182,7 +193,7 @@ class SvgProcessor:
 
             possible_svg_content = decoded_content.decode("utf-8")
             return self.svg_from_string(possible_svg_content)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("Failed to decode base64 content: %s", e)
             return None
 
@@ -195,7 +206,9 @@ class SvgProcessor:
 
         width, height, updated_svg = self.extract_svg_dimensions_as_px(updated_svg)
         if not width or not height:
+            self.log.warning("Invalid or undefined dimensions for SVG (width: %s, height: %s)", width, height)
             return self.without_changes(svg)
+        self.log.debug("Converting SVG (%dx%d px) to PNG with scale factor %.2f", width, height, self.device_scale_factor)
 
         svg_content = self.svg_to_string(updated_svg)
 
@@ -209,7 +222,7 @@ class SvgProcessor:
                 self.log.error("CDP conversion failed: %s", e)
                 return self.without_changes(svg)
         else:
-            self.log.warning("No ChromiumManager available, returning original SVG")
+            self.log.error("No ChromiumManager available, returning original SVG")
             return self.without_changes(svg)
 
     def ensure_mandatory_attributes(self, svg: Element) -> Element:

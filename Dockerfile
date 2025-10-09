@@ -1,7 +1,6 @@
 FROM python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689
 LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
 
-ARG APP_IMAGE_VERSION=0.0.0
 
 # hadolint ignore=DL3008
 RUN apt-get update && \
@@ -37,8 +36,11 @@ RUN apt-get update && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*
 
-ENV WORKING_DIR="/opt/weasyprint"
-ENV WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION}
+ARG APP_IMAGE_VERSION=0.0.0
+ENV WORKING_DIR="/opt/weasyprint" \
+    WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION} \
+    PORT=9080 \
+    LOG_LEVEL=INFO
 
 # Create and configure logging directory
 RUN mkdir -p ${WORKING_DIR}/logs && \
@@ -62,7 +64,10 @@ RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && \
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+EXPOSE ${PORT}
+
+# Add healthcheck
+HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:9080/health | jq -e '.chromium == true and .status == "healthy"' > /dev/null || exit 1
 
 ENTRYPOINT [ "./entrypoint.sh" ]

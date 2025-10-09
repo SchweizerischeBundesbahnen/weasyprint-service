@@ -111,7 +111,7 @@ class ChromiumManager:
                 self._browser = None
                 self._playwright = None
 
-    async def is_running(self) -> bool:
+    def is_running(self) -> bool:
         """Check if the Chromium browser is running."""
         return self._started and self._browser is not None
 
@@ -123,7 +123,7 @@ class ChromiumManager:
             True if the browser is healthy, False otherwise.
         """
         try:
-            if not await self.is_running():
+            if not self.is_running():
                 return False
 
             # Quick check: create and close a page
@@ -143,7 +143,7 @@ class ChromiumManager:
             Chromium version string (e.g., "131.0.6778.69") or None if browser is not running.
         """
         try:
-            if not await self.is_running() or not self._browser:
+            if not self.is_running() or not self._browser:
                 return None
 
             version_string = self._browser.version
@@ -177,7 +177,7 @@ class ChromiumManager:
         Raises:
             RuntimeError: If Chromium is not started or conversion fails.
         """
-        if not await self.is_running():
+        if not self.is_running():
             raise RuntimeError("Chromium not started. Call start() first.")
 
         # Use provided scale factor or fall back to instance default

@@ -13,18 +13,18 @@ async def test_chromium_manager_lifecycle():
     manager = ChromiumManager()
 
     # Should not be running initially
-    assert not await manager.is_running()
+    assert not manager.is_running()
 
     # Start the browser
     await manager.start()
-    assert await manager.is_running()
+    assert manager.is_running()
 
     # Health check should pass
     assert await manager.health_check()
 
     # Stop the browser
     await manager.stop()
-    assert not await manager.is_running()
+    assert not manager.is_running()
 
 
 @pytest.mark.asyncio
@@ -33,11 +33,11 @@ async def test_chromium_manager_double_start():
     manager = ChromiumManager()
 
     await manager.start()
-    assert await manager.is_running()
+    assert manager.is_running()
 
     # Second start should log warning but not fail
     await manager.start()
-    assert await manager.is_running()
+    assert manager.is_running()
 
     await manager.stop()
 
@@ -107,10 +107,10 @@ async def test_chromium_manager_restart():
     manager = ChromiumManager()
 
     await manager.start()
-    assert await manager.is_running()
+    assert manager.is_running()
 
     await manager.restart()
-    assert await manager.is_running()
+    assert manager.is_running()
 
     # Should still be able to convert after restart
     svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
@@ -295,7 +295,7 @@ async def test_chromium_manager_stop_when_not_running():
 
     # Stop should be safe even if never started
     await manager.stop()
-    assert not await manager.is_running()
+    assert not manager.is_running()
 
 
 @pytest.mark.asyncio
@@ -420,7 +420,7 @@ async def test_chromium_manager_start_playwright_import_error():
             await manager.start()
 
         # Manager should not be marked as started
-        assert not await manager.is_running()
+        assert not manager.is_running()
 
 
 @pytest.mark.asyncio
@@ -437,7 +437,7 @@ async def test_chromium_manager_start_generic_error():
             await manager.start()
 
         # Manager should not be marked as started
-        assert not await manager.is_running()
+        assert not manager.is_running()
 
 
 @pytest.mark.asyncio
@@ -451,7 +451,7 @@ async def test_chromium_manager_stop_with_errors():
         # Stop should not raise exception, just log it
         await manager.stop()
         # Should still mark as not started
-        assert not await manager.is_running()
+        assert not manager.is_running()
 
 
 @pytest.mark.asyncio

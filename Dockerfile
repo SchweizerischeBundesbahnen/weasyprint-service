@@ -7,7 +7,6 @@ RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
     curl \
-    dbus \
     fonts-dejavu \
     fonts-liberation \
     fonts-noto-cjk \
@@ -29,7 +28,6 @@ RUN apt-get update && \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
-    procps \
     python3-brotli \
     python3-cffi && \
     apt-get clean autoclean && \

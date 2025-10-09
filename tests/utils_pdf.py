@@ -49,6 +49,7 @@ def assert_png_pages_equal_to_refs(
     ref_base: Path,
     *,
     update_env_var: str = "UPDATE_EXPECTED_REFS",
+    pdf_bytes: bytes | None = None,
 ) -> None:
     """
     Compare a list of produced PNG page bytes with reference images on disk.
@@ -61,6 +62,12 @@ def assert_png_pages_equal_to_refs(
     If a reference image is missing and the environment variable specified by
     update_env_var is set to "1", the reference(s) will be generated and the caller
     should skip the test with an explanatory message.
+
+    Args:
+        produced_pages: List of PNG bytes for each page
+        ref_base: Base path for reference PNG files
+        update_env_var: Environment variable name to check for update mode
+        pdf_bytes: Optional PDF bytes to save alongside PNG references when updating
     """
     import os
     from io import BytesIO
@@ -68,7 +75,11 @@ def assert_png_pages_equal_to_refs(
     n_pages = len(produced_pages)
 
     def page_ref_path(i: int) -> Path:
-        return ref_base.with_suffix("").with_name(ref_base.stem + f".page-{i}").with_suffix(ref_base.suffix)
+        # Create path like: /path/to/base-name.page-0.png
+        stem = ref_base.stem  # e.g., "html-with-svg-and-png-in-tables"
+        suffix = ref_base.suffix  # e.g., ".png"
+        parent = ref_base.parent  # e.g., "tests/test-data/expected"
+        return parent / f"{stem}.page-{i}{suffix}"
 
     # Verify references exist or generate them
     missing = []
@@ -84,11 +95,13 @@ def assert_png_pages_equal_to_refs(
             for i, png in enumerate(produced_pages):
                 page_ref = page_ref_path(i)
                 page_ref.write_bytes(png)
+            # Save PDF file if provided
+            if pdf_bytes is not None:
+                pdf_ref_path = ref_base.with_suffix(".pdf")
+                pdf_ref_path.write_bytes(pdf_bytes)
             raise ReferenceGenerated(str(missing))
         else:
-            raise ReferenceMissing(
-                f"Missing reference images: {', '.join(map(str, missing))}. Set {update_env_var}=1 to generate references."
-            )
+            raise ReferenceMissing(f"Missing reference images: {', '.join(map(str, missing))}. Set {update_env_var}=1 to generate references.")
 
     # Compare each page
     for i, png in enumerate(produced_pages):

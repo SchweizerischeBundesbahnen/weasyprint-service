@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import TypedDict
 from weakref import WeakKeyDictionary
 
-from bs4 import BeautifulSoup, Comment
+from bs4 import BeautifulSoup, Comment, XMLParsedAsHTMLWarning
+
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 logger = logging.getLogger(__name__)
 

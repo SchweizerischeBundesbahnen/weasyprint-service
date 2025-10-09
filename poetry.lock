@@ -2005,5 +2005,5 @@ test = ["pytest"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.13"
-content-hash = "48aa526cbce5add1a2bdf10deeee7b4c95fa3fd6b0458feeb4e8932ecd3dafe5"
+python-versions = ">=3.14"
+content-hash = "9e21699f5090c9acbd852eff13d779294d8c392dc2e84c4f47831ce749596230"

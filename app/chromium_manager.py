@@ -89,19 +89,27 @@ class ChromiumManager:
 
             try:
                 if self._browser:
-                    await self._browser.close()
-                    self._browser = None
+                    try:
+                        await self._browser.close()
+                    except Exception as e:  # noqa: BLE001
+                        self.log.error("Error closing browser: %s", e)
+                    finally:
+                        self._browser = None
 
                 if self._playwright:
-                    await self._playwright.stop()
-                    self._playwright = None
+                    try:
+                        await self._playwright.stop()
+                    except Exception as e:  # noqa: BLE001
+                        self.log.error("Error stopping Playwright: %s", e)
+                    finally:
+                        self._playwright = None
 
                 self.log.info("Chromium browser stopped successfully")
-            except Exception as e:  # noqa: BLE001
-                self.log.error("Error stopping Chromium: %s", e)
             finally:
-                # Always mark as stopped, even if cleanup fails
+                # Always mark as stopped and clear resources, even if cleanup fails
                 self._started = False
+                self._browser = None
+                self._playwright = None
 
     async def is_running(self) -> bool:
         """Check if the Chromium browser is running."""

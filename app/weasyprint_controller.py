@@ -34,12 +34,12 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG0
     logger = logging.getLogger(__name__)
 
     try:
-        logger.info("Starting Chromium browser for SVG conversion...")
+        logger.info("Prepare Chromium browser for SVG conversion...")
         await chromium_manager.start()
-        logger.info("Chromium browser started successfully")
+        logger.info("Chromium browser prepared successfully")
     except Exception as e:
         logger.error("Failed to start Chromium browser: %s", e)
-        logger.warning("SVG conversion will fall back to subprocess mode")
+        logger.warning("SVG to PNG conversion will be unavailable")
 
     yield  # Application runs here
 

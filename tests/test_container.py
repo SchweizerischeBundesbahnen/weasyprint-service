@@ -101,8 +101,8 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
     logs = test_parameters.container.logs().decode("utf-8")
     log_lines = logs.splitlines()
 
-    # Check line count is as expected
-    assert len(log_lines) == 12, f"Expected 11 log lines, got {len(log_lines)}:\n{logs}"
+    # Check line count is as expected (note: "Chromium browser started successfully" appears twice)
+    assert len(log_lines) == 12, f"Expected 12 log lines, got {len(log_lines)}:\n{logs}"
 
     # Check for critical errors (should not contain ERROR or CRITICAL level messages)
     errors = [line for line in log_lines if " - ERROR - " in line or " - CRITICAL - " in line]
@@ -115,10 +115,10 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
         "Weasyprint service listening port: 9080",
         "Started server process",
         "Waiting for application startup",
-        "Starting Chromium browser for SVG conversion",
+        "Prepare Chromium browser for SVG conversion",
         "Starting Chromium browser process via Playwright",
-        "Chromium browser started successfully (PID: running)",
-        "Chromium browser started successfully",
+        "app.chromium_manager - INFO - Chromium browser started successfully",
+        "app.weasyprint_controller - INFO - Chromium browser prepared successfully",
         "Application startup complete",
         "Uvicorn running on http://:9080",
         "\"GET /health HTTP/1.1\" 200 OK",

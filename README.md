@@ -63,6 +63,27 @@ docker run --detach \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
+### Automatic Chromium Restart
+
+The service can automatically restart the Chromium browser after a specified number of conversions to prevent memory accumulation and ensure long-term stability. This is controlled by the `CHROMIUM_RESTART_AFTER_N_CONVERSIONS` environment variable (default: 0 = disabled).
+
+To enable automatic restart after every 1000 conversions:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env CHROMIUM_RESTART_AFTER_N_CONVERSIONS=1000 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+**How it works:**
+- When enabled (value > 0), Chromium will automatically restart after reaching the specified conversion count
+- The restart happens transparently before the next conversion begins
+- Conversion counter resets to 0 after each restart
+- Set to 0 (default) to disable automatic restarts
+- Useful for long-running services with high conversion volumes
+
 ### Chromium Requirements
 
 The service requires a persistent Chromium browser instance for SVG to PNG conversion. **If Chromium fails to start, the service will not start** (fail-fast behavior):

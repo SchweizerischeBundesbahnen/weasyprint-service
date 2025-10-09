@@ -1,5 +1,6 @@
 """Tests for ChromiumManager CDP-based SVG conversion."""
 
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -533,6 +534,90 @@ async def test_chromium_manager_max_concurrent_from_env():
         del os.environ["MAX_CONCURRENT_CONVERSIONS"]
     manager = ChromiumManager()
     assert manager.max_concurrent_conversions == 10
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_restart_after_n_conversions():
+    """Test that Chromium automatically restarts after N conversions."""
+    manager = ChromiumManager(restart_after_n_conversions=3)
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect width="50" height="50" fill="blue"/></svg>'
+
+        # First conversion: counter increments to 1, no restart
+        assert manager._conversion_count == 0
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+        assert manager._conversion_count == 1
+
+        # Second conversion: counter increments to 2, no restart
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+        assert manager._conversion_count == 2
+
+        # Third conversion: counter increments to 3, then restart (counter resets to 0)
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+        assert manager._conversion_count == 0
+
+        # Fourth conversion: counter increments to 1, no restart
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+        assert manager._conversion_count == 1
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_restart_disabled_by_default():
+    """Test that auto-restart is disabled when restart_after_n_conversions is 0."""
+    manager = ChromiumManager(restart_after_n_conversions=0)
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Perform many conversions
+        for _i in range(10):
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        # Counter should keep incrementing (no restart)
+        assert manager._conversion_count == 10
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_restart_from_env():
+    """Test that restart_after_n_conversions can be configured via environment variable."""
+    os.environ["CHROMIUM_RESTART_AFTER_N_CONVERSIONS"] = "2"
+
+    try:
+        manager = ChromiumManager()
+        assert manager.restart_after_n_conversions == 2
+
+        await manager.start()
+
+        try:
+            svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+            # First conversion: counter increments to 1, no restart
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+            assert manager._conversion_count == 1
+
+            # Second conversion: counter increments to 2, then restart (counter resets to 0)
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+            assert manager._conversion_count == 0
+
+            # Third conversion: counter increments to 1, no restart
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+            assert manager._conversion_count == 1
+
+        finally:
+            await manager.stop()
+
+    finally:
+        # Cleanup
+        del os.environ["CHROMIUM_RESTART_AFTER_N_CONVERSIONS"]
 
 
 @pytest.mark.asyncio

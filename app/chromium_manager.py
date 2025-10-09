@@ -31,7 +31,7 @@ class ChromiumManager:
     SVG images to PNG using Chrome DevTools Protocol via Playwright.
     """
 
-    def __init__(self, device_scale_factor: float | None = None, logger: logging.Logger | None = None, max_concurrent_conversions: int | None = None) -> None:
+    def __init__(self, device_scale_factor: float | None = None, logger: logging.Logger | None = None, max_concurrent_conversions: int | None = None, restart_after_n_conversions: int | None = None) -> None:
         """
         Initialize ChromiumManager.
 
@@ -39,6 +39,7 @@ class ChromiumManager:
             device_scale_factor: Device scale factor for rendering. If None, reads DEVICE_SCALE_FACTOR (default 1.0).
             logger: Optional logger; if None, a module-level logger is used.
             max_concurrent_conversions: Maximum concurrent SVG conversions. If None, reads MAX_CONCURRENT_CONVERSIONS (default 10).
+            restart_after_n_conversions: Restart Chromium after N conversions. If None, reads CHROMIUM_RESTART_AFTER_N_CONVERSIONS (default 0 = disabled).
         """
         self.device_scale_factor = self._parse_float(os.environ.get("DEVICE_SCALE_FACTOR"), 1.0) if device_scale_factor is None else float(device_scale_factor)
         self.log = logger or logging.getLogger(__name__)
@@ -48,11 +49,17 @@ class ChromiumManager:
             max_concurrent_conversions = int(os.environ.get("MAX_CONCURRENT_CONVERSIONS", "10"))
         self.max_concurrent_conversions = max_concurrent_conversions
 
+        # Parse restart threshold from env or use provided value
+        if restart_after_n_conversions is None:
+            restart_after_n_conversions = int(os.environ.get("CHROMIUM_RESTART_AFTER_N_CONVERSIONS", "0"))
+        self.restart_after_n_conversions = restart_after_n_conversions
+
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._lock = asyncio.Lock()
         self._semaphore = asyncio.Semaphore(self.max_concurrent_conversions)
         self._started = False
+        self._conversion_count = 0
 
     async def start(self) -> None:
         """Start the persistent Chromium browser process."""
@@ -167,6 +174,28 @@ class ChromiumManager:
         self.log.info("Restarting Chromium browser...")
         await self.stop()
         await self.start()
+        # Reset conversion counter after restart
+        self._conversion_count = 0
+
+    async def _check_and_restart_if_needed(self) -> None:
+        """
+        Check if Chromium needs to be restarted based on conversion count.
+
+        If restart_after_n_conversions > 0 and conversion count reaches the threshold,
+        restarts Chromium automatically.
+        """
+        if self.restart_after_n_conversions <= 0:
+            return  # Auto-restart disabled
+
+        if self._conversion_count >= self.restart_after_n_conversions:
+            conversions_before_restart = self._conversion_count
+            self.log.info(
+                "Conversion count (%d) reached threshold (%d), restarting Chromium...",
+                conversions_before_restart,
+                self.restart_after_n_conversions,
+            )
+            await self.restart()
+            self.log.info("Chromium restarted successfully after %d conversions", conversions_before_restart)
 
     async def convert_svg_to_png(self, svg_content: str, width: int, height: int, device_scale_factor: float | None = None) -> bytes:
         """
@@ -186,6 +215,12 @@ class ChromiumManager:
         """
         if not self.is_running():
             raise RuntimeError("Chromium not started. Call start() first.")
+
+        # Increment conversion counter BEFORE performing conversion
+        self._conversion_count += 1
+
+        # Check if restart is needed (after incrementing counter)
+        await self._check_and_restart_if_needed()
 
         # Use provided scale factor or fall back to instance default
         scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor

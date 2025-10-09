@@ -55,9 +55,16 @@ def setup_logging() -> Path:
     console_handler.setFormatter(formatter)
 
     # Setup root logger
-    root_logger.setLevel(getattr(logging, log_level, logging.INFO))  # Default to INFO if invalid
+    configured_level = getattr(logging, log_level, logging.INFO)  # Default to INFO if invalid
+    root_logger.setLevel(configured_level)
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
+
+    # Explicitly set logging level for third-party libraries that have their own loggers
+    # This ensures they respect the LOG_LEVEL environment variable
+    # Note: Setting level on parent logger affects all child loggers
+    for logger_name in ["fontTools", "fontTools.subset", "fontTools.ttLib", "weasyprint", "PIL", "playwright"]:
+        logging.getLogger(logger_name).setLevel(configured_level)
 
     # Force immediate file creation
     root_logger.info(f"Logging initialized with level: {log_level}")

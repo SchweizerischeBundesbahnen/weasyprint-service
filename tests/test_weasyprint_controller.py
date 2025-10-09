@@ -1,6 +1,7 @@
 import os
 import platform
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -71,3 +72,22 @@ def test_convert_html_with_attachments_files():
             files=files,
         )
         assert result.status_code == 200
+
+
+def test_health_with_chromium_unhealthy():
+    """Test /health endpoint returns unhealthy status when Chromium health check fails at runtime."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+
+    # Mock ChromiumManager to simulate Chromium health check failing at runtime
+    with patch("app.weasyprint_controller.get_chromium_manager") as mock_get_manager:
+        mock_manager = AsyncMock()
+        mock_manager.health_check = AsyncMock(return_value=False)
+        mock_get_manager.return_value = mock_manager
+
+        with TestClient(app) as test_client:
+            result = test_client.get("/health")
+
+            assert result.status_code == 200
+            data = result.json()
+            assert data["status"] == "unhealthy"
+            assert data["chromium"] is False

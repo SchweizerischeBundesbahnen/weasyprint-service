@@ -65,7 +65,7 @@ RUN chmod +x ${WORKING_DIR}/entrypoint.sh
 EXPOSE ${PORT}
 
 # Add healthcheck
-HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:9080/health | jq -e '.chromium == true and .status == "healthy"' > /dev/null || exit 1
 
 ENTRYPOINT [ "./entrypoint.sh" ]

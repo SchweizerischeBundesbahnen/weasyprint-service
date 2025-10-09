@@ -63,6 +63,18 @@ docker run --detach \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
+### Chromium Requirements
+
+The service requires a persistent Chromium browser instance for SVG to PNG conversion. **If Chromium fails to start, the service will not start** (fail-fast behavior):
+
+- **Startup Behavior**: The service will terminate if Chromium cannot be initialized during startup
+- **Common Causes**: Missing dependencies, insufficient memory, or missing Chromium binaries
+- **Docker Requirements**: `--shm-size` should be configured if running many concurrent conversions
+- **Health Check**: The `/health` endpoint verifies Chromium is running and healthy at runtime
+- **Monitoring**: Use Docker healthcheck or the `/health` endpoint to monitor service availability
+
+To diagnose Chromium startup issues, check the service logs for error messages during initialization. The container will exit if Chromium fails to start.
+
 ### Logging Configuration
 
 The service includes a robust logging system with the following features:

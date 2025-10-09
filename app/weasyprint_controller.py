@@ -29,17 +29,16 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG0
 
     This ensures a single persistent Chromium instance is started when the
     FastAPI application starts and properly cleaned up on shutdown.
+
+    If Chromium fails to start, the application will not start and the
+    service will terminate (fail-fast behavior for containerized environments).
     """
     chromium_manager = get_chromium_manager()
     logger = logging.getLogger(__name__)
 
-    try:
-        logger.info("Prepare Chromium browser for SVG conversion...")
-        await chromium_manager.start()
-        logger.info("Chromium browser prepared successfully")
-    except Exception as e:
-        logger.error("Failed to start Chromium browser: %s", e)
-        logger.warning("SVG to PNG conversion will be unavailable")
+    logger.info("Prepare Chromium browser for SVG conversion...")
+    await chromium_manager.start()
+    logger.info("Chromium browser prepared successfully")
 
     yield  # Application runs here
 
@@ -73,10 +72,17 @@ app = FastAPI(
 async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | bool]:
     """
     Health check endpoint that verifies service and Chromium browser status.
+
+    Returns:
+        - status: "healthy" if Chromium is running and healthy
+        - chromium: True if Chromium is running and healthy
+
+    Note: If Chromium is not healthy, the service should have failed to start.
+    This endpoint primarily serves as a runtime health verification.
     """
     chromium_healthy = await chromium_manager.health_check()
     return {
-        "status": "healthy" if chromium_healthy else "degraded",
+        "status": "healthy" if chromium_healthy else "unhealthy",
         "chromium": chromium_healthy,
     }
 

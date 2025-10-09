@@ -78,8 +78,11 @@ class SvgProcessor:
         - Replace only top-level <svg> with <img data:image/svg+xml;base64,...>
         - Convert base64 SVG images inside <img> to base64 PNG via Chromium
         """
+        self.log.info("Starting SVG processing in HTML")
         parsed_html = self.replace_inline_svgs_with_img(input_html)
-        return self.replace_img_base64(parsed_html)
+        result = self.replace_img_base64(parsed_html)
+        self.log.info("Completed SVG processing")
+        return result
 
     def replace_inline_svgs_with_img(self, parsed_html: BeautifulSoup) -> BeautifulSoup:
         """
@@ -91,8 +94,10 @@ class SvgProcessor:
             if isinstance(node, Tag) and node.find_parent("svg") is None:
                 top_level_svgs.append(node)
 
+        self.log.debug("Found %d top-level SVG tags to replace with img tags", len(top_level_svgs))
         for svg in top_level_svgs:
             svg_str = str(svg)
+            self.log.debug("Converting inline SVG to data URL, size: %d characters", len(svg_str))
             b64 = base64.b64encode(svg_str.encode("utf-8")).decode("ascii")
             img: Tag = parsed_html.new_tag("img")
 
@@ -115,7 +120,10 @@ class SvgProcessor:
         """
         Replace base64 SVG images with PNG equivalents in HTML <img> tags.
         """
-        for node in parsed_html.find_all("img"):
+        img_nodes = parsed_html.find_all("img")
+        self.log.debug("Found %d img tags to check for SVG data URLs", len(img_nodes))
+        converted_count = 0
+        for node in img_nodes:
             if not isinstance(node, Tag):
                 continue
 
@@ -141,7 +149,10 @@ class SvgProcessor:
             self._apply_img_dimensions_from_svg(node, svg)
 
             node["src"] = f"data:{image_type};base64,{replaced_content_base64}"
+            converted_count += 1
 
+        if converted_count > 0:
+            self.log.info("Converted %d SVG data URLs to PNG", converted_count)
         return parsed_html
 
     def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element) -> None:
@@ -159,7 +170,7 @@ class SvgProcessor:
             if style_parts:
                 node["style"] = "; ".join(style_parts)
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # Log at debug level to avoid noise but prevent silent pass
             logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
@@ -194,7 +205,7 @@ class SvgProcessor:
 
             possible_svg_content = decoded_content.decode("utf-8")
             return self.svg_from_string(possible_svg_content)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("Failed to decode base64 content: %s", e)
             return None
 
@@ -207,24 +218,31 @@ class SvgProcessor:
 
         width, height, updated_svg = self.extract_svg_dimensions_as_px(updated_svg)
         if not width or not height:
+            self.log.warning("Invalid or undefined dimensions for SVG (width: %s, height: %s)", width, height)
             return self.without_changes(svg)
+        self.log.debug("Converting SVG (%dx%d px) to PNG with scale factor %.2f", width, height, self.device_scale_factor)
 
         svg_content = self.svg_to_string(updated_svg)
         svg_filepath, png_filepath = self.prepare_temp_files(svg_content)
         if not svg_filepath or not png_filepath:
+            self.log.error("Failed to prepare temporary files for SVG conversion")
             return self.without_changes(svg)
 
         # Add extra height to prevent clipping, then crop later
         if not self.convert_svg_to_png(width, height + self.chromium_height_adjustment, png_filepath, svg_filepath):
+            self.log.error("Failed to convert SVG to PNG using Chromium")
             return self.without_changes(svg)
 
         if not self.crop_png(png_filepath, max(1, round(self.chromium_height_adjustment * self.device_scale_factor))):
+            self.log.warning("Failed to crop PNG")
             return self.without_changes(svg)
 
         png_content = self.read_and_cleanup_png(png_filepath)
         if not png_content:
+            self.log.error("Failed to read generated PNG file")
             return self.without_changes(svg)
 
+        self.log.info("Successfully converted SVG to PNG, size: %d bytes", len(png_content) if isinstance(png_content, bytes) else len(str(png_content)))
         return self.IMAGE_PNG, png_content
 
     def ensure_mandatory_attributes(self, svg: Element) -> Element:
@@ -261,7 +279,7 @@ class SvgProcessor:
                 cropped = img.crop((0, 0, img_width, img_height - bottom_pixels_to_crop))
                 cropped.save(file_path)
                 return True
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("PNG file to crop not found or crop failed: %s", e)
             return False
 
@@ -388,14 +406,16 @@ class SvgProcessor:
             with svg_filepath.open("w", encoding="utf-8") as f:
                 f.write(content)
             return svg_filepath, png_filepath
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("Failed to save SVG to temp file: %s", e)
             return None, None
 
     def convert_svg_to_png(self, width: int, height: int, png_filepath: Path, svg_filepath: Path) -> bool:
         command = self.create_chromium_command(width, height, png_filepath, svg_filepath)
         if not command:
+            self.log.error("Could not determine Chromium executable path")
             return False
+        self.log.debug("Running Chromium command for SVG to PNG conversion")
 
         process = None
         try:
@@ -406,6 +426,7 @@ class SvgProcessor:
             if process.returncode != 0:
                 self.log.error("Error converting SVG to PNG, return code = %s", process.returncode)
                 return False
+            self.log.debug("Chromium screenshot command completed successfully")
             return True
         except subprocess.TimeoutExpired:
             self.log.error("SVG to PNG conversion timed out after %s seconds", self.subprocess_timeout)
@@ -426,7 +447,7 @@ class SvgProcessor:
                 img_data = img_file.read()
             png_filepath.unlink(missing_ok=True)
             return img_data
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.log.error("Failed to read or clean up PNG file: %s", e)
             return None
 

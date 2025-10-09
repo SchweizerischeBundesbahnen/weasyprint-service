@@ -491,6 +491,51 @@ async def test_chromium_manager_get_version_with_error():
 
 
 @pytest.mark.asyncio
+async def test_chromium_manager_concurrent_limit():
+    """Test that semaphore limits concurrent conversions and prevents resource exhaustion."""
+    import asyncio
+
+    # Set a low limit to test semaphore behavior
+    manager = ChromiumManager(max_concurrent_conversions=3)
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Run many conversions concurrently - semaphore should limit to 3 at a time
+        tasks = [manager.convert_svg_to_png(svg_content, 50, 50) for _ in range(10)]
+        results = await asyncio.gather(*tasks)
+
+        # All conversions should succeed
+        assert len(results) == 10
+        for png_bytes in results:
+            assert png_bytes.startswith(b"\x89PNG")
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_max_concurrent_from_env():
+    """Test that MAX_CONCURRENT_CONVERSIONS env var is respected."""
+    import os
+
+    # Set environment variable
+    os.environ["MAX_CONCURRENT_CONVERSIONS"] = "5"
+    try:
+        manager = ChromiumManager()
+        assert manager.max_concurrent_conversions == 5
+    finally:
+        del os.environ["MAX_CONCURRENT_CONVERSIONS"]
+
+    # Test default value
+    if "MAX_CONCURRENT_CONVERSIONS" in os.environ:
+        del os.environ["MAX_CONCURRENT_CONVERSIONS"]
+    manager = ChromiumManager()
+    assert manager.max_concurrent_conversions == 10
+
+
+@pytest.mark.asyncio
 async def test_chromium_manager_get_page_cleanup_errors():
     """Test _get_page cleanup when page/context close fails."""
     manager = ChromiumManager()

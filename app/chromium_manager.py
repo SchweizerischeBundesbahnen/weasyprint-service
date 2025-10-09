@@ -31,20 +31,27 @@ class ChromiumManager:
     SVG images to PNG using Chrome DevTools Protocol via Playwright.
     """
 
-    def __init__(self, device_scale_factor: float | None = None, logger: logging.Logger | None = None) -> None:
+    def __init__(self, device_scale_factor: float | None = None, logger: logging.Logger | None = None, max_concurrent_conversions: int | None = None) -> None:
         """
         Initialize ChromiumManager.
 
         Args:
             device_scale_factor: Device scale factor for rendering. If None, reads DEVICE_SCALE_FACTOR (default 1.0).
             logger: Optional logger; if None, a module-level logger is used.
+            max_concurrent_conversions: Maximum concurrent SVG conversions. If None, reads MAX_CONCURRENT_CONVERSIONS (default 10).
         """
         self.device_scale_factor = self._parse_float(os.environ.get("DEVICE_SCALE_FACTOR"), 1.0) if device_scale_factor is None else float(device_scale_factor)
         self.log = logger or logging.getLogger(__name__)
 
+        # Parse max concurrent conversions from env or use provided value
+        if max_concurrent_conversions is None:
+            max_concurrent_conversions = int(os.environ.get("MAX_CONCURRENT_CONVERSIONS", "10"))
+        self.max_concurrent_conversions = max_concurrent_conversions
+
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._lock = asyncio.Lock()
+        self._semaphore = asyncio.Semaphore(self.max_concurrent_conversions)
         self._started = False
 
     async def start(self) -> None:
@@ -232,39 +239,42 @@ class ChromiumManager:
 
         Note:
             The page and its context are automatically closed when exiting the context.
+            Uses a semaphore to limit concurrent conversions and prevent memory leaks.
         """
         if not self._browser:
             raise RuntimeError("Chromium browser is not started")
 
-        context: BrowserContext | None = None
-        page: Page | None = None
+        # Acquire semaphore to limit concurrent conversions
+        async with self._semaphore:
+            context: BrowserContext | None = None
+            page: Page | None = None
 
-        # Use provided scale factor or fall back to instance default
-        scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
-
-        try:
-            # Create new context with device scale factor
-            context = await self._browser.new_context(
-                device_scale_factor=scale_factor,
-                viewport=ViewportSize(width=800, height=600),  # Default, will be overridden
-            )
-
-            page = await context.new_page()
-            yield page
-
-        finally:
-            # Clean up: close page and context to prevent memory leaks
-            try:
-                if page:
-                    await page.close()
-            except Exception as e:  # noqa: BLE001
-                self.log.warning("Error closing page: %s", e)
+            # Use provided scale factor or fall back to instance default
+            scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
 
             try:
-                if context:
-                    await context.close()
-            except Exception as e:  # noqa: BLE001
-                self.log.warning("Error closing context: %s", e)
+                # Create new context with device scale factor
+                context = await self._browser.new_context(
+                    device_scale_factor=scale_factor,
+                    viewport=ViewportSize(width=800, height=600),  # Default, will be overridden
+                )
+
+                page = await context.new_page()
+                yield page
+
+            finally:
+                # Clean up: close page and context to prevent memory leaks
+                try:
+                    if page:
+                        await page.close()
+                except Exception as e:  # noqa: BLE001
+                    self.log.warning("Error closing page: %s", e)
+
+                try:
+                    if context:
+                        await context.close()
+                except Exception as e:  # noqa: BLE001
+                    self.log.warning("Error closing context: %s", e)
 
     @staticmethod
     def _parse_float(value: str | None, default: float) -> float:

@@ -39,13 +39,27 @@ The service will be accessible on port 9080.
 
 Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.
 
-To customize the device scaling when running the container, use:
+To customize the device scaling when running the container:
 
 ```bash
 docker run --detach \
   --publish 9080:9080 \
   --name weasyprint-service \
   --env DEVICE_SCALE_FACTOR=2.0 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+### Concurrency Control
+
+The service limits concurrent SVG to PNG conversions to prevent memory leaks and resource exhaustion. This can be configured via the `MAX_CONCURRENT_CONVERSIONS` environment variable (default: 10).
+
+To customize the concurrency limit when running the container:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env MAX_CONCURRENT_CONVERSIONS=5 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 

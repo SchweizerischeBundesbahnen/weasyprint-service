@@ -39,6 +39,8 @@ The service will be accessible on port 9080.
 
 Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.
 
+**Valid range:** 1.0 - 10.0 (default: 1.0)
+
 To customize the device scaling when running the container:
 
 ```bash
@@ -49,9 +51,13 @@ docker run --detach \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
+**Note:** Invalid values will fall back to default (1.0) with a warning logged.
+
 ### Concurrency Control
 
-The service limits concurrent SVG to PNG conversions to prevent memory leaks and resource exhaustion. This can be configured via the `MAX_CONCURRENT_CONVERSIONS` environment variable (default: 10).
+The service limits concurrent SVG to PNG conversions to prevent memory leaks and resource exhaustion.
+
+**Valid range:** 1 - 100 (default: 10)
 
 To customize the concurrency limit when running the container:
 
@@ -59,13 +65,17 @@ To customize the concurrency limit when running the container:
 docker run --detach \
   --publish 9080:9080 \
   --name weasyprint-service \
-  --env MAX_CONCURRENT_CONVERSIONS=5 \
+  --env MAX_CONCURRENT_CONVERSIONS=20 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
+**Note:** Invalid values will fall back to default (10) with a warning logged.
+
 ### Automatic Chromium Restart
 
-The service can automatically restart the Chromium browser after a specified number of conversions to prevent memory accumulation and ensure long-term stability. This is controlled by the `CHROMIUM_RESTART_AFTER_N_CONVERSIONS` environment variable (default: 0 = disabled).
+The service can automatically restart the Chromium browser after a specified number of conversions to prevent memory accumulation and ensure long-term stability.
+
+**Valid range:** 0 - 10000 (default: 0 = disabled)
 
 To enable automatic restart after every 1000 conversions:
 
@@ -84,6 +94,8 @@ docker run --detach \
 - Set to 0 (default) to disable automatic restarts
 - Useful for long-running services with high conversion volumes
 
+**Note:** Invalid values will fall back to default (0) with a warning logged.
+
 ### Chromium Requirements and Recovery
 
 The service requires a persistent Chromium browser instance for SVG to PNG conversion.
@@ -96,7 +108,7 @@ The service requires a persistent Chromium browser instance for SVG to PNG conve
 
 **Automatic Recovery:**
 - If a conversion fails due to Chromium crash or error, the service automatically restarts Chromium and retries
-- Default: 2 attempts (configurable via `CHROMIUM_MAX_CONVERSION_RETRIES` environment variable)
+- **Valid range:** 1 - 10 (default: 2)
 - This provides resilience against transient Chromium failures during operation
 - If restart fails or all retry attempts are exhausted, the conversion request will fail with an error
 - Recovery attempts are logged for monitoring and troubleshooting
@@ -109,6 +121,8 @@ docker run --detach \
   --env CHROMIUM_MAX_CONVERSION_RETRIES=3 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
+
+**Note:** Invalid values will fall back to default (2) with a warning logged.
 
 **Monitoring:**
 - Use Docker healthcheck or the `/health` endpoint to monitor service availability

@@ -13,7 +13,7 @@ import base64
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 from playwright.async_api import ViewportSize, async_playwright
 
@@ -45,27 +45,20 @@ class ChromiumManager:
         Args:
             device_scale_factor: Device scale factor for rendering. If None, reads DEVICE_SCALE_FACTOR (default 1.0).
             logger: Optional logger; if None, a module-level logger is used.
-            max_concurrent_conversions: Maximum concurrent SVG conversions. If None, reads MAX_CONCURRENT_CONVERSIONS (default 10).
-            restart_after_n_conversions: Restart Chromium after N conversions. If None, reads CHROMIUM_RESTART_AFTER_N_CONVERSIONS (default 0 = disabled).
-            max_conversion_retries: Maximum retry attempts on conversion failure. If None, reads CHROMIUM_MAX_CONVERSION_RETRIES (default 2).
+            max_concurrent_conversions: Maximum concurrent SVG conversions (1-100). If None, reads MAX_CONCURRENT_CONVERSIONS (default 10).
+            restart_after_n_conversions: Restart Chromium after N conversions (0-10000). If None, reads CHROMIUM_RESTART_AFTER_N_CONVERSIONS (default 0 = disabled).
+            max_conversion_retries: Maximum retry attempts on conversion failure (1-10). If None, reads CHROMIUM_MAX_CONVERSION_RETRIES (default 2).
+
+        Raises:
+            ValueError: If any configuration parameter is out of valid range.
         """
-        self.device_scale_factor = self._parse_float(os.environ.get("DEVICE_SCALE_FACTOR"), 1.0) if device_scale_factor is None else float(device_scale_factor)
         self.log = logger or logging.getLogger(__name__)
 
-        # Parse max concurrent conversions from env or use provided value
-        if max_concurrent_conversions is None:
-            max_concurrent_conversions = int(os.environ.get("MAX_CONCURRENT_CONVERSIONS", "10"))
-        self.max_concurrent_conversions = max_concurrent_conversions
-
-        # Parse restart threshold from env or use provided value
-        if restart_after_n_conversions is None:
-            restart_after_n_conversions = int(os.environ.get("CHROMIUM_RESTART_AFTER_N_CONVERSIONS", "0"))
-        self.restart_after_n_conversions = restart_after_n_conversions
-
-        # Parse max retry attempts from env or use provided value
-        if max_conversion_retries is None:
-            max_conversion_retries = int(os.environ.get("CHROMIUM_MAX_CONVERSION_RETRIES", "2"))
-        self.max_conversion_retries = max_conversion_retries
+        # Parse and validate all configuration parameters
+        self.device_scale_factor = self._validate_device_scale_factor(device_scale_factor)
+        self.max_concurrent_conversions = self._validate_max_concurrent_conversions(max_concurrent_conversions)
+        self.restart_after_n_conversions = self._validate_restart_after_n_conversions(restart_after_n_conversions)
+        self.max_conversion_retries = self._validate_max_conversion_retries(max_conversion_retries)
 
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
@@ -356,12 +349,157 @@ class ChromiumManager:
                 except Exception as e:  # noqa: BLE001
                     self.log.warning("Error closing context: %s", e)
 
+    @overload
+    def _validate_config_value(
+        self,
+        value: float | None,
+        env_var: str,
+        default: float,
+        min_value: float,
+        max_value: float,
+        value_type: type[float],
+    ) -> float: ...
+
+    @overload
+    def _validate_config_value(
+        self,
+        value: int | None,
+        env_var: str,
+        default: int,
+        min_value: int,
+        max_value: int,
+        value_type: type[int] = ...,
+    ) -> int: ...
+
+    def _validate_config_value(
+        self,
+        value: int | float | None,
+        env_var: str,
+        default: int | float,
+        min_value: int | float,
+        max_value: int | float,
+        value_type: type[int] | type[float] = int,
+    ) -> int | float:
+        """
+        Generic validation for configuration parameters.
+
+        Args:
+            value: Value to validate or None to read from env.
+            env_var: Environment variable name.
+            default: Default value if env var not set or invalid.
+            min_value: Minimum valid value (inclusive or exclusive based on param).
+            max_value: Maximum valid value (inclusive).
+            value_type: Type to parse (int or float).
+
+        Returns:
+            Validated configuration value.
+        """
+        value = (
+            (
+                self._parse_float(os.environ.get(env_var), default)  # type: ignore[arg-type]
+                if value_type is float
+                else self._parse_int(os.environ.get(env_var), default)  # type: ignore[arg-type]
+            )
+            if value is None
+            else value_type(value)
+        )
+
+        # Check bounds
+        is_valid = min_value <= value <= max_value
+
+        if not is_valid:
+            self.log.warning("%s must be between %s and %s, using default: %s", env_var, min_value, max_value, default)
+            return default
+
+        return value
+
+    def _validate_device_scale_factor(self, value: float | None) -> float:
+        """
+        Validate device scale factor.
+
+        Args:
+            value: Device scale factor or None to read from env.
+
+        Returns:
+            Validated device scale factor (1.0 - 10.0).
+        """
+        return self._validate_config_value(
+            value=value,
+            env_var="DEVICE_SCALE_FACTOR",
+            default=1.0,
+            min_value=1.0,
+            max_value=10.0,
+            value_type=float,
+        )
+
+    def _validate_max_concurrent_conversions(self, value: int | None) -> int:
+        """
+        Validate max concurrent conversions.
+
+        Args:
+            value: Max concurrent conversions or None to read from env.
+
+        Returns:
+            Validated max concurrent conversions (1 - 100).
+        """
+        return self._validate_config_value(
+            value=value,
+            env_var="MAX_CONCURRENT_CONVERSIONS",
+            default=10,
+            min_value=1,
+            max_value=100,
+        )
+
+    def _validate_restart_after_n_conversions(self, value: int | None) -> int:
+        """
+        Validate restart after N conversions threshold.
+
+        Args:
+            value: Restart threshold or None to read from env.
+
+        Returns:
+            Validated restart threshold (0 - 10000).
+        """
+        return self._validate_config_value(
+            value=value,
+            env_var="CHROMIUM_RESTART_AFTER_N_CONVERSIONS",
+            default=0,
+            min_value=0,
+            max_value=10000,
+        )
+
+    def _validate_max_conversion_retries(self, value: int | None) -> int:
+        """
+        Validate max conversion retry attempts.
+
+        Args:
+            value: Max retry attempts or None to read from env.
+
+        Returns:
+            Validated max retry attempts (1 - 10).
+        """
+        return self._validate_config_value(
+            value=value,
+            env_var="CHROMIUM_MAX_CONVERSION_RETRIES",
+            default=2,
+            min_value=1,
+            max_value=10,
+        )
+
     @staticmethod
     def _parse_float(value: str | None, default: float) -> float:
         """Parse a string to float with a default fallback."""
         try:
             return float(value) if value is not None else default
-        except ValueError:
+        except (ValueError, TypeError):
+            return default
+
+    @staticmethod
+    def _parse_int(value: str | None, default: int) -> int:
+        """Parse a string to int with a default fallback."""
+        try:
+            return int(value) if value is not None else default
+        except (ValueError, TypeError):
             return default
 
 

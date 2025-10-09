@@ -727,6 +727,114 @@ async def test_chromium_manager_max_retries_from_env():
 
 
 @pytest.mark.asyncio
+async def test_chromium_manager_validation_max_concurrent_out_of_range():
+    """Test that MAX_CONCURRENT_CONVERSIONS is validated and clamped to valid range."""
+    # Test value too low
+    os.environ["MAX_CONCURRENT_CONVERSIONS"] = "0"
+    try:
+        manager = ChromiumManager()
+        assert manager.max_concurrent_conversions == 10  # Should fall back to default
+    finally:
+        del os.environ["MAX_CONCURRENT_CONVERSIONS"]
+
+    # Test value too high
+    os.environ["MAX_CONCURRENT_CONVERSIONS"] = "200"
+    try:
+        manager = ChromiumManager()
+        assert manager.max_concurrent_conversions == 10  # Should fall back to default
+    finally:
+        del os.environ["MAX_CONCURRENT_CONVERSIONS"]
+
+    # Test valid value at boundary
+    os.environ["MAX_CONCURRENT_CONVERSIONS"] = "100"
+    try:
+        manager = ChromiumManager()
+        assert manager.max_concurrent_conversions == 100
+    finally:
+        del os.environ["MAX_CONCURRENT_CONVERSIONS"]
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_validation_restart_threshold_out_of_range():
+    """Test that CHROMIUM_RESTART_AFTER_N_CONVERSIONS is validated."""
+    # Test negative value
+    os.environ["CHROMIUM_RESTART_AFTER_N_CONVERSIONS"] = "-1"
+    try:
+        manager = ChromiumManager()
+        assert manager.restart_after_n_conversions == 0  # Should fall back to default
+    finally:
+        del os.environ["CHROMIUM_RESTART_AFTER_N_CONVERSIONS"]
+
+    # Test value too high
+    os.environ["CHROMIUM_RESTART_AFTER_N_CONVERSIONS"] = "20000"
+    try:
+        manager = ChromiumManager()
+        assert manager.restart_after_n_conversions == 0  # Should fall back to default
+    finally:
+        del os.environ["CHROMIUM_RESTART_AFTER_N_CONVERSIONS"]
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_validation_max_retries_out_of_range():
+    """Test that CHROMIUM_MAX_CONVERSION_RETRIES is validated."""
+    # Test value too low
+    os.environ["CHROMIUM_MAX_CONVERSION_RETRIES"] = "0"
+    try:
+        manager = ChromiumManager()
+        assert manager.max_conversion_retries == 2  # Should fall back to default
+    finally:
+        del os.environ["CHROMIUM_MAX_CONVERSION_RETRIES"]
+
+    # Test value too high
+    os.environ["CHROMIUM_MAX_CONVERSION_RETRIES"] = "20"
+    try:
+        manager = ChromiumManager()
+        assert manager.max_conversion_retries == 2  # Should fall back to default
+    finally:
+        del os.environ["CHROMIUM_MAX_CONVERSION_RETRIES"]
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_validation_device_scale_out_of_range():
+    """Test that DEVICE_SCALE_FACTOR is validated."""
+    # Test value too low
+    os.environ["DEVICE_SCALE_FACTOR"] = "0"
+    try:
+        manager = ChromiumManager()
+        assert manager.device_scale_factor == 1.0  # Should fall back to default
+    finally:
+        del os.environ["DEVICE_SCALE_FACTOR"]
+
+    # Test value too high
+    os.environ["DEVICE_SCALE_FACTOR"] = "15"
+    try:
+        manager = ChromiumManager()
+        assert manager.device_scale_factor == 1.0  # Should fall back to default
+    finally:
+        del os.environ["DEVICE_SCALE_FACTOR"]
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_validation_invalid_string_values():
+    """Test that invalid string values fall back to defaults."""
+    # Test non-numeric MAX_CONCURRENT_CONVERSIONS
+    os.environ["MAX_CONCURRENT_CONVERSIONS"] = "invalid"
+    try:
+        manager = ChromiumManager()
+        assert manager.max_concurrent_conversions == 10
+    finally:
+        del os.environ["MAX_CONCURRENT_CONVERSIONS"]
+
+    # Test non-numeric DEVICE_SCALE_FACTOR
+    os.environ["DEVICE_SCALE_FACTOR"] = "abc"
+    try:
+        manager = ChromiumManager()
+        assert manager.device_scale_factor == 1.0
+    finally:
+        del os.environ["DEVICE_SCALE_FACTOR"]
+
+
+@pytest.mark.asyncio
 async def test_chromium_manager_get_page_cleanup_errors():
     """Test _get_page cleanup when page/context close fails."""
     manager = ChromiumManager()

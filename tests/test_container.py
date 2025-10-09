@@ -130,20 +130,12 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
 
 
 def test_health(test_parameters: TestParameters) -> None:
-    """Test /health endpoint returns service status and Chromium health."""
+    """Test /health endpoint returns OK when service is healthy."""
     url = f"{test_parameters.base_url}/health"
     response = test_parameters.request_session.get(url)
 
     assert response.status_code == 200
-    data = response.json()
-
-    # Verify response structure
-    assert "status" in data
-    assert "chromium" in data
-
-    # Verify Chromium is healthy
-    assert data["chromium"] is True
-    assert data["status"] == "healthy"
+    assert response.text == "OK"
 
 
 def test_convert_simple_html(test_parameters: TestParameters) -> None:

@@ -143,14 +143,8 @@ class ChromiumManager:
             True if the browser is healthy, False otherwise.
         """
         try:
-            if not self.is_running():
-                return False
-
-            # Quick check: create and close a page
-            async with self._get_page() as page:
-                await page.goto("about:blank", wait_until="domcontentloaded", timeout=5000)
-
-            return True
+            # Check if browser is running and connection is active
+            return self.is_running() and self._browser is not None and self._browser.is_connected()
         except Exception as e:  # noqa: BLE001
             self.log.error("Health check failed: %s", e)
             return False
@@ -394,15 +388,12 @@ class ChromiumManager:
         Returns:
             Validated configuration value.
         """
-        value = (
-            (
-                self._parse_float(os.environ.get(env_var), default)  # type: ignore[arg-type]
-                if value_type is float
-                else self._parse_int(os.environ.get(env_var), default)  # type: ignore[arg-type]
-            )
-            if value is None
-            else value_type(value)
-        )
+        # Parse value from environment variable or use provided value
+        if value is None:
+            env_value = os.environ.get(env_var)
+            value = self._parse_float(env_value, default) if value_type is float else self._parse_int(env_value, default)  # type: ignore[arg-type]
+        else:
+            value = value_type(value)
 
         # Check bounds
         is_valid = min_value <= value <= max_value

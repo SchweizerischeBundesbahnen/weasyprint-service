@@ -457,15 +457,13 @@ async def test_chromium_manager_stop_with_errors():
 
 @pytest.mark.asyncio
 async def test_chromium_manager_health_check_with_error():
-    """Test health check when page navigation fails."""
+    """Test health check when browser connection check fails."""
     manager = ChromiumManager()
     await manager.start()
 
     try:
-        # Mock _get_page to raise an exception
-        with patch.object(manager, "_get_page") as mock_get_page:
-            mock_get_page.side_effect = Exception("Page creation failed")
-
+        # Mock is_connected to raise an exception
+        with patch.object(manager._browser, "is_connected", side_effect=Exception("Connection check failed")):
             # Health check should return False, not raise exception
             result = await manager.health_check()
             assert result is False

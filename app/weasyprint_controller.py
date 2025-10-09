@@ -65,26 +65,29 @@ app = FastAPI(
 @app.get(
     "/health",
     summary="Health check",
-    description="Returns the health status of the service and Chromium browser.",
+    description="Returns 200 OK if service is healthy, 503 if unhealthy.",
     operation_id="getHealth",
     tags=["meta"],
+    responses={
+        200: {"content": {"text/plain": {}}, "description": "Service is healthy"},
+        503: {"content": {"text/plain": {}}, "description": "Service is unhealthy"},
+    },
 )
-async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | bool]:
+async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> Response:
     """
     Health check endpoint that verifies service and Chromium browser status.
 
     Returns:
-        - status: "healthy" if Chromium is running and healthy
-        - chromium: True if Chromium is running and healthy
+        - 200 with "OK" if Chromium is running and healthy
+        - 503 with "Service Unavailable" if Chromium is not healthy
 
     Note: If Chromium is not healthy, the service should have failed to start.
     This endpoint primarily serves as a runtime health verification.
     """
     chromium_healthy = await chromium_manager.health_check()
-    return {
-        "status": "healthy" if chromium_healthy else "unhealthy",
-        "chromium": chromium_healthy,
-    }
+    if chromium_healthy:
+        return Response("OK", media_type="text/plain", status_code=200)
+    return Response("Service Unavailable", media_type="text/plain", status_code=503)
 
 
 @app.get(

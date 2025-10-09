@@ -75,7 +75,7 @@ def test_convert_html_with_attachments_files():
 
 
 def test_health_with_chromium_unhealthy():
-    """Test /health endpoint returns unhealthy status when Chromium health check fails at runtime."""
+    """Test /health endpoint returns 503 when Chromium health check fails at runtime."""
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
 
     # Mock ChromiumManager to simulate Chromium health check failing at runtime
@@ -87,7 +87,5 @@ def test_health_with_chromium_unhealthy():
         with TestClient(app) as test_client:
             result = test_client.get("/health")
 
-            assert result.status_code == 200
-            data = result.json()
-            assert data["status"] == "unhealthy"
-            assert data["chromium"] is False
+            assert result.status_code == 503
+            assert result.text == "Service Unavailable"

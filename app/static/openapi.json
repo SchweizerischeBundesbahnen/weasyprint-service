@@ -11,28 +11,22 @@
           "meta"
         ],
         "summary": "Health check",
-        "description": "Returns the health status of the service and Chromium browser.",
+        "description": "Returns 200 OK if service is healthy, 503 if unhealthy.",
         "operationId": "getHealth",
         "responses": {
           "200": {
-            "description": "Successful Response",
+            "description": "Service is healthy",
             "content": {
               "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "boolean"
-                      }
-                    ]
-                  },
-                  "type": "object",
-                  "title": "Response Gethealth"
-                }
-              }
+                "schema": {}
+              },
+              "text/plain": {}
+            }
+          },
+          "503": {
+            "description": "Service is unhealthy",
+            "content": {
+              "text/plain": {}
             }
           }
         }

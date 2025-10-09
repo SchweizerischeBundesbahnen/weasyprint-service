@@ -239,32 +239,43 @@ class ChromiumManager:
             except TimeoutError:
                 last_error = TimeoutError(f"Conversion timed out after {self.conversion_timeout} seconds")
                 self.log.error("SVG conversion timed out (attempt %d/%d): %d seconds", attempt + 1, self.max_conversion_retries, self.conversion_timeout)
-                if attempt < self.max_conversion_retries - 1:
-                    try:
-                        await self.restart()
-                        self.log.info("Chromium restarted successfully after timeout")
-                    except Exception as restart_error:
-                        self.log.error("Failed to restart Chromium: %s", restart_error)
-                        raise RuntimeError(f"Chromium restart failed after timeout: {restart_error}") from last_error
+                await self._handle_conversion_retry(attempt, last_error, "timeout")
             except Exception as e:
                 last_error = e
-                if attempt < self.max_conversion_retries - 1:
-                    self.log.warning(
-                        "SVG conversion failed (attempt %d/%d): %s. Attempting to restart Chromium...",
-                        attempt + 1,
-                        self.max_conversion_retries,
-                        str(e),
-                    )
-                    try:
-                        await self.restart()
-                        self.log.info("Chromium restarted successfully after conversion failure")
-                    except Exception as restart_error:
-                        self.log.error("Failed to restart Chromium: %s", restart_error)
-                        raise RuntimeError(f"Chromium restart failed after conversion error: {restart_error}") from e
+                self.log.warning(
+                    "SVG conversion failed (attempt %d/%d): %s. Attempting to restart Chromium...",
+                    attempt + 1,
+                    self.max_conversion_retries,
+                    str(e),
+                )
+                await self._handle_conversion_retry(attempt, e, "conversion error")
 
         # If we get here, all retries failed
         self.log.error("SVG conversion failed after %d attempts: %s", self.max_conversion_retries, str(last_error))
         raise RuntimeError(f"SVG to PNG conversion failed after {self.max_conversion_retries} attempts") from last_error
+
+    async def _handle_conversion_retry(self, attempt: int, error: Exception, error_type: str) -> None:
+        """
+        Handle retry logic after a conversion failure.
+
+        Args:
+            attempt: Current attempt number (0-based).
+            error: The exception that caused the failure.
+            error_type: Description of the error type (for logging).
+
+        Raises:
+            RuntimeError: If this is not the last attempt and restart fails.
+        """
+        is_last_attempt = attempt >= self.max_conversion_retries - 1
+        if is_last_attempt:
+            return  # Don't restart on last attempt, let caller handle final error
+
+        try:
+            await self.restart()
+            self.log.info("Chromium restarted successfully after %s", error_type)
+        except Exception as restart_error:
+            self.log.error("Failed to restart Chromium: %s", restart_error)
+            raise RuntimeError(f"Chromium restart failed after {error_type}: {restart_error}") from error
 
     async def _perform_conversion(self, svg_content: str, width: int, height: int, device_scale_factor: float | None = None) -> bytes:
         """

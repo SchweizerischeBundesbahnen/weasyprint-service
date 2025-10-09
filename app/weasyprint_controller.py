@@ -84,7 +84,7 @@ async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromi
     Note: If Chromium is not healthy, the service should have failed to start.
     This endpoint primarily serves as a runtime health verification.
     """
-    chromium_healthy = await chromium_manager.health_check()
+    chromium_healthy = chromium_manager.health_check()
     if chromium_healthy:
         return Response("OK", media_type="text/plain", status_code=200)
     return Response("Service Unavailable", media_type="text/plain", status_code=503)

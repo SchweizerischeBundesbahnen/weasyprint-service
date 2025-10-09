@@ -139,7 +139,7 @@ class ChromiumManager:
         """Check if the Chromium browser is running."""
         return self._started and self._browser is not None
 
-    async def health_check(self) -> bool:
+    def health_check(self) -> bool:
         """
         Perform a health check on the Chromium browser.
 

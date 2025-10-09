@@ -21,7 +21,7 @@ async def test_chromium_manager_lifecycle():
     assert manager.is_running()
 
     # Health check should pass
-    assert await manager.health_check()
+    assert manager.health_check()
 
     # Stop the browser
     await manager.stop()
@@ -99,7 +99,7 @@ async def test_chromium_manager_health_check_not_running():
     manager = ChromiumManager()
 
     # Health check should fail when not running
-    assert not await manager.health_check()
+    assert not manager.health_check()
 
 
 @pytest.mark.asyncio
@@ -465,7 +465,7 @@ async def test_chromium_manager_health_check_with_error():
         # Mock is_connected to raise an exception
         with patch.object(manager._browser, "is_connected", side_effect=Exception("Connection check failed")):
             # Health check should return False, not raise exception
-            result = await manager.health_check()
+            result = manager.health_check()
             assert result is False
 
     finally:

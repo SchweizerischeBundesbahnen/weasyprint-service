@@ -24,6 +24,7 @@ class Note:
     time: str
     username: str
     text: str
+    title: str = ""
     replies: list["Note"] = field(default_factory=list)
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
 
@@ -48,14 +49,16 @@ class NotesProcessor:
 
     def _parse_note(self, node: Tag) -> Note:
         """Recursively parse a note node and its replies."""
-        # Extract username and text from direct children only
+        # Extract username, text, title, and time from direct children only
         time_tag = node.find("div", class_="weasyprint-note-time", recursive=False)
         username_tag = node.find("div", class_="weasyprint-note-username", recursive=False)
         text_tag = node.find("div", class_="weasyprint-note-text", recursive=False)
+        title_tag = node.find("div", class_="weasyprint-note-title", recursive=False)
 
         time = time_tag.get_text(strip=True) if time_tag else ""
         username = username_tag.get_text(strip=True) if username_tag else ""
         text = text_tag.get_text(strip=True) if text_tag else ""
+        title = title_tag.get_text(strip=True) if title_tag else ""
 
         # Find direct child notes (replies)
         replies: list[Note] = []
@@ -64,7 +67,7 @@ class NotesProcessor:
                 reply = self._parse_note(child)
                 replies.append(reply)
 
-        return Note(time=time, username=username, text=text, replies=replies)
+        return Note(time=time, username=username, text=text, title=title, replies=replies)
 
     def processPdf(self, pdf_content: bytes, notes: list[Note]) -> bytes:
         """Process PDF to replace fake note links with actual PDF sticky note annotations."""
@@ -103,7 +106,6 @@ class NotesProcessor:
                                     full_content = f"{main_content}\n\n{replies_content}" if replies_content else main_content
 
                                     # Create text annotation (sticky note) with proper PDF fields
-                                    # Note: We'll set /T (title/author) and /M (modification date) after creation
                                     text_annot = Text(
                                         rect=(float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3])),
                                         text=full_content,
@@ -111,11 +113,19 @@ class NotesProcessor:
                                     )
 
                                     # Manually set PDF annotation fields using proper PDF objects
-                                    # /T = Title (author/username)
+                                    # /T = Author/username
+                                    # /Subj = Subject/title
+                                    # /CreationDate = Creation date in PDF format
                                     # /M = Modification date in PDF format
                                     annot_dict = text_annot
                                     annot_dict[NameObject("/T")] = TextStringObject(note.username)
-                                    annot_dict[NameObject("/M")] = TextStringObject(self._format_pdf_date(note.time))
+
+                                    pdf_date = self._format_pdf_date(note.time)
+                                    annot_dict[NameObject("/CreationDate")] = TextStringObject(pdf_date)
+                                    annot_dict[NameObject("/M")] = TextStringObject(pdf_date)
+
+                                    if note.title:
+                                        annot_dict[NameObject("/Subj")] = TextStringObject(note.title)
 
                                     new_annotations.append(text_annot)
                                     # Skip adding this link annotation
@@ -198,11 +208,13 @@ class NotesProcessor:
             <div class="weasyprint-note">
                 <div class="weasyprint-note-time">2025-10-08 11:24</div>
                 <div class="weasyprint-note-username">Admin</div>
+                <div class="weasyprint-note-title">Main Note Title</div>
                 <div class="weasyprint-note-text">Test comment</div>
 
                 <div class="weasyprint-note">
                     <div class="weasyprint-note-time">2025-10-08 11:25</div>
                     <div class="weasyprint-note-username">User 1</div>
+                    <div class="weasyprint-note-title">Reply 1 Title</div>
                     <div class="weasyprint-note-text">Test reply 1</div>
 
                     <div class="weasyprint-note">
@@ -228,12 +240,16 @@ class NotesProcessor:
         # Verify structure
         assert len(notes) == 1, "Should have 1 top-level note"
         assert notes[0].username == "Admin", "Top-level username should be Admin"
+        assert notes[0].title == "Main Note Title", "Top-level title should be 'Main Note Title'"
         assert notes[0].text == "Test comment", "Top-level text should be 'Test comment'"
+        assert notes[0].time == "2025-10-08 11:24", "Top-level time should be '2025-10-08 11:24'"
         assert len(notes[0].replies) == 2, "Top-level note should have 2 replies"
 
         # Verify first reply
         assert notes[0].replies[0].username == "User 1", "First reply username should be User 1"
+        assert notes[0].replies[0].title == "Reply 1 Title", "First reply title should be 'Reply 1 Title'"
         assert notes[0].replies[0].text == "Test reply 1", "First reply text should be 'Test reply 1'"
+        assert notes[0].replies[0].time == "2025-10-08 11:25", "First reply time should be '2025-10-08 11:25'"
         assert len(notes[0].replies[0].replies) == 1, "First reply should have 1 nested reply"
 
         # Verify nested reply

@@ -235,7 +235,7 @@ class NotesProcessor:
             return ""
 
     @staticmethod
-    def test_init():
+    def test_parse() -> list[Note]:
         html = """
             <div class="weasyprint-note">
                 <div class="weasyprint-note-time">2020-04-30T08:00:00.000+08:00</div>
@@ -268,6 +268,9 @@ class NotesProcessor:
         processor = NotesProcessor()
 
         notes = processor.replaceNotes(soup)
+
+        # Override the UUID of the main note to match the one in date7.pdf
+        notes[0].uuid = "7590439a-cbbc-49f3-8e16-d1e395a18414"
 
         # Verify structure
         assert len(notes) == 1, "Should have 1 top-level note"
@@ -315,6 +318,32 @@ class NotesProcessor:
 
         print("All assertions passed!")
 
+        return notes
+
+    @staticmethod
+    def test_replace(notes: list[Note]):
+        """Test PDF processing by loading a PDF with fake note links and replacing them with annotations."""
+        from pathlib import Path
+
+        # Load the test PDF
+        test_pdf_path = Path(__file__).parent.parent / "tests" / "test-data" / "date7.pdf"
+        with open(test_pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+
+        print(f"Loaded PDF from {test_pdf_path} ({len(pdf_bytes)} bytes)")
+
+        # Process the PDF with notes
+        processor = NotesProcessor()
+        updated_pdf = processor.processPdf(pdf_bytes, notes)
+
+        # Save the updated PDF
+        output_path = test_pdf_path.parent / "date7_output.pdf"
+        with open(output_path, "wb") as f:
+            f.write(updated_pdf)
+
+        print(f"Saved updated PDF to {output_path} ({len(updated_pdf)} bytes)")
+        print(f"Added {len(notes)} note(s) with nested replies")
 
 if __name__ == "__main__":
-    NotesProcessor.test_init()
+    notes = NotesProcessor.test_parse()
+    NotesProcessor.test_replace(notes)

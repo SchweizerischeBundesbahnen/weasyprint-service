@@ -317,6 +317,29 @@ class ChromiumManager:
 
             return png_bytes
 
+    async def _cleanup_page_resources(self, page: Page | None, context: BrowserContext | None, is_cancelled: bool = False) -> None:
+        """
+        Clean up page and context resources.
+
+        Args:
+            page: The page to close (or None if not created).
+            context: The context to close (or None if not created).
+            is_cancelled: Whether cleanup is happening due to cancellation.
+        """
+        error_prefix = "during cancellation" if is_cancelled else ""
+
+        if page is not None:
+            try:
+                await page.close()
+            except Exception as e:  # noqa: BLE001
+                self.log.warning("Error closing page %s: %s", error_prefix, e)
+
+        if context is not None:
+            try:
+                await context.close()
+            except Exception as e:  # noqa: BLE001
+                self.log.warning("Error closing context %s: %s", error_prefix, e)
+
     @asynccontextmanager
     async def _get_page(self, device_scale_factor: float | None = None) -> AsyncGenerator[Page]:
         """
@@ -331,6 +354,7 @@ class ChromiumManager:
         Note:
             The page and its context are automatically closed when exiting the context.
             Uses a semaphore to limit concurrent conversions and prevent memory leaks.
+            Handles cancellation (e.g., from timeout) gracefully to ensure semaphore is always released.
         """
         if not self._browser:
             raise RuntimeError("Chromium browser is not started")
@@ -353,19 +377,21 @@ class ChromiumManager:
                 page = await context.new_page()
                 yield page
 
-            finally:
-                # Clean up: close page and context to prevent memory leaks
-                try:
-                    if page:
-                        await page.close()
-                except Exception as e:  # noqa: BLE001
-                    self.log.warning("Error closing page: %s", e)
+            except asyncio.CancelledError:
+                # Handle cancellation (e.g., from timeout in wait_for)
+                # Explicitly clean up resources before re-raising
+                self.log.warning("Conversion cancelled (timeout or external cancellation), cleaning up page and context")
+                await self._cleanup_page_resources(page, context, is_cancelled=True)
+                # Mark as cleaned up to prevent duplicate close in finally
+                page = None
+                context = None
+                # Re-raise CancelledError to propagate cancellation
+                raise
 
-                try:
-                    if context:
-                        await context.close()
-                except Exception as e:  # noqa: BLE001
-                    self.log.warning("Error closing context: %s", e)
+            finally:
+                # Clean up: close page and context to prevent memory leaks (for normal exit path)
+                # Note: If CancelledError was caught above, these will be None and skip cleanup
+                await self._cleanup_page_resources(page, context, is_cancelled=False)
 
     @overload
     def _validate_config_value(

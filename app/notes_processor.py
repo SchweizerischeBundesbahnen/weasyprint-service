@@ -70,7 +70,7 @@ class NotesProcessor:
         return Note(time=time, username=username, text=text, title=title, replies=replies)
 
     def processPdf(self, pdf_content: bytes, notes: list[Note]) -> bytes:
-        """Process PDF to replace fake note links with actual PDF sticky note annotations."""
+        """Process PDF to replace fake note links with actual PDF sticky note annotations with nested replies."""
         # Create a UUID to Note mapping for quick lookup (only top-level notes)
         note_map: dict[str, Note] = {note.uuid: note for note in notes}
 
@@ -81,7 +81,7 @@ class NotesProcessor:
         # Process each page
         for page in reader.pages:
             # Find and remove note links, create annotations instead
-            new_annotations = []
+            notes_to_create: list[tuple[Note, tuple[float, float, float, float]]] = []
 
             if "/Annots" in page:
                 annots_to_keep = []
@@ -96,38 +96,11 @@ class NotesProcessor:
                                 # Extract UUID from URI
                                 note_uuid = uri.replace("https://weasyprint.note/", "")
                                 if note_uuid in note_map:
-                                    # Get the note and create a sticky note annotation
+                                    # Store note and rect for later processing
                                     note = note_map[note_uuid]
                                     rect = annot_obj["/Rect"]
-
-                                    # Build the note content (main note text + replies)
-                                    main_content = f"{note.text}"
-                                    replies_content = self._build_note_content_for_replies(note)
-                                    full_content = f"{main_content}\n\n{replies_content}" if replies_content else main_content
-
-                                    # Create text annotation (sticky note) with proper PDF fields
-                                    text_annot = Text(
-                                        rect=(float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3])),
-                                        text=full_content,
-                                        open=False,
-                                    )
-
-                                    # Manually set PDF annotation fields using proper PDF objects
-                                    # /T = Author/username
-                                    # /Subj = Subject/title
-                                    # /CreationDate = Creation date in PDF format
-                                    # /M = Modification date in PDF format
-                                    annot_dict = text_annot
-                                    annot_dict[NameObject("/T")] = TextStringObject(note.username)
-
-                                    pdf_date = self._format_pdf_date(note.time)
-                                    annot_dict[NameObject("/CreationDate")] = TextStringObject(pdf_date)
-                                    annot_dict[NameObject("/M")] = TextStringObject(pdf_date)
-
-                                    if note.title:
-                                        annot_dict[NameObject("/Subj")] = TextStringObject(note.title)
-
-                                    new_annotations.append(text_annot)
+                                    rect_tuple = (float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3]))
+                                    notes_to_create.append((note, rect_tuple))
                                     # Skip adding this link annotation
                                     continue
 
@@ -140,18 +113,82 @@ class NotesProcessor:
                 else:
                     del page["/Annots"]
 
-            # Add page to writer
+            # Add page to writer first
             writer.add_page(page)
-
-            # Add new text annotations to the page in the writer
             page_number = len(writer.pages) - 1
-            for text_annot in new_annotations:
-                writer.add_annotation(page_number, text_annot)
+
+            # Now create annotations with proper parent-child relationships
+            for note, rect in notes_to_create:
+                self._create_note_annotation_with_replies(writer, page_number, note, rect, parent_ref=None)
 
         # Write to bytes
         output = BytesIO()
         writer.write(output)
         return output.getvalue()
+
+    def _create_note_annotation_with_replies(
+        self, writer: PdfWriter, page_number: int, note: Note, rect: tuple[float, float, float, float], parent_ref: object | None = None
+    ) -> object:
+        """
+        Recursively create note annotations with proper parent-child relationships using /IRT field.
+
+        Args:
+            writer: PdfWriter instance
+            page_number: Page number to add annotation to
+            note: Note object to create annotation from
+            rect: Rectangle coordinates (x1, y1, x2, y2) for the annotation
+            parent_ref: Reference to parent annotation (for replies) or None for top-level notes
+
+        Returns:
+            Reference to the created annotation (for use as parent in child annotations)
+        """
+        # Create text annotation (sticky note) with proper PDF fields
+        text_annot = Text(
+            rect=rect,
+            text=note.text,
+            open=False,
+        )
+
+        # Manually set PDF annotation fields using proper PDF objects
+        # /T = Author/username
+        # /Subj = Subject/title
+        # /CreationDate = Creation date in PDF format
+        # /M = Modification date in PDF format
+        annot_dict = text_annot
+        annot_dict[NameObject("/T")] = TextStringObject(note.username)
+
+        pdf_date = self._format_pdf_date(note.time)
+        annot_dict[NameObject("/CreationDate")] = TextStringObject(pdf_date)
+        annot_dict[NameObject("/M")] = TextStringObject(pdf_date)
+
+        if note.title:
+            annot_dict[NameObject("/Subj")] = TextStringObject(note.title)
+
+        # If this is a reply, set the /IRT (In Reply To) field
+        if parent_ref is not None:
+            annot_dict[NameObject("/IRT")] = parent_ref
+            # /RT specifies reply type: /R = Reply (default)
+            annot_dict[NameObject("/RT")] = NameObject("/R")
+
+        # Add annotation to the page
+        writer.add_annotation(page_number, text_annot)
+
+        # Get reference to the annotation we just added
+        # The annotation is now in the page's annotation array
+        page = writer.pages[page_number]
+        if "/Annots" in page:
+            # The last annotation in the list is the one we just added
+            current_annot_ref = page["/Annots"][-1]
+        else:
+            # This shouldn't happen, but handle gracefully
+            return None
+
+        # Recursively create reply annotations
+        for reply in note.replies:
+            # Replies use the same rect as parent (they appear as nested in the UI)
+            self._create_note_annotation_with_replies(writer, page_number, reply, rect, current_annot_ref)
+
+        return current_annot_ref
 
     def _format_pdf_date(self, time_str: str) -> str:
         """
@@ -178,29 +215,6 @@ class NotesProcessor:
             return time_str
         except Exception:
             return time_str
-
-    def _build_note_content(self, note: Note, level: int = 0) -> str:
-        """Build formatted note content including all replies."""
-        indent = "  " * level
-        content = f"{indent}{note.username}: {note.text}"
-
-        if note.replies:
-            content += "\n"
-            for reply in note.replies:
-                content += "\n" + self._build_note_content(reply, level + 1)
-
-        return content
-
-    def _build_note_content_for_replies(self, note: Note) -> str:
-        """Build formatted content for replies only (excluding the top-level note)."""
-        if not note.replies:
-            return ""
-
-        content_parts = []
-        for reply in note.replies:
-            content_parts.append(self._build_note_content(reply, level=0))
-
-        return "\n\n".join(content_parts)
 
     @staticmethod
     def test_init():

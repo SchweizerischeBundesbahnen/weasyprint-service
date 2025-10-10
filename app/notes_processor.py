@@ -157,9 +157,13 @@ class NotesProcessor:
         annot_dict = text_annot
         annot_dict[NameObject("/T")] = TextStringObject(note.username)
 
-        pdf_date = self._format_pdf_date(note.time)
-        annot_dict[NameObject("/CreationDate")] = TextStringObject(pdf_date)
-        annot_dict[NameObject("/M")] = TextStringObject(pdf_date)
+        # Only set date fields if we have a valid date
+        if note.time:
+            pdf_date = self._format_pdf_date(note.time)
+            # Only set if we got a valid PDF date (starts with "D:")
+            if pdf_date and pdf_date.startswith("D:"):
+                annot_dict[NameObject("/CreationDate")] = TextStringObject(pdf_date)
+                annot_dict[NameObject("/M")] = TextStringObject(pdf_date)
 
         if note.title:
             annot_dict[NameObject("/Subj")] = TextStringObject(note.title)
@@ -192,54 +196,68 @@ class NotesProcessor:
 
     def _format_pdf_date(self, time_str: str) -> str:
         """
-        Convert time string to PDF date format.
+        Convert ISO 8601 time string to PDF date format.
         PDF date format: D:YYYYMMDDHHmmSSOHH'mm
         Example: D:20251008112400+02'00
 
         Args:
-            time_str: Time string (e.g., "2025-10-08 11:24")
+            time_str: ISO 8601 time string (e.g., "2020-04-30T08:00:00.000+08:00")
 
         Returns:
-            PDF formatted date string
+            PDF formatted date string with timezone
         """
         try:
-            # Try to parse common formats
-            for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"]:
-                try:
-                    dt = datetime.strptime(time_str, fmt)
-                    # PDF date format: D:YYYYMMDDHHmmSS
-                    return f"D:{dt.strftime('%Y%m%d%H%M%S')}"
-                except ValueError:
-                    continue
-            # If parsing fails, return original string
-            return time_str
-        except Exception:
-            return time_str
+            # Parse ISO 8601 format with timezone support
+            # Python 3.11+ supports fromisoformat with most ISO 8601 variants
+            dt = datetime.fromisoformat(time_str)
+
+            # Build PDF date format: D:YYYYMMDDHHmmSSOHH'mm
+            base_date = dt.strftime('%Y%m%d%H%M%S')
+
+            # Extract timezone offset
+            if dt.tzinfo is not None:
+                # Get UTC offset in seconds
+                offset = dt.utcoffset()
+                if offset is not None:
+                    total_seconds = int(offset.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = abs(total_seconds % 3600) // 60
+
+                    # Format as +HH'mm or -HH'mm
+                    tz_str = f"{hours:+03d}'{minutes:02d}"
+                    return f"D:{base_date}{tz_str}"
+
+            # No timezone info, return without TZ
+            return f"D:{base_date}"
+
+        except (ValueError, AttributeError):
+            # If ISO format parsing fails, return empty to skip setting the field
+            return ""
 
     @staticmethod
     def test_init():
         html = """
             <div class="weasyprint-note">
-                <div class="weasyprint-note-time">2025-10-08 11:24</div>
+                <div class="weasyprint-note-time">2020-04-30T08:00:00.000+08:00</div>
                 <div class="weasyprint-note-username">Admin</div>
                 <div class="weasyprint-note-title">Main Note Title</div>
                 <div class="weasyprint-note-text">Test comment</div>
 
                 <div class="weasyprint-note">
-                    <div class="weasyprint-note-time">2025-10-08 11:25</div>
+                    <div class="weasyprint-note-time">2020-04-30T08:15:00+08:00</div>
                     <div class="weasyprint-note-username">User 1</div>
                     <div class="weasyprint-note-title">Reply 1 Title</div>
                     <div class="weasyprint-note-text">Test reply 1</div>
 
                     <div class="weasyprint-note">
-                        <div class="weasyprint-note-time">2025-10-08 11:27</div>
+                        <div class="weasyprint-note-time">2020-04-30T08:30:00+08:00</div>
                         <div class="weasyprint-note-username">User 3</div>
                         <div class="weasyprint-note-text">Test reply to reply 1</div>
                     </div>
                 </div>
 
                 <div class="weasyprint-note">
-                    <div class="weasyprint-note-time">2025-10-08 12:24</div>
+                    <div class="weasyprint-note-time">2020-04-30T09:00:00+08:00</div>
                     <div class="weasyprint-note-username">User 2</div>
                     <div class="weasyprint-note-text">Test reply 2</div>
                 </div>
@@ -256,14 +274,14 @@ class NotesProcessor:
         assert notes[0].username == "Admin", "Top-level username should be Admin"
         assert notes[0].title == "Main Note Title", "Top-level title should be 'Main Note Title'"
         assert notes[0].text == "Test comment", "Top-level text should be 'Test comment'"
-        assert notes[0].time == "2025-10-08 11:24", "Top-level time should be '2025-10-08 11:24'"
+        assert notes[0].time == "2020-04-30T08:00:00.000+08:00", "Top-level time should be ISO 8601 format"
         assert len(notes[0].replies) == 2, "Top-level note should have 2 replies"
 
         # Verify first reply
         assert notes[0].replies[0].username == "User 1", "First reply username should be User 1"
         assert notes[0].replies[0].title == "Reply 1 Title", "First reply title should be 'Reply 1 Title'"
         assert notes[0].replies[0].text == "Test reply 1", "First reply text should be 'Test reply 1'"
-        assert notes[0].replies[0].time == "2025-10-08 11:25", "First reply time should be '2025-10-08 11:25'"
+        assert notes[0].replies[0].time == "2020-04-30T08:15:00+08:00", "First reply time should be ISO 8601 format"
         assert len(notes[0].replies[0].replies) == 1, "First reply should have 1 nested reply"
 
         # Verify nested reply

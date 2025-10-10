@@ -178,28 +178,6 @@ class ChromiumManager:
         self.log.info("Restarting Chromium browser...")
         await self.stop()
         await self.start()
-        # Reset conversion counter after restart
-        self._conversion_count = 0
-
-    async def _check_and_restart_if_needed(self) -> None:
-        """
-        Check if Chromium needs to be restarted based on conversion count.
-
-        If restart_after_n_conversions > 0 and conversion count reaches the threshold,
-        restarts Chromium automatically.
-        """
-        if self.restart_after_n_conversions <= 0:
-            return  # Auto-restart disabled
-
-        if self._conversion_count >= self.restart_after_n_conversions:
-            conversions_before_restart = self._conversion_count
-            self.log.info(
-                "Conversion count (%d) reached threshold (%d), restarting Chromium...",
-                conversions_before_restart,
-                self.restart_after_n_conversions,
-            )
-            await self.restart()
-            self.log.info("Chromium restarted successfully after %d conversions", conversions_before_restart)
 
     async def convert_svg_to_png(self, svg_content: str, width: int, height: int, device_scale_factor: float | None = None) -> bytes:
         """
@@ -220,11 +198,28 @@ class ChromiumManager:
         if not self.is_running():
             raise RuntimeError("Chromium not started. Call start() first.")
 
-        # Atomically increment counter and check restart (prevent race condition)
+        # Atomically increment counter and check if restart is needed
+        # IMPORTANT: Restart must happen OUTSIDE the lock to avoid blocking other conversions
+        should_restart = False
+        conversions_before_restart = 0
         async with self._counter_lock:
             self._conversion_count += 1
             # Check if restart is needed (after incrementing counter)
-            await self._check_and_restart_if_needed()
+            if 0 < self.restart_after_n_conversions <= self._conversion_count:
+                should_restart = True
+                conversions_before_restart = self._conversion_count
+                # Reset counter immediately inside lock to prevent other threads from also triggering restart
+                self._conversion_count = 0
+
+        # Perform restart OUTSIDE the counter lock to avoid blocking other conversions
+        if should_restart:
+            self.log.info(
+                "Conversion count (%d) reached threshold (%d), restarting Chromium...",
+                conversions_before_restart,
+                self.restart_after_n_conversions,
+            )
+            await self.restart()
+            self.log.info("Chromium restarted successfully after %d conversions", conversions_before_restart)
 
         # Try conversion with automatic recovery on failure
         last_error: Exception | None = None

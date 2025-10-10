@@ -5,6 +5,33 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Health check",
+        "description": "Returns 200 OK if service is healthy, 503 if unhealthy.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/plain": {}
+            }
+          },
+          "503": {
+            "description": "Service is unhealthy",
+            "content": {
+              "text/plain": {}
+            }
+          }
+        }
+      }
+    },
     "/version": {
       "get": {
         "tags": [

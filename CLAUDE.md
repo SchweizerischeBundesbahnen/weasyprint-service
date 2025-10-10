@@ -88,7 +88,8 @@ grype weasyprint-service:0.0.0
 - **AttachmentManager** (`app/attachment_manager.py`): Handles multipart form data and file attachments for HTML conversion
 - **FormParser** (`app/form_parser.py`): Parses multipart/form-data with configurable limits via environment variables
 - **HtmlParser** (`app/html_parser.py`): Processes HTML content and handles embedded resources
-- **SvgProcessor** (`app/svg_processor.py`): Converts SVG to PNG with configurable device scaling (`DEVICE_SCALE_FACTOR` env var)
+- **SvgProcessor** (`app/svg_processor.py`): Converts SVG to PNG via CDP (Chrome DevTools Protocol) with configurable device scaling (`DEVICE_SCALE_FACTOR` env var)
+- **ChromiumManager** (`app/chromium_manager.py`): Manages persistent Chromium browser instance for SVG to PNG conversion via CDP
 - **Schemas** (`app/schemas.py`): Pydantic models for API request/response validation
 
 ### API Endpoints Architecture
@@ -100,16 +101,12 @@ grype weasyprint-service:0.0.0
 ### Configuration and Environment Variables
 - `LOG_LEVEL`: Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) - defaults to INFO
 - `LOG_DIR`: Directory for log files (defaults to `/opt/weasyprint/logs`)
-- `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor (float, e.g., 2.0)
-- `SUBPROCESS_TIMEOUT`: Timeout for subprocess calls (Chromium) in seconds (default: 30)
-- `CPU_NICE_LEVEL`: CPU priority (nice level) for Chromium subprocess (default: 10). Range: -20 (highest priority) to 19 (lowest priority). Higher values mean lower CPU priority, keeping the system more responsive.
+- `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor via CDP (float, e.g., 2.0, default: 1.0)
 - `FORM_MAX_FIELDS`: Maximum number of form fields (default: 1000)
 - `FORM_MAX_FILES`: Maximum number of file uploads (default: 1000)
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)
-- `CHROMIUM_EXECUTABLE_PATH`: Path to Chromium executable (set in Docker)
 - `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
 - `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
-- `WEASYPRINT_SERVICE_CHROMIUM_VERSION`: Chromium version (set during build)
 
 ## Development Workflow
 
@@ -156,9 +153,10 @@ The repository uses extensive pre-commit hooks including:
 ### Docker Considerations
 - Multi-architecture support (amd64/arm64)
 - Uses `--init` flag for proper signal handling and zombie process reaping
-- Includes fonts and Chromium for complete PDF rendering capabilities
+- Includes fonts and Playwright Chromium for complete PDF rendering capabilities
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
+- Playwright Chromium browser installed via `playwright install chromium --with-deps`
 
 ### Security and Compliance
 - Follows security practices with comprehensive pre-commit hooks
@@ -169,6 +167,7 @@ The repository uses extensive pre-commit hooks including:
 - Static analysis via MyPy with strict typing
 
 ### Request/Response Flow
-1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → WeasyPrint renders → PDF returned
-2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → WeasyPrint renders → PDF returned
-3. **SVG Processing**: SVG detected → SvgProcessor converts to PNG using Chromium → Embedded in PDF
+1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → SvgProcessor converts SVG to PNG via CDP → WeasyPrint renders → PDF returned
+2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → SvgProcessor converts SVG → WeasyPrint renders → PDF returned
+3. **SVG Processing via CDP**: SVG detected → SvgProcessor uses ChromiumManager (persistent Chromium instance) → CDP creates browser tab → Renders SVG → Screenshots as PNG → Tab closed → PNG embedded in PDF
+4. **Application Lifecycle**: FastAPI startup → ChromiumManager starts persistent Chromium browser → Handles all SVG conversions → FastAPI shutdown → ChromiumManager stops Chromium gracefully

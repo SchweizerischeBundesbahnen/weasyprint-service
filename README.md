@@ -39,7 +39,9 @@ The service will be accessible on port 9080.
 
 Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.
 
-To customize the device scaling when running the container, use:
+**Valid range:** 1.0 - 10.0 (default: 1.0)
+
+To customize the device scaling when running the container:
 
 ```bash
 docker run --detach \
@@ -49,38 +51,85 @@ docker run --detach \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
-### CPU Priority Configuration
+**Note:** Invalid values will fall back to default (1.0) with a warning logged.
 
-The service can control CPU priority for Chromium subprocess (used for SVG to PNG conversion) via the `CPU_NICE_LEVEL` environment variable. This helps keep the system responsive during heavy processing.
+### Concurrency Control
 
-- **CPU_NICE_LEVEL**: CPU priority (nice level) for Chromium subprocess (default: 10)
-  - Range: -20 (highest priority) to 19 (lowest priority)
-  - Higher values mean lower CPU priority, keeping the system more responsive
-  - Only works on Unix-like systems (Linux, macOS)
+The service limits concurrent SVG to PNG conversions to prevent memory leaks and resource exhaustion.
 
-To customize CPU priority when running the container:
+**Valid range:** 1 - 100 (default: 10)
 
-```bash
-docker run --detach \
-  --publish 9080:9080 \
-  --name weasyprint-service \
-  --env CPU_NICE_LEVEL=15 \
-  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
-```
-
-### Subprocess Timeout Configuration
-
-The timeout for Chromium subprocess calls can be configured via the `SUBPROCESS_TIMEOUT` environment variable (default: 30 seconds).
-
-To customize subprocess timeout when running the container:
+To customize the concurrency limit when running the container:
 
 ```bash
 docker run --detach \
   --publish 9080:9080 \
   --name weasyprint-service \
-  --env SUBPROCESS_TIMEOUT=60 \
+  --env MAX_CONCURRENT_CONVERSIONS=20 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
+
+**Note:** Invalid values will fall back to default (10) with a warning logged.
+
+### Automatic Chromium Restart
+
+The service can automatically restart the Chromium browser after a specified number of conversions to prevent memory accumulation and ensure long-term stability.
+
+**Valid range:** 0 - 10000 (default: 0 = disabled)
+
+To enable automatic restart after every 1000 conversions:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env CHROMIUM_RESTART_AFTER_N_CONVERSIONS=1000 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+**How it works:**
+- When enabled (value > 0), Chromium will automatically restart after reaching the specified conversion count
+- The restart happens transparently before the next conversion begins
+- Conversion counter resets to 0 after each restart
+- Set to 0 (default) to disable automatic restarts
+- Useful for long-running services with high conversion volumes
+
+**Note:** Invalid values will fall back to default (0) with a warning logged.
+
+### Chromium Requirements and Recovery
+
+The service requires a persistent Chromium browser instance for SVG to PNG conversion.
+
+**Startup Behavior (Fail-Fast):**
+- The service will terminate if Chromium cannot be initialized during startup
+- Common causes: Missing dependencies, insufficient memory, or missing Chromium binaries
+- Docker requirements: `--shm-size` should be configured if running many concurrent conversions
+- Health check: The `/health` endpoint verifies Chromium is running and healthy at runtime
+
+**Automatic Recovery:**
+- If a conversion fails due to Chromium crash or error, the service automatically restarts Chromium and retries
+- **Valid range:** 1 - 10 (default: 2)
+- This provides resilience against transient Chromium failures during operation
+- If restart fails or all retry attempts are exhausted, the conversion request will fail with an error
+- Recovery attempts are logged for monitoring and troubleshooting
+
+To customize the number of retry attempts:
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env CHROMIUM_MAX_CONVERSION_RETRIES=3 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+**Note:** Invalid values will fall back to default (2) with a warning logged.
+
+**Monitoring:**
+- Use Docker healthcheck or the `/health` endpoint to monitor service availability
+- Check service logs for automatic recovery events and conversion failures
+- Failed conversions are logged with WARNING level, recovery attempts with INFO level
+
+To diagnose Chromium startup issues, check the service logs for error messages during initialization. The container will exit if Chromium fails to start.
 
 ### Logging Configuration
 
@@ -152,20 +201,6 @@ docker run --detach \
   -e FORM_MAX_FILES=2000 \
   -e FORM_MAX_PART_SIZE=20971520 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
-```
-
-docker-compose.yml:
-```yaml
-services:
-  weasyprint:
-    image: ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
-    init: true
-    environment:
-      FORM_MAX_FIELDS: 2000
-      FORM_MAX_FILES: 2000
-      FORM_MAX_PART_SIZE: 20971520
-    ports:
-      - "9080:9080"
 ```
 
 ### Mount a custom fonts folder

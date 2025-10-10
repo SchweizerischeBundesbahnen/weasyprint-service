@@ -1,4 +1,3 @@
-import os
 from fastapi.testclient import TestClient
 
 from app.weasyprint_controller import app
@@ -9,7 +8,7 @@ class DummySvgProcessor:
         # capture the passed value for assertions
         DummySvgProcessor.last_device_scale_factor = device_scale_factor
 
-    def process_svg(self, parsed_html):  # type: ignore[no-untyped-def]
+    async def process_svg(self, parsed_html):  # type: ignore[no-untyped-def]
         return parsed_html
 
 

@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 import tempfile
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import unquote
@@ -13,11 +14,41 @@ from fastapi import Depends, FastAPI, Query, Request, Response
 from pydantic import BaseModel
 
 from app.attachment_manager import AttachmentManager
+from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import VersionSchema
 from app.svg_processor import SvgProcessor
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG001
+    """
+    Manage the lifecycle of the Chromium browser for SVG to PNG conversion.
+
+    This ensures a single persistent Chromium instance is started when the
+    FastAPI application starts and properly cleaned up on shutdown.
+
+    If Chromium fails to start, the application will not start and the
+    service will terminate (fail-fast behavior for containerized environments).
+    """
+    chromium_manager = get_chromium_manager()
+    logger = logging.getLogger(__name__)
+
+    logger.info("Prepare Chromium browser for SVG conversion...")
+    await chromium_manager.start()
+    logger.info("Chromium browser prepared successfully")
+
+    yield  # Application runs here
+
+    try:
+        logger.info("Stopping Chromium browser...")
+        await chromium_manager.stop()
+        logger.info("Chromium browser stopped successfully")
+    except Exception as e:  # noqa: BLE001
+        logger.error("Error stopping Chromium browser: %s", e)
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +58,36 @@ app = FastAPI(
     openapi_url="/static/openapi.json",
     docs_url="/api/docs",
     openapi_version="3.1.0",
+    lifespan=lifespan,
 )
+
+
+@app.get(
+    "/health",
+    summary="Health check",
+    description="Returns 200 OK if service is healthy, 503 if unhealthy.",
+    operation_id="getHealth",
+    tags=["meta"],
+    responses={
+        200: {"content": {"text/plain": {}}, "description": "Service is healthy"},
+        503: {"content": {"text/plain": {}}, "description": "Service is unhealthy"},
+    },
+)
+async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> Response:
+    """
+    Health check endpoint that verifies service and Chromium browser status.
+
+    Returns:
+        - 200 with "OK" if Chromium is running and healthy
+        - 503 with "Service Unavailable" if Chromium is not healthy
+
+    Note: If Chromium is not healthy, the service should have failed to start.
+    This endpoint primarily serves as a runtime health verification.
+    """
+    chromium_healthy = chromium_manager.health_check()
+    if chromium_healthy:
+        return Response("OK", media_type="text/plain", status_code=200)
+    return Response("Service Unavailable", media_type="text/plain", status_code=503)
 
 
 @app.get(
@@ -38,7 +98,7 @@ app = FastAPI(
     operation_id="getVersion",
     tags=["meta"],
 )
-async def version() -> dict[str, str | None]:
+async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | None]:
     """
     Get version information
     """
@@ -48,7 +108,7 @@ async def version() -> dict[str, str | None]:
         "weasyprint": weasyprint.__version__,
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),
         "timestamp": os.environ.get("WEASYPRINT_SERVICE_BUILD_TIMESTAMP"),
-        "chromium": os.environ.get("WEASYPRINT_SERVICE_CHROMIUM_VERSION"),
+        "chromium": chromium_manager.get_version(),
     }
     logger.debug("Version info: %s", version_info)
     return version_info
@@ -166,6 +226,7 @@ async def convert_html(
     request: Request,
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
+    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
 ) -> Response:
     """
     Convert HTML content from the request body to a PDF document.
@@ -183,7 +244,11 @@ async def convert_html(
         html = raw.decode(encoding)
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-        parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
+
+        # Use CDP-based async SVG processing
+        svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
+        parsed_html = await svg_processor.process_svg(parsed_html)
+
         processed_html = html_parser.serialize(parsed_html)
 
         logger.debug("Creating WeasyPrint HTML object with media_type=%s", render.media_type)
@@ -261,6 +326,7 @@ async def convert_html_with_attachments(
     request: Request,
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
+    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
 ) -> Response:
     """
     Convert HTML to PDF and embed provided files as PDF attachments.
@@ -284,7 +350,10 @@ async def convert_html_with_attachments(
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-        parsed_html = SvgProcessor(device_scale_factor=render.scale_factor).process_svg(parsed_html)
+
+        # Use CDP-based async SVG processing
+        svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
+        parsed_html = await svg_processor.process_svg(parsed_html)
 
         attachment_manager = AttachmentManager()
         parsed_html, attachments = await attachment_manager.process_html_and_uploads(

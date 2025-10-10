@@ -23,6 +23,30 @@ class TestParameters(NamedTuple):
     __test__ = False
 
 
+def wait_for_container_healthy(container: Container, max_wait_time: int = 60) -> None:
+    """
+    Wait for container to become healthy based on Docker healthcheck.
+
+    Args:
+        container: Docker container to wait for
+        max_wait_time: Maximum time to wait in seconds (default: 60)
+
+    Raises:
+        TimeoutError: If container does not become healthy within max_wait_time
+    """
+    start_time = time.time()
+    while time.time() - start_time < max_wait_time:
+        container.reload()
+        health_status = container.attrs.get("State", {}).get("Health", {}).get("Status")
+        if health_status == "healthy":
+            return
+        time.sleep(1)
+
+    # Timeout reached, print logs for debugging
+    logs = container.logs().decode("utf-8")
+    raise TimeoutError(f"Container did not become healthy within {max_wait_time} seconds. Logs:\n{logs}")
+
+
 @pytest.fixture(scope="module")
 def weasyprint_container():
     """
@@ -43,7 +67,8 @@ def weasyprint_container():
         auto_remove=True,  # Ensure container is automatically removed after it stops
         labels={"test-suite": "weasyprint-service"},
     )
-    time.sleep(5)
+
+    wait_for_container_healthy(container)
 
     yield container
 
@@ -72,9 +97,45 @@ def test_parameters(weasyprint_container: Container):
 
 
 def test_container_no_error_logs(test_parameters: TestParameters) -> None:
-    logs = test_parameters.container.logs()
+    """Verify container logs contain expected startup messages and no errors."""
+    logs = test_parameters.container.logs().decode("utf-8")
+    log_lines = logs.splitlines()
 
-    assert len(logs.splitlines()) == 7
+    # Check line count is as expected (note: "Chromium browser started successfully" appears twice)
+    assert len(log_lines) == 12, f"Expected 12 log lines, got {len(log_lines)}:\n{logs}"
+
+    # Check for critical errors (should not contain ERROR or CRITICAL level messages)
+    errors = [line for line in log_lines if " - ERROR - " in line or " - CRITICAL - " in line]
+    assert not errors, f"Found error logs: {errors}"
+
+    # Check for expected startup messages (ignore timestamps and specific details)
+    expected_patterns = [
+        "Logging initialized with level: INFO",
+        "Log file: /opt/weasyprint/logs/weasyprint-service_",
+        "Weasyprint service listening port: 9080",
+        "Started server process",
+        "Waiting for application startup",
+        "Prepare Chromium browser for SVG conversion",
+        "Starting Chromium browser process via Playwright",
+        "app.chromium_manager - INFO - Chromium browser started successfully",
+        "app.weasyprint_controller - INFO - Chromium browser prepared successfully",
+        "Application startup complete",
+        "Uvicorn running on http://:9080",
+        "\"GET /health HTTP/1.1\" 200 OK",
+    ]
+
+    log_text = "\n".join(log_lines)
+    for pattern in expected_patterns:
+        assert any(pattern in line for line in log_lines), f"Expected log pattern not found: '{pattern}'\nLogs:\n{log_text}"
+
+
+def test_health(test_parameters: TestParameters) -> None:
+    """Test /health endpoint returns OK when service is healthy."""
+    url = f"{test_parameters.base_url}/health"
+    response = test_parameters.request_session.get(url)
+
+    assert response.status_code == 200
+    assert response.text == "OK"
 
 
 def test_convert_simple_html(test_parameters: TestParameters) -> None:

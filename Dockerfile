@@ -6,16 +6,27 @@ LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
-    chromium \
     curl \
-    dbus \
     fonts-dejavu \
     fonts-liberation \
     fonts-noto-cjk \
     fonts-noto-cjk-extra \
     fonts-noto-color-emoji \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
+    libnspr4 \
+    libnss3 \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxkbcommon0 \
+    libxrandr2 \
     python3-brotli \
     python3-cffi && \
     apt-get clean autoclean && \
@@ -24,7 +35,6 @@ RUN apt-get update && \
 
 ARG APP_IMAGE_VERSION=0.0.0
 ENV WORKING_DIR="/opt/weasyprint" \
-    CHROMIUM_EXECUTABLE_PATH="/usr/bin/chromium" \
     WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION} \
     PORT=9080 \
     LOG_LEVEL=INFO
@@ -44,7 +54,9 @@ COPY ./app/*.py ${WORKING_DIR}/app/
 COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
 COPY ./poetry.lock ${WORKING_DIR}/poetry.lock
 
-RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && poetry install --no-root --only main
+RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && \
+    poetry install --no-root --only main && \
+    poetry run playwright install chromium --with-deps
 
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh
@@ -52,7 +64,7 @@ RUN chmod +x ${WORKING_DIR}/entrypoint.sh
 EXPOSE ${PORT}
 
 # Add healthcheck
-HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:${PORT}/version || exit 1
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:9080/health || exit 1
 
 ENTRYPOINT [ "./entrypoint.sh" ]

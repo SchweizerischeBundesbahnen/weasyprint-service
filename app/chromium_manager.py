@@ -13,7 +13,7 @@ import base64
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, cast, overload
+from typing import TYPE_CHECKING
 
 from playwright.async_api import ViewportSize, async_playwright
 
@@ -393,62 +393,71 @@ class ChromiumManager:
                 # Note: If CancelledError was caught above, these will be None and skip cleanup
                 await self._cleanup_page_resources(page, context, is_cancelled=False)
 
-    @overload
-    def _validate_config_value(
-        self,
-        value: float | None,
-        env_var: str,
-        default: float,
-        min_value: float,
-        max_value: float,
-        value_type: type[float],
-    ) -> float: ...
-
-    @overload
-    def _validate_config_value(
+    def _validate_int_config(
         self,
         value: int | None,
         env_var: str,
         default: int,
         min_value: int,
         max_value: int,
-        value_type: type[int] = ...,
-    ) -> int: ...
-
-    def _validate_config_value(
-        self,
-        value: int | float | None,
-        env_var: str,
-        default: int | float,
-        min_value: int | float,
-        max_value: int | float,
-        value_type: type[int] | type[float] = int,
-    ) -> int | float:
+    ) -> int:
         """
-        Generic validation for configuration parameters.
+        Validate integer configuration parameters.
 
         Args:
             value: Value to validate or None to read from env.
             env_var: Environment variable name.
             default: Default value if env var not set or invalid.
-            min_value: Minimum valid value (inclusive or exclusive based on param).
+            min_value: Minimum valid value (inclusive).
             max_value: Maximum valid value (inclusive).
-            value_type: Type to parse (int or float).
 
         Returns:
-            Validated configuration value.
+            Validated integer configuration value.
         """
         # Parse value from environment variable or use provided value
         if value is None:
             env_value = os.environ.get(env_var)
-            value = self._parse_float(env_value, cast("float", default)) if value_type is float else self._parse_int(env_value, cast("int", default))
+            value = self._parse_int(env_value, default)
         else:
-            value = value_type(value)
+            value = int(value)
 
         # Check bounds
-        is_valid = min_value <= value <= max_value
+        if not (min_value <= value <= max_value):
+            self.log.warning("%s must be between %s and %s, using default: %s", env_var, min_value, max_value, default)
+            return default
 
-        if not is_valid:
+        return value
+
+    def _validate_float_config(
+        self,
+        value: float | None,
+        env_var: str,
+        default: float,
+        min_value: float,
+        max_value: float,
+    ) -> float:
+        """
+        Validate float configuration parameters.
+
+        Args:
+            value: Value to validate or None to read from env.
+            env_var: Environment variable name.
+            default: Default value if env var not set or invalid.
+            min_value: Minimum valid value (inclusive).
+            max_value: Maximum valid value (inclusive).
+
+        Returns:
+            Validated float configuration value.
+        """
+        # Parse value from environment variable or use provided value
+        if value is None:
+            env_value = os.environ.get(env_var)
+            value = self._parse_float(env_value, default)
+        else:
+            value = float(value)
+
+        # Check bounds
+        if not (min_value <= value <= max_value):
             self.log.warning("%s must be between %s and %s, using default: %s", env_var, min_value, max_value, default)
             return default
 
@@ -464,13 +473,12 @@ class ChromiumManager:
         Returns:
             Validated device scale factor (1.0 - 10.0).
         """
-        return self._validate_config_value(
+        return self._validate_float_config(
             value=value,
             env_var="DEVICE_SCALE_FACTOR",
             default=1.0,
             min_value=1.0,
             max_value=10.0,
-            value_type=float,
         )
 
     def _validate_max_concurrent_conversions(self, value: int | None) -> int:
@@ -483,7 +491,7 @@ class ChromiumManager:
         Returns:
             Validated max concurrent conversions (1 - 100).
         """
-        return self._validate_config_value(
+        return self._validate_int_config(
             value=value,
             env_var="MAX_CONCURRENT_CONVERSIONS",
             default=10,
@@ -501,7 +509,7 @@ class ChromiumManager:
         Returns:
             Validated restart threshold (0 - 10000).
         """
-        return self._validate_config_value(
+        return self._validate_int_config(
             value=value,
             env_var="CHROMIUM_RESTART_AFTER_N_CONVERSIONS",
             default=0,
@@ -519,7 +527,7 @@ class ChromiumManager:
         Returns:
             Validated max retry attempts (1 - 10).
         """
-        return self._validate_config_value(
+        return self._validate_int_config(
             value=value,
             env_var="CHROMIUM_MAX_CONVERSION_RETRIES",
             default=2,
@@ -537,7 +545,7 @@ class ChromiumManager:
         Returns:
             Validated timeout in seconds (5 - 300).
         """
-        return self._validate_config_value(
+        return self._validate_int_config(
             value=value,
             env_var="CHROMIUM_CONVERSION_TIMEOUT",
             default=30,

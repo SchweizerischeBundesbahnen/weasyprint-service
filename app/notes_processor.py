@@ -8,17 +8,20 @@ Features:
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from io import BytesIO
 
 from bs4 import BeautifulSoup, Tag
 from pypdf import PdfReader, PdfWriter
 from pypdf.annotations import Text
+from pypdf.generic import NameObject, TextStringObject
 
 
 @dataclass
 class Note:
     """Represents a single note with its content and nested replies."""
 
+    time: str
     username: str
     text: str
     replies: list["Note"] = field(default_factory=list)
@@ -46,9 +49,11 @@ class NotesProcessor:
     def _parse_note(self, node: Tag) -> Note:
         """Recursively parse a note node and its replies."""
         # Extract username and text from direct children only
+        time_tag = node.find("div", class_="weasyprint-note-time", recursive=False)
         username_tag = node.find("div", class_="weasyprint-note-username", recursive=False)
         text_tag = node.find("div", class_="weasyprint-note-text", recursive=False)
 
+        time = time_tag.get_text(strip=True) if time_tag else ""
         username = username_tag.get_text(strip=True) if username_tag else ""
         text = text_tag.get_text(strip=True) if text_tag else ""
 
@@ -59,7 +64,7 @@ class NotesProcessor:
                 reply = self._parse_note(child)
                 replies.append(reply)
 
-        return Note(username=username, text=text, replies=replies)
+        return Note(time=time, username=username, text=text, replies=replies)
 
     def processPdf(self, pdf_content: bytes, notes: list[Note]) -> bytes:
         """Process PDF to replace fake note links with actual PDF sticky note annotations."""
@@ -92,15 +97,26 @@ class NotesProcessor:
                                     note = note_map[note_uuid]
                                     rect = annot_obj["/Rect"]
 
-                                    # Build the note content with replies
-                                    note_content = self._build_note_content(note)
+                                    # Build the note content (main note text + replies)
+                                    main_content = f"{note.text}"
+                                    replies_content = self._build_note_content_for_replies(note)
+                                    full_content = f"{main_content}\n\n{replies_content}" if replies_content else main_content
 
-                                    # Create text annotation (sticky note)
+                                    # Create text annotation (sticky note) with proper PDF fields
+                                    # Note: We'll set /T (title/author) and /M (modification date) after creation
                                     text_annot = Text(
                                         rect=(float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3])),
-                                        text=note_content,
+                                        text=full_content,
                                         open=False,
                                     )
+
+                                    # Manually set PDF annotation fields using proper PDF objects
+                                    # /T = Title (author/username)
+                                    # /M = Modification date in PDF format
+                                    annot_dict = text_annot
+                                    annot_dict[NameObject("/T")] = TextStringObject(note.username)
+                                    annot_dict[NameObject("/M")] = TextStringObject(self._format_pdf_date(note.time))
+
                                     new_annotations.append(text_annot)
                                     # Skip adding this link annotation
                                     continue
@@ -127,6 +143,32 @@ class NotesProcessor:
         writer.write(output)
         return output.getvalue()
 
+    def _format_pdf_date(self, time_str: str) -> str:
+        """
+        Convert time string to PDF date format.
+        PDF date format: D:YYYYMMDDHHmmSSOHH'mm
+        Example: D:20251008112400+02'00
+
+        Args:
+            time_str: Time string (e.g., "2025-10-08 11:24")
+
+        Returns:
+            PDF formatted date string
+        """
+        try:
+            # Try to parse common formats
+            for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"]:
+                try:
+                    dt = datetime.strptime(time_str, fmt)
+                    # PDF date format: D:YYYYMMDDHHmmSS
+                    return f"D:{dt.strftime('%Y%m%d%H%M%S')}"
+                except ValueError:
+                    continue
+            # If parsing fails, return original string
+            return time_str
+        except Exception:
+            return time_str
+
     def _build_note_content(self, note: Note, level: int = 0) -> str:
         """Build formatted note content including all replies."""
         indent = "  " * level
@@ -139,24 +181,39 @@ class NotesProcessor:
 
         return content
 
+    def _build_note_content_for_replies(self, note: Note) -> str:
+        """Build formatted content for replies only (excluding the top-level note)."""
+        if not note.replies:
+            return ""
+
+        content_parts = []
+        for reply in note.replies:
+            content_parts.append(self._build_note_content(reply, level=0))
+
+        return "\n\n".join(content_parts)
+
     @staticmethod
     def test_init():
         html = """
             <div class="weasyprint-note">
+                <div class="weasyprint-note-time">2025-10-08 11:24</div>
                 <div class="weasyprint-note-username">Admin</div>
                 <div class="weasyprint-note-text">Test comment</div>
 
                 <div class="weasyprint-note">
+                    <div class="weasyprint-note-time">2025-10-08 11:25</div>
                     <div class="weasyprint-note-username">User 1</div>
                     <div class="weasyprint-note-text">Test reply 1</div>
 
                     <div class="weasyprint-note">
+                        <div class="weasyprint-note-time">2025-10-08 11:27</div>
                         <div class="weasyprint-note-username">User 3</div>
                         <div class="weasyprint-note-text">Test reply to reply 1</div>
                     </div>
                 </div>
 
                 <div class="weasyprint-note">
+                    <div class="weasyprint-note-time">2025-10-08 12:24</div>
                     <div class="weasyprint-note-username">User 2</div>
                     <div class="weasyprint-note-text">Test reply 2</div>
                 </div>

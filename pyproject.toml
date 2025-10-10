@@ -50,7 +50,7 @@ tox = "4.31.0"
 # for debug source code for pytest --> see tox.ini section [testenv]
 docker = "7.1.0"
 pytest = "8.4.2"
-pytest-asyncio = "^0.26.0"
+pytest-asyncio = "^1.0.0"
 pymupdf = "1.26.4"
 pypdf = "6.1.1"
 httpx = "0.28.1"

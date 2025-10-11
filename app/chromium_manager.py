@@ -13,7 +13,7 @@ import base64
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, cast, overload
+from typing import TYPE_CHECKING
 
 from playwright.async_api import ViewportSize, async_playwright
 
@@ -178,28 +178,6 @@ class ChromiumManager:
         self.log.info("Restarting Chromium browser...")
         await self.stop()
         await self.start()
-        # Reset conversion counter after restart
-        self._conversion_count = 0
-
-    async def _check_and_restart_if_needed(self) -> None:
-        """
-        Check if Chromium needs to be restarted based on conversion count.
-
-        If restart_after_n_conversions > 0 and conversion count reaches the threshold,
-        restarts Chromium automatically.
-        """
-        if self.restart_after_n_conversions <= 0:
-            return  # Auto-restart disabled
-
-        if self._conversion_count >= self.restart_after_n_conversions:
-            conversions_before_restart = self._conversion_count
-            self.log.info(
-                "Conversion count (%d) reached threshold (%d), restarting Chromium...",
-                conversions_before_restart,
-                self.restart_after_n_conversions,
-            )
-            await self.restart()
-            self.log.info("Chromium restarted successfully after %d conversions", conversions_before_restart)
 
     async def convert_svg_to_png(self, svg_content: str, width: int, height: int, device_scale_factor: float | None = None) -> bytes:
         """
@@ -220,11 +198,28 @@ class ChromiumManager:
         if not self.is_running():
             raise RuntimeError("Chromium not started. Call start() first.")
 
-        # Atomically increment counter and check restart (prevent race condition)
+        # Atomically increment counter and check if restart is needed
+        # IMPORTANT: Restart must happen OUTSIDE the lock to avoid blocking other conversions
+        should_restart = False
+        conversions_before_restart = 0
         async with self._counter_lock:
             self._conversion_count += 1
             # Check if restart is needed (after incrementing counter)
-            await self._check_and_restart_if_needed()
+            if 0 < self.restart_after_n_conversions <= self._conversion_count:
+                should_restart = True
+                conversions_before_restart = self._conversion_count
+                # Reset counter immediately inside lock to prevent other threads from also triggering restart
+                self._conversion_count = 0
+
+        # Perform restart OUTSIDE the counter lock to avoid blocking other conversions
+        if should_restart:
+            self.log.info(
+                "Conversion count (%d) reached threshold (%d), restarting Chromium...",
+                conversions_before_restart,
+                self.restart_after_n_conversions,
+            )
+            await self.restart()
+            self.log.info("Chromium restarted successfully after %d conversions", conversions_before_restart)
 
         # Try conversion with automatic recovery on failure
         last_error: Exception | None = None
@@ -322,6 +317,29 @@ class ChromiumManager:
 
             return png_bytes
 
+    async def _cleanup_page_resources(self, page: Page | None, context: BrowserContext | None, is_cancelled: bool = False) -> None:
+        """
+        Clean up page and context resources.
+
+        Args:
+            page: The page to close (or None if not created).
+            context: The context to close (or None if not created).
+            is_cancelled: Whether cleanup is happening due to cancellation.
+        """
+        error_prefix = "during cancellation" if is_cancelled else ""
+
+        if page is not None:
+            try:
+                await page.close()
+            except Exception as e:  # noqa: BLE001
+                self.log.warning("Error closing page %s: %s", error_prefix, e)
+
+        if context is not None:
+            try:
+                await context.close()
+            except Exception as e:  # noqa: BLE001
+                self.log.warning("Error closing context %s: %s", error_prefix, e)
+
     @asynccontextmanager
     async def _get_page(self, device_scale_factor: float | None = None) -> AsyncGenerator[Page]:
         """
@@ -336,6 +354,7 @@ class ChromiumManager:
         Note:
             The page and its context are automatically closed when exiting the context.
             Uses a semaphore to limit concurrent conversions and prevent memory leaks.
+            Handles cancellation (e.g., from timeout) gracefully to ensure semaphore is always released.
         """
         if not self._browser:
             raise RuntimeError("Chromium browser is not started")
@@ -358,76 +377,87 @@ class ChromiumManager:
                 page = await context.new_page()
                 yield page
 
+            except asyncio.CancelledError:
+                # Handle cancellation (e.g., from timeout in wait_for)
+                # Explicitly clean up resources before re-raising
+                self.log.warning("Conversion cancelled (timeout or external cancellation), cleaning up page and context")
+                await self._cleanup_page_resources(page, context, is_cancelled=True)
+                # Mark as cleaned up to prevent duplicate close in finally
+                page = None
+                context = None
+                # Re-raise CancelledError to propagate cancellation
+                raise
+
             finally:
-                # Clean up: close page and context to prevent memory leaks
-                try:
-                    if page:
-                        await page.close()
-                except Exception as e:  # noqa: BLE001
-                    self.log.warning("Error closing page: %s", e)
+                # Clean up: close page and context to prevent memory leaks (for normal exit path)
+                # Note: If CancelledError was caught above, these will be None and skip cleanup
+                await self._cleanup_page_resources(page, context, is_cancelled=False)
 
-                try:
-                    if context:
-                        await context.close()
-                except Exception as e:  # noqa: BLE001
-                    self.log.warning("Error closing context: %s", e)
-
-    @overload
-    def _validate_config_value(
-        self,
-        value: float | None,
-        env_var: str,
-        default: float,
-        min_value: float,
-        max_value: float,
-        value_type: type[float],
-    ) -> float: ...
-
-    @overload
-    def _validate_config_value(
+    def _validate_int_config(
         self,
         value: int | None,
         env_var: str,
         default: int,
         min_value: int,
         max_value: int,
-        value_type: type[int] = ...,
-    ) -> int: ...
-
-    def _validate_config_value(
-        self,
-        value: int | float | None,
-        env_var: str,
-        default: int | float,
-        min_value: int | float,
-        max_value: int | float,
-        value_type: type[int] | type[float] = int,
-    ) -> int | float:
+    ) -> int:
         """
-        Generic validation for configuration parameters.
+        Validate integer configuration parameters.
 
         Args:
             value: Value to validate or None to read from env.
             env_var: Environment variable name.
             default: Default value if env var not set or invalid.
-            min_value: Minimum valid value (inclusive or exclusive based on param).
+            min_value: Minimum valid value (inclusive).
             max_value: Maximum valid value (inclusive).
-            value_type: Type to parse (int or float).
 
         Returns:
-            Validated configuration value.
+            Validated integer configuration value.
         """
         # Parse value from environment variable or use provided value
         if value is None:
             env_value = os.environ.get(env_var)
-            value = self._parse_float(env_value, cast("float", default)) if value_type is float else self._parse_int(env_value, cast("int", default))
+            value = self._parse_int(env_value, default)
         else:
-            value = value_type(value)
+            value = int(value)
 
         # Check bounds
-        is_valid = min_value <= value <= max_value
+        if not (min_value <= value <= max_value):
+            self.log.warning("%s must be between %s and %s, using default: %s", env_var, min_value, max_value, default)
+            return default
 
-        if not is_valid:
+        return value
+
+    def _validate_float_config(
+        self,
+        value: float | None,
+        env_var: str,
+        default: float,
+        min_value: float,
+        max_value: float,
+    ) -> float:
+        """
+        Validate float configuration parameters.
+
+        Args:
+            value: Value to validate or None to read from env.
+            env_var: Environment variable name.
+            default: Default value if env var not set or invalid.
+            min_value: Minimum valid value (inclusive).
+            max_value: Maximum valid value (inclusive).
+
+        Returns:
+            Validated float configuration value.
+        """
+        # Parse value from environment variable or use provided value
+        if value is None:
+            env_value = os.environ.get(env_var)
+            value = self._parse_float(env_value, default)
+        else:
+            value = float(value)
+
+        # Check bounds
+        if not (min_value <= value <= max_value):
             self.log.warning("%s must be between %s and %s, using default: %s", env_var, min_value, max_value, default)
             return default
 
@@ -443,13 +473,12 @@ class ChromiumManager:
         Returns:
             Validated device scale factor (1.0 - 10.0).
         """
-        return self._validate_config_value(
+        return self._validate_float_config(
             value=value,
             env_var="DEVICE_SCALE_FACTOR",
             default=1.0,
             min_value=1.0,
             max_value=10.0,
-            value_type=float,
         )
 
     def _validate_max_concurrent_conversions(self, value: int | None) -> int:
@@ -462,7 +491,7 @@ class ChromiumManager:
         Returns:
             Validated max concurrent conversions (1 - 100).
         """
-        return self._validate_config_value(
+        return self._validate_int_config(
             value=value,
             env_var="MAX_CONCURRENT_CONVERSIONS",
             default=10,
@@ -480,7 +509,7 @@ class ChromiumManager:
         Returns:
             Validated restart threshold (0 - 10000).
         """
-        return self._validate_config_value(
+        return self._validate_int_config(
             value=value,
             env_var="CHROMIUM_RESTART_AFTER_N_CONVERSIONS",
             default=0,
@@ -498,7 +527,7 @@ class ChromiumManager:
         Returns:
             Validated max retry attempts (1 - 10).
         """
-        return self._validate_config_value(
+        return self._validate_int_config(
             value=value,
             env_var="CHROMIUM_MAX_CONVERSION_RETRIES",
             default=2,
@@ -516,7 +545,7 @@ class ChromiumManager:
         Returns:
             Validated timeout in seconds (5 - 300).
         """
-        return self._validate_config_value(
+        return self._validate_int_config(
             value=value,
             env_var="CHROMIUM_CONVERSION_TIMEOUT",
             default=30,

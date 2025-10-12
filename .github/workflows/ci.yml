@@ -17,12 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
+      pull-requests: write  # Required for SonarCloud to comment on PRs and update status
     steps:
       - name: 📄 Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # Full history required for SonarCloud analysis
           persist-credentials: false
       - name: 🧱 Install Poetry
         run: curl -sSL https://install.python-poetry.org | python3 -

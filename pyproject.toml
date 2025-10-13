@@ -94,6 +94,11 @@ extend-select = [
     "F405", # undefined-local-with-import-star-usage (pyflakes)
     "F403", # No import * (pyflakes)
 ]
+"scripts/load_test.py" = [
+    "T201", # print statements allowed in CLI scripts
+    "PLR2004", # magic values allowed (HTTP status codes, percentiles)
+    "PLC0415", # import location flexible for optional dependencies
+]
 
 [tool.ruff.format]
 line-ending = "lf"
@@ -104,6 +109,6 @@ max-args = 7
 [tool.mypy]
 explicit_package_bases = true
 disallow_untyped_defs = true
-exclude = ["tests/.*", "examples/.*"]
+exclude = ["tests/.*", "examples/.*", "scripts/.*"]
 install_types = true
 non_interactive = true

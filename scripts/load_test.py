@@ -12,14 +12,20 @@ Features:
 - Results export to console, JSON, or CSV
 
 Usage examples:
-    # Simple test with 100 requests, 10 concurrent workers
+    # Simple test with 100 requests, 10 concurrent workers (default: 10 pages, 3 SVGs per page)
     python scripts/load_test.py --requests 100 --concurrency 10
 
     # Complex HTML test with custom URL and JSON output
     python scripts/load_test.py --url http://localhost:9080 --scenario complex --requests 500 --concurrency 20 --output results.json
 
-    # SVG conversion stress test with CSV export
-    python scripts/load_test.py --scenario svg --requests 1000 --concurrency 50 --output results.csv --format csv
+    # SVG conversion stress test with 20 pages and 5 SVGs per page
+    python scripts/load_test.py --scenario svg --requests 1000 --concurrency 50 --pages 20 --svgs-per-page 5
+
+    # Large document test (50 pages, 10 SVGs per page)
+    python scripts/load_test.py --scenario complex --pages 50 --svgs-per-page 10 --requests 100 --concurrency 5
+
+    # Minimal test with single page, no SVGs
+    python scripts/load_test.py --pages 1 --svgs-per-page 0 --requests 50
 """
 
 import argparse
@@ -90,7 +96,7 @@ class LoadTestResults:
 class LoadTester:
     """Async load tester for WeasyPrint service."""
 
-    def __init__(self, base_url: str, scenario: str, concurrency: int, timeout: float):
+    def __init__(self, base_url: str, scenario: str, concurrency: int, timeout: float, pages: int, svgs_per_page: int):
         """
         Initialize load tester.
 
@@ -99,11 +105,15 @@ class LoadTester:
             scenario: Test scenario (simple, complex, svg)
             concurrency: Number of concurrent workers
             timeout: Request timeout in seconds
+            pages: Number of pages to generate in PDF (default: 10)
+            svgs_per_page: Number of SVG elements per page (default: 3)
         """
         self.base_url = base_url.rstrip("/")
         self.scenario = scenario
         self.concurrency = concurrency
         self.timeout = timeout
+        self.pages = pages
+        self.svgs_per_page = svgs_per_page
         self.results: list[RequestStats] = []
         self.lock = asyncio.Lock()
         self.progress_counter = 0
@@ -116,51 +126,210 @@ class LoadTester:
             Tuple of (endpoint, html_content)
         """
         if self.scenario == "simple":
-            return "/convert/html", "<html><body><h1>Load Test</h1><p>Simple HTML content for performance testing.</p></body></html>"
+            return self._generate_simple_html()
         elif self.scenario == "complex":
-            html = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 40px; }
-                    h1 { color: #333; }
-                    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-                    td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #4CAF50; color: white; }
-                </style>
-            </head>
-            <body>
-                <h1>Complex Document</h1>
-                <p>This is a more complex HTML document with tables and styling.</p>
-                <table>
-                    <tr><th>Column 1</th><th>Column 2</th><th>Column 3</th></tr>
-            """
-            # Add 50 rows to make it more complex
-            for i in range(50):
-                html += f"<tr><td>Row {i} Col 1</td><td>Row {i} Col 2</td><td>Row {i} Col 3</td></tr>\n"
-            html += """
-                </table>
-            </body>
-            </html>
-            """
-            return "/convert/html", html
+            return self._generate_complex_html()
         elif self.scenario == "svg":
-            html = """
-            <!DOCTYPE html>
-            <html>
-            <body>
-                <h1>SVG Conversion Test</h1>
-                <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
-                    <circle cx="100" cy="100" r="80" fill="blue"/>
-                    <text x="100" y="110" text-anchor="middle" fill="white" font-size="20">SVG Test</text>
-                </svg>
-            </body>
-            </html>
-            """
-            return "/convert/html", html
+            return self._generate_svg_html()
         else:
             raise ValueError(f"Unknown scenario: {self.scenario}")
+
+    def _generate_svg_element(self, index: int, color: str) -> str:
+        """Generate a single SVG element with varied content."""
+        svg_types = [
+            f"""<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" style="margin: 10px;">
+                <circle cx="100" cy="100" r="80" fill="{color}"/>
+                <text x="100" y="110" text-anchor="middle" fill="white" font-size="16">SVG {index}</text>
+            </svg>""",
+            f"""<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" style="margin: 10px;">
+                <rect x="20" y="20" width="160" height="160" fill="{color}" rx="15"/>
+                <text x="100" y="110" text-anchor="middle" fill="white" font-size="16">Box {index}</text>
+            </svg>""",
+            f"""<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" style="margin: 10px;">
+                <polygon points="100,20 180,180 20,180" fill="{color}"/>
+                <text x="100" y="140" text-anchor="middle" fill="white" font-size="16">△ {index}</text>
+            </svg>""",
+        ]
+        return svg_types[index % len(svg_types)]
+
+    def _generate_simple_html(self) -> tuple[str, str]:
+        """Generate simple HTML with multiple pages and SVG elements."""
+        colors = ["#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c"]
+
+        html = """<!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                h1 { color: #2c3e50; font-size: 28px; }
+                h2 { color: #34495e; font-size: 20px; margin-top: 30px; }
+                .page-break { page-break-after: always; }
+                .svg-container { display: flex; flex-wrap: wrap; justify-content: space-around; margin: 20px 0; }
+                p { line-height: 1.6; color: #555; }
+            </style>
+        </head>
+        <body>
+        """
+
+        for page_num in range(self.pages):
+            html += f"""
+            <div class="{"page-break" if page_num < self.pages - 1 else ""}">
+                <h1>Load Test Document - Page {page_num + 1}</h1>
+                <p>This is a multi-page document generated for load testing purposes.
+                Page {page_num + 1} of {self.pages}. Each page contains SVG graphics and text content
+                to simulate realistic PDF generation scenarios.</p>
+
+                <h2>SVG Graphics Section</h2>
+                <div class="svg-container">
+            """
+
+            for svg_num in range(self.svgs_per_page):
+                color = colors[(page_num * self.svgs_per_page + svg_num) % len(colors)]
+                html += self._generate_svg_element(page_num * self.svgs_per_page + svg_num + 1, color)
+
+            html += """
+                </div>
+                <p>Additional content to fill the page. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+                Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+                quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+            </div>
+            """
+
+        html += """
+        </body>
+        </html>
+        """
+        return "/convert/html", html
+
+    def _generate_complex_html(self) -> tuple[str, str]:
+        """Generate complex HTML with tables, styling, and SVG elements."""
+        colors = ["#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c"]
+
+        html = """<!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+                h2 { color: #34495e; margin-top: 30px; }
+                table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+                td, th { border: 1px solid #bdc3c7; padding: 10px; text-align: left; }
+                th { background-color: #3498db; color: white; font-weight: bold; }
+                tr:nth-child(even) { background-color: #ecf0f1; }
+                .page-break { page-break-after: always; }
+                .svg-container { display: flex; flex-wrap: wrap; justify-content: space-around; margin: 20px 0; }
+                .stats { background-color: #e8f4f8; padding: 15px; border-radius: 5px; margin: 15px 0; }
+            </style>
+        </head>
+        <body>
+        """
+
+        for page_num in range(self.pages):
+            html += f"""
+            <div class="{"page-break" if page_num < self.pages - 1 else ""}">
+                <h1>Complex Performance Test Report - Page {page_num + 1}</h1>
+
+                <div class="stats">
+                    <strong>Document Statistics:</strong> Page {page_num + 1} of {self.pages} |
+                    SVG Elements: {self.svgs_per_page} | Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                </div>
+
+                <h2>Data Table Section</h2>
+                <table>
+                    <tr>
+                        <th>ID</th><th>Metric</th><th>Value</th><th>Status</th><th>Timestamp</th>
+                    </tr>
+            """
+
+            # Add 20 rows per page
+            for i in range(20):
+                row_id = page_num * 20 + i + 1
+                status = "Success" if (row_id % 3) != 0 else "Pending"
+                html += f"""
+                    <tr>
+                        <td>{row_id:04d}</td>
+                        <td>Metric-{row_id % 5}</td>
+                        <td>{(row_id * 123.45) % 1000:.2f}</td>
+                        <td>{status}</td>
+                        <td>2025-10-13 14:{row_id % 60:02d}:00</td>
+                    </tr>
+                """
+
+            html += """
+                </table>
+
+                <h2>Visual Elements</h2>
+                <div class="svg-container">
+            """
+
+            for svg_num in range(self.svgs_per_page):
+                color = colors[(page_num * self.svgs_per_page + svg_num) % len(colors)]
+                html += self._generate_svg_element(page_num * self.svgs_per_page + svg_num + 1, color)
+
+            html += """
+                </div>
+            </div>
+            """
+
+        html += """
+        </body>
+        </html>
+        """
+        return "/convert/html", html
+
+    def _generate_svg_html(self) -> tuple[str, str]:
+        """Generate SVG-focused HTML with maximum SVG content."""
+        colors = ["#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c", "#e67e22", "#16a085"]
+
+        html = """<!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; }
+                h1 { color: #2c3e50; text-align: center; }
+                h2 { color: #34495e; margin-top: 20px; border-left: 4px solid #3498db; padding-left: 10px; }
+                .page-break { page-break-after: always; }
+                .svg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+                .description { background-color: #f8f9fa; padding: 12px; border-radius: 5px; margin: 15px 0; }
+            </style>
+        </head>
+        <body>
+        """
+
+        for page_num in range(self.pages):
+            html += f"""
+            <div class="{"page-break" if page_num < self.pages - 1 else ""}">
+                <h1>SVG Graphics Showcase - Page {page_num + 1}</h1>
+
+                <div class="description">
+                    <strong>SVG Conversion Test:</strong> This page contains {self.svgs_per_page} SVG elements
+                    that are converted to PNG via Chromium CDP for PDF rendering. Page {page_num + 1} of {self.pages}.
+                </div>
+
+                <h2>SVG Graphics Grid</h2>
+                <div class="svg-grid">
+            """
+
+            for svg_num in range(self.svgs_per_page):
+                color = colors[(page_num * self.svgs_per_page + svg_num) % len(colors)]
+                html += f"<div>{self._generate_svg_element(page_num * self.svgs_per_page + svg_num + 1, color)}</div>"
+
+            html += """
+                </div>
+
+                <p style="margin-top: 20px; color: #7f8c8d; font-size: 14px;">
+                    Each SVG element above is processed through the Chromium browser via CDP (Chrome DevTools Protocol),
+                    converted to PNG format, and then embedded into the final PDF document. This ensures consistent
+                    rendering across all platforms and PDF viewers.
+                </p>
+            </div>
+            """
+
+        html += """
+        </body>
+        </html>
+        """
+        return "/convert/html", html
 
     async def _send_request(self, client: httpx.AsyncClient, request_id: int) -> RequestStats:
         """
@@ -433,6 +602,10 @@ def main() -> None:
 
     parser.add_argument("--timeout", "-t", type=float, default=30.0, help="Request timeout in seconds (default: 30.0)")
 
+    parser.add_argument("--pages", "-p", type=int, default=10, help="Number of pages to generate in PDF (default: 10)")
+
+    parser.add_argument("--svgs-per-page", type=int, default=3, help="Number of SVG elements per page (default: 3)")
+
     parser.add_argument("--output", "-o", type=Path, help="Output file path (optional, if not specified results are only printed to console)")
 
     parser.add_argument("--format", "-f", choices=["json", "csv"], default="json", help="Output format: json or csv (default: json)")
@@ -446,10 +619,21 @@ def main() -> None:
         parser.error("--concurrency must be positive")
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
+    if args.pages <= 0:
+        parser.error("--pages must be positive")
+    if args.svgs_per_page < 0:
+        parser.error("--svgs-per-page must be non-negative")
 
     # Run load test
     try:
-        tester = LoadTester(base_url=args.url, scenario=args.scenario, concurrency=args.concurrency, timeout=args.timeout)
+        tester = LoadTester(
+            base_url=args.url,
+            scenario=args.scenario,
+            concurrency=args.concurrency,
+            timeout=args.timeout,
+            pages=args.pages,
+            svgs_per_page=args.svgs_per_page,
+        )
 
         results = asyncio.run(tester.run(args.requests))
 

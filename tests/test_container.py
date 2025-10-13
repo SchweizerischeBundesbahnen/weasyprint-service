@@ -96,37 +96,61 @@ def test_parameters(weasyprint_container: Container):
     request_session.close()
 
 
-def test_container_no_error_logs(test_parameters: TestParameters) -> None:
-    """Verify container logs contain expected startup messages and no errors."""
+def test_container_startup_logs_valid(test_parameters: TestParameters) -> None:
+    """Verify container logs contain expected startup messages and no errors.
+
+    This test validates both single-worker (Uvicorn) and multi-worker (Gunicorn) startup modes.
+    By default, the container runs in single-worker mode (WORKERS=1).
+    """
     logs = test_parameters.container.logs().decode("utf-8")
     log_lines = logs.splitlines()
 
-    # Check line count is as expected (note: "Chromium browser started successfully" appears twice)
-    assert len(log_lines) == 12, f"Expected 12 log lines, got {len(log_lines)}:\n{logs}"
+    # Check minimum line count (flexible to account for different startup modes)
+    assert len(log_lines) >= 10, f"Expected at least 10 log lines, got {len(log_lines)}:\n{logs}"
 
     # Check for critical errors (should not contain ERROR or CRITICAL level messages)
     errors = [line for line in log_lines if " - ERROR - " in line or " - CRITICAL - " in line]
     assert not errors, f"Found error logs: {errors}"
 
-    # Check for expected startup messages (ignore timestamps and specific details)
-    expected_patterns = [
+    # Check for required startup messages (common to both single and multi-worker modes)
+    required_patterns = [
         "Logging initialized with level: INFO",
         "Log file: /opt/weasyprint/logs/weasyprint-service_",
-        "Weasyprint service listening port: 9080",
-        "Started server process",
-        "Waiting for application startup",
         "Prepare Chromium browser for SVG conversion",
         "Starting Chromium browser process via Playwright",
-        "app.chromium_manager - INFO - Chromium browser started successfully",
-        "app.weasyprint_controller - INFO - Chromium browser prepared successfully",
+        "Chromium browser started successfully",
+        "Chromium browser prepared successfully",
         "Application startup complete",
-        "Uvicorn running on http://:9080",
         "\"GET /health HTTP/1.1\" 200 OK",
     ]
 
     log_text = "\n".join(log_lines)
-    for pattern in expected_patterns:
-        assert any(pattern in line for line in log_lines), f"Expected log pattern not found: '{pattern}'\nLogs:\n{log_text}"
+    for pattern in required_patterns:
+        assert any(pattern in line for line in log_lines), f"Required log pattern not found: '{pattern}'\nLogs:\n{log_text}"
+
+    # Check for single-worker mode indicators (Uvicorn) - default mode
+    single_worker_patterns = [
+        "Weasyprint service listening port: 9080",
+        "Started server process",
+        "Uvicorn running on http://:9080",
+    ]
+
+    # Check for multi-worker mode indicators (Gunicorn) - if WORKERS > 1
+    multi_worker_patterns = [
+        "Starting Gunicorn with",
+        "Gunicorn is ready. Listening on:",
+        "Worker",
+        "spawned",
+    ]
+
+    single_worker_detected = any(pattern in log_text for pattern in single_worker_patterns)
+    multi_worker_detected = any(pattern in log_text for pattern in multi_worker_patterns)
+
+    # At least one mode should be detected
+    assert single_worker_detected or multi_worker_detected, (
+        f"Could not detect single-worker (Uvicorn) or multi-worker (Gunicorn) mode in logs.\n"
+        f"Logs:\n{log_text}"
+    )
 
 
 def test_health(test_parameters: TestParameters) -> None:

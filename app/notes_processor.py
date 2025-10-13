@@ -220,8 +220,11 @@ class NotesProcessor:
         height = y2 - y1
 
         # Create the appearance stream content (PDF content stream)
-        # This draws the image to fill the annotation rectangle
-        content = f"q {width} 0 0 {height} 0 0 cm /Img Do Q"
+        # PDF uses bottom-left origin, but images are top-left origin
+        # We need to flip the image vertically: scale Y by -1 and translate
+        # Transformation matrix: [width 0 0 -height 0 height]
+        # This scales to width/height and flips Y axis
+        content = f"q {width} 0 0 {-height} 0 {height} cm /Img Do Q"
 
         # Create the appearance stream
         appearance_stream = DecodedStreamObject()

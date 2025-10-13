@@ -20,7 +20,6 @@ from pypdf import PdfReader, PdfWriter
 from pypdf.annotations import Text
 from pypdf.generic import (
     ArrayObject,
-    ContentStream,
     DecodedStreamObject,
     DictionaryObject,
     NameObject,
@@ -54,10 +53,12 @@ class NotesProcessor:
             if isinstance(node, Tag) and node.find_parent(class_="weasyprint-note") is None:
                 note = self._parse_note(node)
                 notes.append(note)
+                # Create a link that WeasyPrint will convert to annotation
+                # Use a span with background to reserve space without text
                 fake_a_href: Tag = parsed_html.new_tag("a")
                 fake_a_href.attrs["href"] = f"https://weasyprint.note/{note.uuid}"
-                fake_a_href.attrs["style"] = "display: inline-block; width: 20px; height: 20px; overflow: hidden;"
-                fake_a_href.string = "N"
+                fake_a_href.attrs["style"] = "display: inline-block; width: 20px; height: 20px; text-decoration: none; color: transparent; background: transparent;"
+                fake_a_href.string = " "  # Empty string
                 node.replace_with(fake_a_href)
 
         return notes
@@ -136,7 +137,7 @@ class NotesProcessor:
                 else:
                     del page["/Annots"]
 
-            # Add page to writer first
+            # Add page to writer
             writer.add_page(page)
             page_number = len(writer.pages) - 1
 

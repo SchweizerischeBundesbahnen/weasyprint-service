@@ -847,11 +847,9 @@ async def test_chromium_manager_get_page_cleanup_errors():
             page = await context.new_page()
 
             # Make page.close raise an exception
-            original_page_close = page.close
             page.close = AsyncMock(side_effect=Exception("Page close error"))
 
             # Make context.close raise an exception
-            original_context_close = context.close
             context.close = AsyncMock(side_effect=Exception("Context close error"))
 
             # Return mock context that returns the failing page
@@ -867,3 +865,265 @@ async def test_chromium_manager_get_page_cleanup_errors():
 
     finally:
         await manager.stop()
+
+
+# Additional critical test cases for race conditions and edge cases
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_concurrent_restart_during_conversions():
+    """
+    Test concurrent restart behavior when restart threshold is hit while other conversions are in progress.
+
+    This tests the race condition fix where restart must happen outside the counter lock.
+    """
+    import asyncio
+
+    # Set low restart threshold to trigger restart quickly
+    manager = ChromiumManager(restart_after_n_conversions=2, max_concurrent_conversions=5)
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><circle cx="25" cy="25" r="20" fill="orange"/></svg>'
+
+        # Track which conversions complete
+        conversion_count = 10
+
+        async def convert_with_tracking(index: int) -> tuple[int, bytes]:
+            png_bytes = await manager.convert_svg_to_png(svg_content, 50, 50)
+            return (index, png_bytes)
+
+        # Run many conversions concurrently - restart will happen during execution
+        tasks = [convert_with_tracking(i) for i in range(conversion_count)]
+        completed = await asyncio.gather(*tasks)
+
+        # All conversions should succeed even though restart happened
+        assert len(completed) == conversion_count
+        for index, png_bytes in completed:
+            assert png_bytes.startswith(b"\x89PNG"), f"Conversion {index} failed"
+
+        # Counter should have wrapped around due to restart
+        # With 10 conversions and restart_after_n=2, we should have multiple restarts
+        # Final counter should be: 10 % 2 = 0 (after 5 restarts)
+        assert manager._conversion_count == 0
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_cancellation_handling():
+    """
+    Test task cancellation during convert_svg_to_png (e.g., timeout).
+
+    This tests the semaphore leak fix - ensures semaphore is released even on cancellation.
+    """
+    import asyncio
+
+    manager = ChromiumManager(max_concurrent_conversions=2, conversion_timeout=5)
+    await manager.start()
+
+    try:
+        # Create an SVG that will cause timeout
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>'
+
+        # Mock _perform_conversion to hang longer than timeout
+        original_perform = manager._perform_conversion
+
+        async def slow_conversion(*args, **kwargs):
+            await asyncio.sleep(10)  # Longer than 5-second timeout
+            return await original_perform(*args, **kwargs)
+
+        manager._perform_conversion = slow_conversion
+
+        # First conversion should timeout and be cancelled
+        with pytest.raises(RuntimeError, match="SVG to PNG conversion failed after"):
+            await manager.convert_svg_to_png(svg_content, 100, 100)
+
+        # Restore original method
+        manager._perform_conversion = original_perform
+
+        # Semaphore should have been released - subsequent conversions should work
+        svg_content_fast = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect width="50" height="50" fill="green"/></svg>'
+        png_bytes = await manager.convert_svg_to_png(svg_content_fast, 50, 50)
+        assert png_bytes.startswith(b"\x89PNG")
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_large_svg_stress_test():
+    """
+    Test memory behavior with very large SVGs (e.g., 10MB).
+
+    Ensures the system can handle large SVG files without memory issues.
+    """
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        # Generate a large SVG with many elements (~10MB)
+        # Each circle element is about 80 bytes, so ~200,000 circles = ~10MB
+        num_circles = 200_000
+        circles = []
+        for i in range(num_circles):
+            x = (i % 1000) * 2
+            y = (i // 1000) * 2
+            circles.append(f'<circle cx="{x}" cy="{y}" r="1" fill="blue"/>')
+
+        svg_content = f'''<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="2000" viewBox="0 0 2000 2000">
+            {"".join(circles)}
+        </svg>'''
+
+        # Verify SVG is actually large
+        svg_size_mb = len(svg_content.encode('utf-8')) / (1024 * 1024)
+        assert svg_size_mb >= 8, f"SVG should be ~10MB, got {svg_size_mb:.2f}MB"
+
+        # Conversion should succeed without memory issues
+        png_bytes = await manager.convert_svg_to_png(svg_content, 2000, 2000)
+        assert png_bytes.startswith(b"\x89PNG")
+
+        # PNG should be reasonable size (compressed)
+        png_size_mb = len(png_bytes) / (1024 * 1024)
+        assert png_size_mb < 50, f"PNG should be compressed, got {png_size_mb:.2f}MB"
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_browser_crash_simulation():
+    """
+    Test Chromium crash simulation - mock _perform_conversion to simulate browser process crash.
+
+    This ensures the retry mechanism works correctly when the browser crashes.
+    """
+    manager = ChromiumManager(max_conversion_retries=3)
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect width="50" height="50" fill="purple"/></svg>'
+
+        # Mock _perform_conversion to crash on first attempt
+        original_perform = manager._perform_conversion
+        crash_count = 0
+
+        async def mock_perform_with_crash(*args, **kwargs):
+            nonlocal crash_count
+            crash_count += 1
+            if crash_count == 1:
+                # Simulate browser crash
+                raise Exception("Browser process crashed")
+            # Subsequent calls succeed with original method
+            return await original_perform(*args, **kwargs)
+
+        manager._perform_conversion = mock_perform_with_crash
+
+        # First call should crash, then restart and succeed
+        png_bytes = await manager.convert_svg_to_png(svg_content, 50, 50)
+        assert png_bytes.startswith(b"\x89PNG")
+        assert crash_count == 2  # Crashed once, then succeeded on retry
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_semaphore_exhaustion_prevented():
+    """
+    Test that semaphore exhaustion is prevented even with failures and timeouts.
+
+    This is a comprehensive test of the semaphore leak fix.
+    """
+    import asyncio
+
+    manager = ChromiumManager(max_concurrent_conversions=3, conversion_timeout=5)
+    await manager.start()
+
+    try:
+        # Create slow conversion that will timeout
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        async def slow_conversion(*args, **kwargs):
+            await asyncio.sleep(10)  # Longer than 5-second timeout
+            return b"fake"
+
+        manager._perform_conversion = slow_conversion
+
+        # Try to exhaust semaphore with timeouts
+        tasks = []
+        for _ in range(5):
+            task = asyncio.create_task(manager.convert_svg_to_png(svg_content, 50, 50))
+            tasks.append(task)
+            await asyncio.sleep(0.1)  # Stagger slightly
+
+        # All should timeout/fail
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for result in results:
+            assert isinstance(result, (RuntimeError, Exception))
+
+        # Now verify semaphore is not exhausted - a fast conversion should still work
+        # Restore fast conversion
+        manager._perform_conversion = ChromiumManager._perform_conversion.__get__(manager, ChromiumManager)
+
+        # This should succeed if semaphore was properly released
+        svg_content_fast = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><rect width="50" height="50" fill="red"/></svg>'
+        png_bytes = await manager.convert_svg_to_png(svg_content_fast, 50, 50)
+        assert png_bytes.startswith(b"\x89PNG")
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_timeout_configuration():
+    """Test that conversion timeout is configurable via environment variable."""
+    os.environ["CHROMIUM_CONVERSION_TIMEOUT"] = "5"
+
+    try:
+        manager = ChromiumManager()
+        assert manager.conversion_timeout == 5
+    finally:
+        del os.environ["CHROMIUM_CONVERSION_TIMEOUT"]
+
+    # Test default value
+    if "CHROMIUM_CONVERSION_TIMEOUT" in os.environ:
+        del os.environ["CHROMIUM_CONVERSION_TIMEOUT"]
+    manager = ChromiumManager()
+    assert manager.conversion_timeout == 30
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_timeout_validation_out_of_range():
+    """Test that CHROMIUM_CONVERSION_TIMEOUT is validated."""
+    # Test value too low (minimum is 5)
+    os.environ["CHROMIUM_CONVERSION_TIMEOUT"] = "2"
+    try:
+        manager = ChromiumManager()
+        assert manager.conversion_timeout == 30  # Should fall back to default
+    finally:
+        del os.environ["CHROMIUM_CONVERSION_TIMEOUT"]
+
+    # Test value too high (maximum is 300)
+    os.environ["CHROMIUM_CONVERSION_TIMEOUT"] = "500"
+    try:
+        manager = ChromiumManager()
+        assert manager.conversion_timeout == 30  # Should fall back to default
+    finally:
+        del os.environ["CHROMIUM_CONVERSION_TIMEOUT"]
+
+    # Test valid boundary values
+    os.environ["CHROMIUM_CONVERSION_TIMEOUT"] = "5"
+    try:
+        manager = ChromiumManager()
+        assert manager.conversion_timeout == 5  # Minimum valid value
+    finally:
+        del os.environ["CHROMIUM_CONVERSION_TIMEOUT"]
+
+    os.environ["CHROMIUM_CONVERSION_TIMEOUT"] = "300"
+    try:
+        manager = ChromiumManager()
+        assert manager.conversion_timeout == 300  # Maximum valid value
+    finally:
+        del os.environ["CHROMIUM_CONVERSION_TIMEOUT"]

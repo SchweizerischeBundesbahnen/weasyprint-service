@@ -99,6 +99,7 @@ extend-select = [
     "T201", # print statements allowed in CLI scripts
     "PLR2004", # magic values allowed (HTTP status codes, percentiles)
     "PLC0415", # import location flexible for optional dependencies
+    "C901", # complexity allowed in CLI main function
 ]
 
 [tool.ruff.format]

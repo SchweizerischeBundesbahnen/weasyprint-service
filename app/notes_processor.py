@@ -37,8 +37,6 @@ class Note:
     username: str
     text: str
     title: str = ""
-    icon: str = "Comment"
-    custom_icon_path: str = ""  # Path to custom PNG icon file
     replies: list["Note"] = field(default_factory=list)
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
 
@@ -65,20 +63,16 @@ class NotesProcessor:
 
     def _parse_note(self, node: Tag) -> Note:
         """Recursively parse a note node and its replies."""
-        # Extract username, text, title, icon, custom_icon_path, and time from direct children only
+        # Extract username, text, title, and time from direct children only
         time_tag = node.find("div", class_="weasyprint-note-time", recursive=False)
         username_tag = node.find("div", class_="weasyprint-note-username", recursive=False)
         text_tag = node.find("div", class_="weasyprint-note-text", recursive=False)
         title_tag = node.find("div", class_="weasyprint-note-title", recursive=False)
-        icon_tag = node.find("div", class_="weasyprint-note-icon", recursive=False)
-        custom_icon_tag = node.find("div", class_="weasyprint-note-custom-icon", recursive=False)
 
         time = time_tag.get_text(strip=True) if time_tag else ""
         username = username_tag.get_text(strip=True) if username_tag else ""
         text = text_tag.get_text(strip=True) if text_tag else ""
         title = title_tag.get_text(strip=True) if title_tag else ""
-        icon = icon_tag.get_text(strip=True) if icon_tag else "Comment"
-        custom_icon_path = custom_icon_tag.get_text(strip=True) if custom_icon_tag else ""
 
         # Find direct child notes (replies)
         replies: list[Note] = []
@@ -87,7 +81,7 @@ class NotesProcessor:
                 reply = self._parse_note(child)
                 replies.append(reply)
 
-        return Note(time=time, username=username, text=text, title=title, icon=icon, custom_icon_path=custom_icon_path, replies=replies)
+        return Note(time=time, username=username, text=text, title=title, replies=replies)
 
     def processPdf(self, pdf_content: bytes, notes: list[Note]) -> bytes:
         """Process PDF to replace fake note links with actual PDF sticky note annotations with nested replies."""
@@ -272,19 +266,16 @@ class NotesProcessor:
         # Manually set PDF annotation fields using proper PDF objects
         # /T = Author/username
         # /Subj = Subject/title
-        # /Name = Icon name (Comment, Key, Note, Help, NewParagraph, Paragraph, Insert)
+        # /AP = Custom appearance (icon)
         # /CreationDate = Creation date in PDF format
         # /M = Modification date in PDF format
         annot_dict = text_annot
         annot_dict[NameObject("/T")] = TextStringObject(note.username)
 
-        # Set icon if specified (defaults to "Comment")
-        if note.icon:
-            annot_dict[NameObject("/Name")] = NameObject(f"/{note.icon}")
-
-        # If custom icon is specified, create custom appearance
-        if note.custom_icon_path and Path(note.custom_icon_path).exists():
-            xobject_ref = self._embed_png_as_xobject(writer, note.custom_icon_path)
+        # Always use custom icon
+        custom_icon_path = str(Path(__file__).parent.parent / "tests" / "test-data" / "note.png")
+        if Path(custom_icon_path).exists():
+            xobject_ref = self._embed_png_as_xobject(writer, custom_icon_path)
             if xobject_ref is not None:
                 appearance_dict = self._create_custom_appearance(writer, rect, xobject_ref)
                 annot_dict[NameObject("/AP")] = appearance_dict
@@ -373,23 +364,17 @@ class NotesProcessor:
 # Comment, Key, Note, Help, NewParagraph, Paragraph, Insert
     @staticmethod
     def test_parse() -> list[Note]:
-        # Get path to custom icon for testing
-        from pathlib import Path
-        custom_icon_path = str(Path(__file__).parent.parent / "tests" / "test-data" / "note.png")
-
-        html = f"""
+        html = """
             <div class="weasyprint-note">
                 <div class="weasyprint-note-time">2020-04-30T07:24:55.000+02:00</div>
                 <div class="weasyprint-note-username">Admin</div>
-                <div class="weasyprint-note-title">Main Note Title (Custom Icon)</div>
-                <div class="weasyprint-note-custom-icon">{custom_icon_path}</div>
+                <div class="weasyprint-note-title">Main Note Title</div>
                 <div class="weasyprint-note-text">Test comment with custom icon</div>
 
                 <div class="weasyprint-note">
                     <div class="weasyprint-note-time">2020-04-30T09:33:55.000</div>
                     <div class="weasyprint-note-username">User 1</div>
                     <div class="weasyprint-note-title">Reply 1 Title</div>
-                    <div class="weasyprint-note-icon">Help</div>
                     <div class="weasyprint-note-text">Test reply 1</div>
 
                     <div class="weasyprint-note">
@@ -402,7 +387,6 @@ class NotesProcessor:
                 <div class="weasyprint-note">
                     <div class="weasyprint-note-time">2020-04-30T09:00:00+08:00</div>
                     <div class="weasyprint-note-username">User 2</div>
-                    <div class="weasyprint-note-icon">Note</div>
                     <div class="weasyprint-note-text">Test reply 2</div>
                 </div>
 
@@ -419,28 +403,22 @@ class NotesProcessor:
         # Verify structure
         assert len(notes) == 1, "Should have 1 top-level note"
         assert notes[0].username == "Admin", "Top-level username should be Admin"
-        assert notes[0].title == "Main Note Title (Custom Icon)", "Top-level title should match"
-        assert notes[0].custom_icon_path == custom_icon_path, f"Top-level custom_icon_path should be '{custom_icon_path}'"
+        assert notes[0].title == "Main Note Title", "Top-level title should match"
         assert notes[0].text == "Test comment with custom icon", "Top-level text should match"
-        # assert notes[0].time == "2020-04-30T08:00:00.000+08:00", "Top-level time should be ISO 8601 format"
         assert len(notes[0].replies) == 2, "Top-level note should have 2 replies"
 
         # Verify first reply
         assert notes[0].replies[0].username == "User 1", "First reply username should be User 1"
         assert notes[0].replies[0].title == "Reply 1 Title", "First reply title should be 'Reply 1 Title'"
-        # assert notes[0].replies[0].icon == "Help", "First reply icon should be 'Help'"
         assert notes[0].replies[0].text == "Test reply 1", "First reply text should be 'Test reply 1'"
-        # assert notes[0].replies[0].time == "2020-04-30T08:15:00+08:00", "First reply time should be ISO 8601 format"
         assert len(notes[0].replies[0].replies) == 1, "First reply should have 1 nested reply"
 
-        # Verify nested reply (no icon specified, should default to "Comment")
+        # Verify nested reply
         assert notes[0].replies[0].replies[0].username == "User 3", "Nested reply username should be User 3"
-        # assert notes[0].replies[0].replies[0].icon == "Comment", "Nested reply icon should default to 'Comment'"
         assert notes[0].replies[0].replies[0].text == "Test reply to reply 1", "Nested reply text should match"
 
         # Verify second reply
         assert notes[0].replies[1].username == "User 2", "Second reply username should be User 2"
-        # assert notes[0].replies[1].icon == "Note", "Second reply icon should be 'Note'"
         assert notes[0].replies[1].text == "Test reply 2", "Second reply text should be 'Test reply 2'"
         assert len(notes[0].replies[1].replies) == 0, "Second reply should have no nested replies"
 

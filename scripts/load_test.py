@@ -601,7 +601,7 @@ def main() -> None:
         help="Test scenario: simple (basic HTML), complex (tables/styling), svg (SVG conversion) (default: simple)",
     )
 
-    parser.add_argument("--timeout", "-t", type=float, default=30.0, help="Request timeout in seconds (default: 30.0)")
+    parser.add_argument("--timeout", "-t", type=float, default=120.0, help="Request timeout in seconds (default: 120.0)")
 
     parser.add_argument("--pages", "-p", type=int, default=10, help="Number of pages to generate in PDF (default: 10)")
 

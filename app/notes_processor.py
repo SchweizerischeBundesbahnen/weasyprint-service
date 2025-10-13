@@ -272,8 +272,8 @@ class NotesProcessor:
         annot_dict = text_annot
         annot_dict[NameObject("/T")] = TextStringObject(note.username)
 
-        # Always use custom icon
-        custom_icon_path = str(Path(__file__).parent.parent / "tests" / "test-data" / "note.png")
+        # Always use custom icon from static folder
+        custom_icon_path = str(Path(__file__).parent / "static" / "note.png")
         if Path(custom_icon_path).exists():
             xobject_ref = self._embed_png_as_xobject(writer, custom_icon_path)
             if xobject_ref is not None:

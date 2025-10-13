@@ -74,66 +74,74 @@ class ChromiumManager:
     async def start(self) -> None:
         """Start the persistent Chromium browser process."""
         async with self._lock:
-            if self._started:
-                self.log.warning("Chromium already started")
-                return
+            await self._start_internal()
 
-            try:
-                self.log.info("Starting Chromium browser process via Playwright...")
-                self._playwright = await async_playwright().start()
+    async def _start_internal(self) -> None:
+        """Internal start logic without lock acquisition (for use in restart())."""
+        if self._started:
+            self.log.warning("Chromium already started")
+            return
 
-                self._browser = await self._playwright.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-gpu",
-                        "--disable-software-rasterizer",
-                        "--disable-dev-shm-usage",
-                        "--disable-web-security",  # Allow rendering of local and data URLs without CORS restrictions
-                        "--disable-features=IsolateOrigins,site-per-process",  # Disable strict site isolation (needed for local/data URLs to access embedded resources)
-                        "--hide-scrollbars",
-                    ],
-                )
+        try:
+            self.log.info("Starting Chromium browser process via Playwright...")
+            self._playwright = await async_playwright().start()
 
-                self._started = True
-                self.log.info("Chromium browser started successfully")
-            except ImportError as e:
-                self.log.error("Playwright not installed: %s", e)
-                raise RuntimeError("Playwright library is required for ChromiumManager") from e
-            except Exception as e:
-                self.log.error("Failed to start Chromium: %s", e)
-                self._started = False
-                raise
+            self._browser = await self._playwright.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-gpu",
+                    "--disable-software-rasterizer",
+                    "--disable-dev-shm-usage",
+                    "--disable-web-security",  # Allow rendering of local and data URLs without CORS restrictions
+                    "--disable-features=IsolateOrigins,site-per-process",  # Disable strict site isolation (needed for local/data URLs to access embedded resources)
+                    "--hide-scrollbars",
+                ],
+            )
+
+            self._started = True
+            self.log.info("Chromium browser started successfully")
+        except ImportError as e:
+            self.log.error("Playwright not installed: %s", e)
+            raise RuntimeError("Playwright library is required for ChromiumManager") from e
+        except Exception as e:
+            self.log.error("Failed to start Chromium: %s", e)
+            self._started = False
+            raise
 
     async def stop(self) -> None:
         """Stop the persistent Chromium browser process."""
         async with self._lock:
-            if not self._started:
-                return
+            await self._stop_internal()
 
-            try:
-                if self._browser:
-                    try:
-                        await self._browser.close()
-                    except Exception as e:  # noqa: BLE001
-                        self.log.error("Error closing browser: %s", e)
-                    finally:
-                        self._browser = None
+    async def _stop_internal(self) -> None:
+        """Internal stop logic without lock acquisition (for use in restart())."""
+        if not self._started:
+            return
 
-                if self._playwright:
-                    try:
-                        await self._playwright.stop()
-                    except Exception as e:  # noqa: BLE001
-                        self.log.error("Error stopping Playwright: %s", e)
-                    finally:
-                        self._playwright = None
+        try:
+            if self._browser:
+                try:
+                    await self._browser.close()
+                except Exception as e:  # noqa: BLE001
+                    self.log.error("Error closing browser: %s", e)
+                finally:
+                    self._browser = None
 
-                self.log.info("Chromium browser stopped successfully")
-            finally:
-                # Always mark as stopped and clear resources, even if cleanup fails
-                self._started = False
-                self._browser = None
-                self._playwright = None
+            if self._playwright:
+                try:
+                    await self._playwright.stop()
+                except Exception as e:  # noqa: BLE001
+                    self.log.error("Error stopping Playwright: %s", e)
+                finally:
+                    self._playwright = None
+
+            self.log.info("Chromium browser stopped successfully")
+        finally:
+            # Always mark as stopped and clear resources, even if cleanup fails
+            self._started = False
+            self._browser = None
+            self._playwright = None
 
     def is_running(self) -> bool:
         """Check if the Chromium browser is running."""
@@ -174,10 +182,37 @@ class ChromiumManager:
             return None
 
     async def restart(self) -> None:
-        """Restart the Chromium browser (useful for recovering from errors)."""
+        """
+        Restart the Chromium browser (useful for recovering from errors).
+
+        This method ensures thread-safety by:
+        1. Using _lock to serialize restarts (prevent multiple concurrent restarts)
+        2. Acquiring all semaphore permits to wait for active conversions to finish
+        3. Blocking new conversions from starting during restart
+        4. Safely stopping and restarting the browser
+        5. Releasing all permits to allow new conversions
+        """
         self.log.info("Restarting Chromium browser...")
-        await self.stop()
-        await self.start()
+
+        # Use _lock to ensure only one restart at a time (prevents concurrent restarts from deadlocking)
+        async with self._lock:
+            # Acquire all semaphore permits to wait for active conversions to complete
+            # and prevent new conversions from starting during restart
+            permits_acquired = []
+            try:
+                for _ in range(self.max_concurrent_conversions):
+                    await self._semaphore.acquire()
+                    permits_acquired.append(True)
+
+                # Now that all active conversions are done and new ones are blocked,
+                # safely restart the browser using internal methods (to avoid re-acquiring _lock)
+                await self._stop_internal()
+                await self._start_internal()
+
+            finally:
+                # Always release all acquired permits, even if restart fails
+                for _ in permits_acquired:
+                    self._semaphore.release()
 
     async def convert_svg_to_png(self, svg_content: str, width: int, height: int, device_scale_factor: float | None = None) -> bytes:
         """

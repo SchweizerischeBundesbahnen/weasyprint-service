@@ -55,8 +55,14 @@ scripts/precommit_generate_openapi.sh
 
 ### Local Development Server
 ```bash
-# Start FastAPI development server
+# Start FastAPI development server (single-worker mode)
 poetry run python -m app.weasyprint_service_application --port 9080
+
+# Start with multiple workers (production mode)
+poetry run python -m app.weasyprint_service_application --port 9080 --workers 4
+
+# Using environment variables
+WORKERS=4 poetry run python -m app.weasyprint_service_application --port 9080
 
 # Access API documentation
 # http://localhost:9080/api/docs
@@ -67,8 +73,11 @@ poetry run python -m app.weasyprint_service_application --port 9080
 # Build development image
 docker build --build-arg APP_IMAGE_VERSION=0.0.0 --file Dockerfile --tag weasyprint-service:0.0.0 .
 
-# Run development container
+# Run development container (single-worker mode, default)
 docker run --detach --init --publish 9080:9080 --name weasyprint-service weasyprint-service:0.0.0
+
+# Run with multiple workers (production mode)
+docker run --detach --init --publish 9080:9080 --env WORKERS=4 --name weasyprint-service weasyprint-service:0.0.0
 
 # Test container structure
 container-structure-test test --image weasyprint-service:0.0.0 --config ./tests/container/container-structure-test.yaml
@@ -99,6 +108,19 @@ grype weasyprint-service:0.0.0
 - `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data, for embedded resources)
 
 ### Configuration and Environment Variables
+
+**Worker Configuration:**
+- `WORKERS`: Number of worker processes (default: 1)
+  - `1` = Single-worker mode (uvicorn, development)
+  - `>1` = Multi-worker mode (gunicorn + uvicorn workers, production)
+  - Recommended: CPU cores × 2 for production
+  - Each worker gets its own ChromiumManager with dedicated Chromium browser
+- `WORKER_TIMEOUT`: Worker timeout in seconds (default: 120)
+- `GRACEFUL_TIMEOUT`: Graceful shutdown timeout in seconds (default: 30)
+- `KEEP_ALIVE`: Keep-alive timeout in seconds (default: 5)
+
+**Application Configuration:**
+- `PORT`: Service port (default: 9080)
 - `LOG_LEVEL`: Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) - defaults to INFO
 - `LOG_DIR`: Directory for log files (defaults to `/opt/weasyprint/logs`)
 - `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor via CDP (float, e.g., 2.0, default: 1.0)
@@ -301,4 +323,6 @@ The repository uses extensive pre-commit hooks including:
 1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → SvgProcessor converts SVG to PNG via CDP → WeasyPrint renders → PDF returned
 2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → SvgProcessor converts SVG → WeasyPrint renders → PDF returned
 3. **SVG Processing via CDP**: SVG detected → SvgProcessor uses ChromiumManager (persistent Chromium instance) → CDP creates browser tab → Renders SVG → Screenshots as PNG → Tab closed → PNG embedded in PDF
-4. **Application Lifecycle**: FastAPI startup → ChromiumManager starts persistent Chromium browser → Handles all SVG conversions → FastAPI shutdown → ChromiumManager stops Chromium gracefully
+4. **Application Lifecycle**:
+   - **Single-worker mode**: FastAPI/uvicorn startup → ChromiumManager starts persistent Chromium browser → Handles all SVG conversions → FastAPI shutdown → ChromiumManager stops Chromium gracefully
+   - **Multi-worker mode**: Gunicorn spawns N worker processes → Each worker starts FastAPI/uvicorn → Each worker gets its own ChromiumManager with dedicated Chromium browser → Handles conversions independently → Gunicorn shutdown → All workers clean up gracefully

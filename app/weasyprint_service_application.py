@@ -1,6 +1,8 @@
 import argparse
 import logging
 import os
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -77,8 +79,50 @@ def setup_logging() -> Path:
     return log_file  # Return log file path for testing
 
 
-def start_server(port: int) -> None:
+def start_server_single_worker(port: int) -> None:
+    """Start the server in single-worker mode using uvicorn directly."""
     uvicorn.run(app=weasyprint_controller.app, host="", port=port)
+
+
+def start_server_multi_worker(port: int, workers: int) -> None:
+    """
+    Start the server in multi-worker mode using gunicorn with uvicorn workers.
+
+    Args:
+        port: Port to bind to
+        workers: Number of worker processes
+
+    Note:
+        Uses gunicorn.conf.py for configuration. Each worker gets its own
+        ChromiumManager instance with a dedicated Chromium browser process.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("Starting server in multi-worker mode with %d workers", workers)
+
+    # Set PORT environment variable for gunicorn config
+    os.environ["PORT"] = str(port)
+    os.environ["WORKERS"] = str(workers)
+
+    # Build gunicorn command
+    cmd = [
+        "gunicorn",
+        "app.weasyprint_controller:app",
+        "--config",
+        "gunicorn.conf.py",
+    ]
+
+    logger.info("Executing: %s", " ".join(cmd))
+
+    # Execute gunicorn and propagate exit code
+    try:
+        result = subprocess.run(cmd, check=True)  # noqa: S603  # Command built from trusted sources (hardcoded strings + env vars)
+        sys.exit(result.returncode)
+    except subprocess.CalledProcessError as e:
+        logger.error("Gunicorn exited with error code %d", e.returncode)
+        sys.exit(e.returncode)
+    except KeyboardInterrupt:
+        logger.info("Received keyboard interrupt, shutting down")
+        sys.exit(0)
 
 
 def main() -> None:
@@ -86,16 +130,49 @@ def main() -> None:
     Main entry point for the WeasyPrint service.
 
     Parses command line arguments, initializes logging, and starts the server.
-    The service port can be specified via command line argument (defaults to 9080).
+    The service can run in single-worker or multi-worker mode:
+    - Single-worker (default): Uses uvicorn directly, suitable for development
+    - Multi-worker: Uses gunicorn with uvicorn workers, recommended for production
+
+    Command-line arguments:
+        --port: Service port (default: 9080)
+        --workers: Number of worker processes (default: 1)
+
+    Environment variables:
+        WORKERS: Number of worker processes (overrides --workers)
+        PORT: Service port (overrides --port)
+
+    Examples:
+        # Single-worker mode (development)
+        python -m app.weasyprint_service_application --port 9080
+
+        # Multi-worker mode (production)
+        python -m app.weasyprint_service_application --port 9080 --workers 4
+
+        # Using environment variables
+        WORKERS=4 PORT=9080 python -m app.weasyprint_service_application
     """
-    parser = argparse.ArgumentParser(description="Weasyprint service")
+    parser = argparse.ArgumentParser(description="WeasyPrint service")
     parser.add_argument("--port", default=9080, type=int, required=False, help="Service port")
+    parser.add_argument("--workers", default=1, type=int, required=False, help="Number of worker processes (default: 1, use >1 for multi-worker mode)")
     args = parser.parse_args()
 
-    setup_logging()
-    logging.info("Weasyprint service listening port: " + str(args.port))
+    # Environment variables override command-line arguments
+    port = int(os.getenv("PORT", args.port))
+    workers = int(os.getenv("WORKERS", args.workers))
 
-    start_server(args.port)
+    setup_logging()
+
+    logger = logging.getLogger(__name__)
+    logger.info("WeasyPrint service configuration:")
+    logger.info("  Port: %d", port)
+    logger.info("  Workers: %d", workers)
+    logger.info("  Mode: %s", "multi-worker (gunicorn)" if workers > 1 else "single-worker (uvicorn)")
+
+    if workers > 1:
+        start_server_multi_worker(port, workers)
+    else:
+        start_server_single_worker(port)
 
 
 if __name__ == "__main__":

@@ -37,7 +37,8 @@ ARG APP_IMAGE_VERSION=0.0.0
 ENV WORKING_DIR="/opt/weasyprint" \
     WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION} \
     PORT=9080 \
-    LOG_LEVEL=INFO
+    LOG_LEVEL=INFO \
+    WORKERS=1
 
 # Create and configure logging directory
 RUN mkdir -p ${WORKING_DIR}/logs && \
@@ -53,6 +54,7 @@ COPY requirements.txt ${WORKING_DIR}/requirements.txt
 COPY ./app/*.py ${WORKING_DIR}/app/
 COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
 COPY ./poetry.lock ${WORKING_DIR}/poetry.lock
+COPY ./gunicorn.conf.py ${WORKING_DIR}/gunicorn.conf.py
 
 RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && \
     poetry install --no-root --only main && \

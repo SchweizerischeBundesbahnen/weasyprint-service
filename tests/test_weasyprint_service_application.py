@@ -10,16 +10,16 @@ def test_main_runs(monkeypatch, tmp_path):
     log_dir = tmp_path / "logs"
     monkeypatch.setenv("LOG_DIR", str(log_dir))
 
-    # Mock command line arguments
+    # Mock command line arguments (single-worker mode)
     monkeypatch.setattr(sys, "argv", ["weasyprint_service_application.py", "--port", "9999"])
 
     # Set up fake server
     logger = logging.getLogger("test")
 
-    def fake_start_server(port):
+    def fake_start_server_single_worker(port):
         logger.info(f"Fake server started on port {port}")
 
-    monkeypatch.setattr(weasyprint_service_application, "start_server", fake_start_server)
+    monkeypatch.setattr(weasyprint_service_application, "start_server_single_worker", fake_start_server_single_worker)
 
     # Run main and verify
     weasyprint_service_application.main()

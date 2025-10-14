@@ -2,8 +2,8 @@
 Notes (sticky notes) processing utilities for WeasyPrint service.
 
 Features:
-- Convert special <span class="weasyprint-note">...<span> with a special <a href="#note-id">...</a>
-- Replaces links like "#note-id" with a native sticky notes
+- Convert special <span class="sticky-note">...<span> with a special <a href="https://sticky.note/XXX">...</a>
+- Replaces links above in the final PDF with a native sticky notes
 - Supports custom PNG icons via appearance streams
 """
 
@@ -47,14 +47,14 @@ class NotesProcessor:
     def replaceNotes(self, parsed_html: BeautifulSoup) -> list[Note]:
         """Parse note trees from HTML and return structured Note objects."""
         notes: list[Note] = []
-        for node in parsed_html.find_all(class_="weasyprint-note"):
-            if isinstance(node, Tag) and node.find_parent(class_="weasyprint-note") is None:
+        for node in parsed_html.find_all(class_="sticky-note"):
+            if isinstance(node, Tag) and node.find_parent(class_="sticky-note") is None:
                 note = self._parse_note(node)
                 notes.append(note)
                 # Create a link that WeasyPrint will convert to annotation
                 # Use an anchor with inline-block to reserve space without visible text
                 fake_a_href: Tag = parsed_html.new_tag("a")
-                fake_a_href.attrs["href"] = f"https://weasyprint.note/{note.uuid}"
+                fake_a_href.attrs["href"] = f"https://sticky.note/{note.uuid}"
                 fake_a_href.attrs["style"] = "display: inline-block; width: 20px; height: 20px; text-decoration: none; color: transparent; background: transparent;"
                 fake_a_href.string = " "  # Empty string
                 node.replace_with(fake_a_href)
@@ -64,10 +64,10 @@ class NotesProcessor:
     def _parse_note(self, node: Tag) -> Note:
         """Recursively parse a note node and its replies."""
         # Extract username, text, title, and time from direct children only
-        time_tag = node.find("span", class_="weasyprint-note-time", recursive=False)
-        username_tag = node.find("span", class_="weasyprint-note-username", recursive=False)
-        text_tag = node.find("span", class_="weasyprint-note-text", recursive=False)
-        title_tag = node.find("span", class_="weasyprint-note-title", recursive=False)
+        time_tag = node.find("span", class_="sticky-note-time", recursive=False)
+        username_tag = node.find("span", class_="sticky-note-username", recursive=False)
+        text_tag = node.find("span", class_="sticky-note-text", recursive=False)
+        title_tag = node.find("span", class_="sticky-note-title", recursive=False)
 
         time = time_tag.get_text(strip=True) if time_tag else ""
         username = username_tag.get_text(strip=True) if username_tag else ""
@@ -76,7 +76,7 @@ class NotesProcessor:
 
         # Find direct child notes (replies)
         replies: list[Note] = []
-        for child in node.find_all(class_="weasyprint-note", recursive=False):
+        for child in node.find_all(class_="sticky-note", recursive=False):
             if isinstance(child, Tag):
                 reply = self._parse_note(child)
                 replies.append(reply)
@@ -110,9 +110,9 @@ class NotesProcessor:
                         action = annot_obj["/A"]
                         if "/URI" in action:
                             uri = str(action["/URI"])
-                            if uri.startswith("https://weasyprint.note/"):
+                            if uri.startswith("https://sticky.note/"):
                                 # Extract UUID from URI
-                                note_uuid = uri.replace("https://weasyprint.note/", "")
+                                note_uuid = uri.replace("https://sticky.note/", "")
                                 if note_uuid in note_map:
                                     # Store note and rect for later processing
                                     note = note_map[note_uuid]
@@ -364,29 +364,29 @@ class NotesProcessor:
     @staticmethod
     def test_parse() -> list[Note]:
         html = """
-            <span class="weasyprint-note">
-                <span class="weasyprint-note-time">2020-04-30T07:24:55.000+02:00</span>
-                <span class="weasyprint-note-username">Admin</span>
-                <span class="weasyprint-note-title">Main Note Title</span>
-                <span class="weasyprint-note-text">Test comment with custom icon</span>
+            <span class="sticky-note">
+                <span class="sticky-note-time">2020-04-30T07:24:55.000+02:00</span>
+                <span class="sticky-note-username">Admin</span>
+                <span class="sticky-note-title">Main Note Title</span>
+                <span class="sticky-note-text">Test comment with custom icon</span>
 
-                <span class="weasyprint-note">
-                    <span class="weasyprint-note-time">2020-04-30T09:33:55.000</span>
-                    <span class="weasyprint-note-username">User 1</span>
-                    <span class="weasyprint-note-title">Reply 1 Title</span>
-                    <span class="weasyprint-note-text">Test reply 1</span>
+                <span class="sticky-note">
+                    <span class="sticky-note-time">2020-04-30T09:33:55.000</span>
+                    <span class="sticky-note-username">User 1</span>
+                    <span class="sticky-note-title">Reply 1 Title</span>
+                    <span class="sticky-note-text">Test reply 1</span>
 
-                    <span class="weasyprint-note">
-                        <span class="weasyprint-note-time">2020-04-30T08:30:00+08:00</span>
-                        <span class="weasyprint-note-username">User 3</span>
-                        <span class="weasyprint-note-text">Test reply to reply 1</span>
+                    <span class="sticky-note">
+                        <span class="sticky-note-time">2020-04-30T08:30:00+08:00</span>
+                        <span class="sticky-note-username">User 3</span>
+                        <span class="sticky-note-text">Test reply to reply 1</span>
                     </span>
                 </span>
 
-                <span class="weasyprint-note">
-                    <span class="weasyprint-note-time">2020-04-30T09:00:00+08:00</span>
-                    <span class="weasyprint-note-username">User 2</span>
-                    <span class="weasyprint-note-text">Test reply 2</span>
+                <span class="sticky-note">
+                    <span class="sticky-note-time">2020-04-30T09:00:00+08:00</span>
+                    <span class="sticky-note-username">User 2</span>
+                    <span class="sticky-note-text">Test reply 2</span>
                 </span>
 
             </span>

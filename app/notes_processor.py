@@ -2,7 +2,7 @@
 Notes (sticky notes) processing utilities for WeasyPrint service.
 
 Features:
-- Convert special <div class="weasyprint-note">...<div> with a special <a href="#note-id">...</a>
+- Convert special <span class="weasyprint-note">...<span> with a special <a href="#note-id">...</a>
 - Replaces links like "#note-id" with a native sticky notes
 - Supports custom PNG icons via appearance streams
 """
@@ -52,7 +52,7 @@ class NotesProcessor:
                 note = self._parse_note(node)
                 notes.append(note)
                 # Create a link that WeasyPrint will convert to annotation
-                # Use a span with background to reserve space without text
+                # Use an anchor with inline-block to reserve space without visible text
                 fake_a_href: Tag = parsed_html.new_tag("a")
                 fake_a_href.attrs["href"] = f"https://weasyprint.note/{note.uuid}"
                 fake_a_href.attrs["style"] = "display: inline-block; width: 20px; height: 20px; text-decoration: none; color: transparent; background: transparent;"
@@ -64,10 +64,10 @@ class NotesProcessor:
     def _parse_note(self, node: Tag) -> Note:
         """Recursively parse a note node and its replies."""
         # Extract username, text, title, and time from direct children only
-        time_tag = node.find("div", class_="weasyprint-note-time", recursive=False)
-        username_tag = node.find("div", class_="weasyprint-note-username", recursive=False)
-        text_tag = node.find("div", class_="weasyprint-note-text", recursive=False)
-        title_tag = node.find("div", class_="weasyprint-note-title", recursive=False)
+        time_tag = node.find("span", class_="weasyprint-note-time", recursive=False)
+        username_tag = node.find("span", class_="weasyprint-note-username", recursive=False)
+        text_tag = node.find("span", class_="weasyprint-note-text", recursive=False)
+        title_tag = node.find("span", class_="weasyprint-note-title", recursive=False)
 
         time = time_tag.get_text(strip=True) if time_tag else ""
         username = username_tag.get_text(strip=True) if username_tag else ""
@@ -127,7 +127,7 @@ class NotesProcessor:
 
                 # Update annotations list with kept annotations
                 if annots_to_keep:
-                    page["/Annots"] = annots_to_keep
+                    page[NameObject("/Annots")] = ArrayObject(annots_to_keep)
                 else:
                     del page["/Annots"]
 
@@ -361,36 +361,35 @@ class NotesProcessor:
             # If ISO format parsing fails, return empty to skip setting the field
             return ""
 
-# Comment, Key, Note, Help, NewParagraph, Paragraph, Insert
     @staticmethod
     def test_parse() -> list[Note]:
         html = """
-            <div class="weasyprint-note">
-                <div class="weasyprint-note-time">2020-04-30T07:24:55.000+02:00</div>
-                <div class="weasyprint-note-username">Admin</div>
-                <div class="weasyprint-note-title">Main Note Title</div>
-                <div class="weasyprint-note-text">Test comment with custom icon</div>
+            <span class="weasyprint-note">
+                <span class="weasyprint-note-time">2020-04-30T07:24:55.000+02:00</span>
+                <span class="weasyprint-note-username">Admin</span>
+                <span class="weasyprint-note-title">Main Note Title</span>
+                <span class="weasyprint-note-text">Test comment with custom icon</span>
 
-                <div class="weasyprint-note">
-                    <div class="weasyprint-note-time">2020-04-30T09:33:55.000</div>
-                    <div class="weasyprint-note-username">User 1</div>
-                    <div class="weasyprint-note-title">Reply 1 Title</div>
-                    <div class="weasyprint-note-text">Test reply 1</div>
+                <span class="weasyprint-note">
+                    <span class="weasyprint-note-time">2020-04-30T09:33:55.000</span>
+                    <span class="weasyprint-note-username">User 1</span>
+                    <span class="weasyprint-note-title">Reply 1 Title</span>
+                    <span class="weasyprint-note-text">Test reply 1</span>
 
-                    <div class="weasyprint-note">
-                        <div class="weasyprint-note-time">2020-04-30T08:30:00+08:00</div>
-                        <div class="weasyprint-note-username">User 3</div>
-                        <div class="weasyprint-note-text">Test reply to reply 1</div>
-                    </div>
-                </div>
+                    <span class="weasyprint-note">
+                        <span class="weasyprint-note-time">2020-04-30T08:30:00+08:00</span>
+                        <span class="weasyprint-note-username">User 3</span>
+                        <span class="weasyprint-note-text">Test reply to reply 1</span>
+                    </span>
+                </span>
 
-                <div class="weasyprint-note">
-                    <div class="weasyprint-note-time">2020-04-30T09:00:00+08:00</div>
-                    <div class="weasyprint-note-username">User 2</div>
-                    <div class="weasyprint-note-text">Test reply 2</div>
-                </div>
+                <span class="weasyprint-note">
+                    <span class="weasyprint-note-time">2020-04-30T09:00:00+08:00</span>
+                    <span class="weasyprint-note-username">User 2</span>
+                    <span class="weasyprint-note-text">Test reply 2</span>
+                </span>
 
-            </div>
+            </span>
         """
         soup = BeautifulSoup(html, "html.parser")
         processor = NotesProcessor()

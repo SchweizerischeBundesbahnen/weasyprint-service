@@ -221,7 +221,10 @@ class NotesProcessor:
             xobject.set_data(compressed_data)
 
             # Add the XObject to the PDF writer
-            return writer._add_object(xobject)
+            # Note: Using private method _add_object() as pypdf 6.1.1 doesn't provide
+            # a public API for adding custom XObject streams. This is the standard
+            # approach for advanced PDF manipulation with pypdf.
+            return writer._add_object(xobject)  # type: ignore[attr-defined]
 
         except Exception as e:
             logger.error("Failed to embed PNG icon from %s: %s", png_path, e, exc_info=True)
@@ -260,7 +263,9 @@ class NotesProcessor:
         appearance_stream.set_data(content.encode("latin-1"))
 
         # Add the appearance stream to the PDF
-        appearance_ref = writer._add_object(appearance_stream)
+        # Note: Using private method _add_object() as pypdf 6.1.1 doesn't provide
+        # a public API for adding custom appearance streams.
+        appearance_ref = writer._add_object(appearance_stream)  # type: ignore[attr-defined]
 
         # Create the appearance dictionary
         appearance_dict = DictionaryObject()
@@ -268,7 +273,7 @@ class NotesProcessor:
 
         return appearance_dict
 
-    def _create_note_annotation_with_replies(self, writer: PdfWriter, page_number: int, note: Note, rect: tuple[float, float, float, float], parent_ref: object | None = None) -> object:
+    def _create_note_annotation_with_replies(self, writer: PdfWriter, page_number: int, note: Note, rect: tuple[float, float, float, float], parent_ref: object | None = None) -> object | None:
         """
         Recursively create note annotations with proper parent-child relationships using /IRT field.
 

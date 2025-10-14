@@ -271,7 +271,14 @@ async def convert_html(
         logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
         if len(notes) > 0:
-            output_pdf = notes_processor.processPdf(output_pdf, notes)
+            try:
+                logger.debug("Processing %d notes for PDF annotation", len(notes))
+                output_pdf = notes_processor.processPdf(output_pdf, notes)
+                logger.debug("Notes processed successfully")
+            except Exception as e:
+                logger.error("Failed to process PDF notes: %s", str(e), exc_info=True)
+                # Continue with PDF without notes rather than failing completely
+                logger.warning("Returning PDF without note annotations due to processing error")
 
         return await __create_response(output, output_pdf)
 

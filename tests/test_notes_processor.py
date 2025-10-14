@@ -143,7 +143,7 @@ def test_process_pdf_with_notes(save_test_outputs: bool):
     notes = processor.replaceNotes(soup)
 
     # Override the UUID of the main note to match the one in notes_link_to_replace.pdf
-    notes[0].uuid = "ee837793-0c2a-4a45-8fd2-10e9b486ec23"
+    notes[0].uuid = "24925f16-d2a8-4000-b181-a909b9f04ed6"
 
     # Load the test PDF
     test_pdf_path = Path(__file__).parent / "test-data" / "notes_link_to_replace.pdf"

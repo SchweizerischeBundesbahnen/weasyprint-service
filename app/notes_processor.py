@@ -7,6 +7,7 @@ Features:
 - Supports custom PNG icons via appearance streams
 """
 
+import logging
 import uuid
 import zlib
 from dataclasses import dataclass, field
@@ -24,9 +25,13 @@ from pypdf.generic import (
     DictionaryObject,
     NameObject,
     NumberObject,
-    RectangleObject,
     TextStringObject,
 )
+
+logger = logging.getLogger(__name__)
+
+# Constants for image processing
+RGBA_CHANNEL_COUNT = 4  # RGBA images have 4 channels (Red, Green, Blue, Alpha)
 
 
 @dataclass
@@ -42,7 +47,12 @@ class Note:
 
 
 class NotesProcessor:
-    """Process SVG elements in HTML content."""
+    """Processes sticky notes in HTML and PDF content.
+
+    - Parses note trees from HTML and returns structured Note objects.
+    - Replaces sticky note elements with anchor tags for annotation.
+    - Embeds notes as native PDF annotations, supporting custom icons.
+    """
 
     def replaceNotes(self, parsed_html: BeautifulSoup) -> list[Note]:
         """Parse note trees from HTML and return structured Note objects."""
@@ -95,41 +105,7 @@ class NotesProcessor:
         # Process each page
         for page in reader.pages:
             # Find and remove note links, create annotations instead
-            notes_to_create: list[tuple[Note, tuple[float, float, float, float]]] = []
-
-            if "/Annots" in page:
-                annots_to_keep = []
-                annots_array = page["/Annots"]  # type: ignore[index]
-                # Type check: ensure annots_array is iterable
-                if not isinstance(annots_array, list):
-                    annots_array = list(annots_array) if hasattr(annots_array, "__iter__") else []  # type: ignore[assignment]
-                for annot in annots_array:  # type: ignore[attr-defined]
-                    annot_obj = annot.get_object()
-                    # Check if this is a link annotation with our fake URL
-                    if annot_obj.get("/Subtype") == "/Link" and "/A" in annot_obj:
-                        action = annot_obj["/A"]
-                        if "/URI" in action:
-                            uri = str(action["/URI"])
-                            if uri.startswith("https://sticky.note/"):
-                                # Extract UUID from URI
-                                note_uuid = uri.replace("https://sticky.note/", "")
-                                if note_uuid in note_map:
-                                    # Store note and rect for later processing
-                                    note = note_map[note_uuid]
-                                    rect = annot_obj["/Rect"]
-                                    rect_tuple = (float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3]))
-                                    notes_to_create.append((note, rect_tuple))
-                                    # Skip adding this link annotation
-                                    continue
-
-                    # Keep other annotations
-                    annots_to_keep.append(annot)
-
-                # Update annotations list with kept annotations
-                if annots_to_keep:
-                    page[NameObject("/Annots")] = ArrayObject(annots_to_keep)
-                else:
-                    del page["/Annots"]
+            notes_to_create = self._extract_note_annotations(page, note_map)
 
             # Add page to writer
             writer.add_page(page)
@@ -143,6 +119,62 @@ class NotesProcessor:
         output = BytesIO()
         writer.write(output)
         return output.getvalue()
+
+    def _extract_note_annotations(self, page: object, note_map: dict[str, Note]) -> list[tuple[Note, tuple[float, float, float, float]]]:
+        """Extract note annotations from page and remove fake links."""
+        notes_to_create: list[tuple[Note, tuple[float, float, float, float]]] = []
+
+        if "/Annots" not in page:  # type: ignore[operator]
+            return notes_to_create
+
+        annots_to_keep = []
+        annots_array = page["/Annots"]  # type: ignore[index]
+        # Type check: ensure annots_array is iterable
+        if not isinstance(annots_array, list):
+            annots_array = list(annots_array) if hasattr(annots_array, "__iter__") else []  # type: ignore[assignment]
+
+        for annot in annots_array:  # type: ignore[attr-defined]
+            annot_obj = annot.get_object()
+            # Check if this is a sticky note link
+            note_data = self._extract_note_from_annotation(annot_obj, note_map)
+            if note_data:
+                notes_to_create.append(note_data)
+                continue  # Skip adding this link annotation
+
+            # Keep other annotations
+            annots_to_keep.append(annot)
+
+        # Update annotations list with kept annotations
+        if annots_to_keep:
+            page[NameObject("/Annots")] = ArrayObject(annots_to_keep)  # type: ignore[index]
+        else:
+            del page["/Annots"]  # type: ignore[attr-defined]
+
+        return notes_to_create
+
+    def _extract_note_from_annotation(self, annot_obj: object, note_map: dict[str, Note]) -> tuple[Note, tuple[float, float, float, float]] | None:
+        """Extract note data from a link annotation if it's a sticky note link."""
+        if annot_obj.get("/Subtype") != "/Link" or "/A" not in annot_obj:  # type: ignore[attr-defined,operator]
+            return None
+
+        action = annot_obj["/A"]  # type: ignore[index]
+        if "/URI" not in action:  # type: ignore[operator]
+            return None
+
+        uri = str(action["/URI"])
+        if not uri.startswith("https://sticky.note/"):
+            return None
+
+        # Extract UUID from URI
+        note_uuid = uri.replace("https://sticky.note/", "")
+        if note_uuid not in note_map:
+            return None
+
+        # Store note and rect for later processing
+        note = note_map[note_uuid]
+        rect = annot_obj["/Rect"]  # type: ignore[index]
+        rect_tuple = (float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3]))
+        return (note, rect_tuple)
 
     def _embed_png_as_xobject(self, writer: PdfWriter, png_path: str) -> object | None:
         """
@@ -163,7 +195,7 @@ class NotesProcessor:
             if img.mode == "RGBA":
                 # Convert RGBA to RGB by compositing over white background
                 background = Image.new("RGB", img.size, (255, 255, 255))
-                background.paste(img, mask=img.split()[3] if len(img.split()) == 4 else None)  # 3 is the alpha channel
+                background.paste(img, mask=img.split()[3] if len(img.split()) == RGBA_CHANNEL_COUNT else None)  # 3 is the alpha channel
                 img = background  # type: ignore[assignment]
             elif img.mode not in ("RGB", "L"):
                 img = img.convert("RGB")  # type: ignore[assignment]
@@ -192,12 +224,10 @@ class NotesProcessor:
             return writer._add_object(xobject)
 
         except Exception as e:
-            print(f"Warning: Failed to embed PNG icon from {png_path}: {e}")
+            logger.error("Failed to embed PNG icon from %s: %s", png_path, e, exc_info=True)
             return None
 
-    def _create_custom_appearance(
-        self, writer: PdfWriter, rect: tuple[float, float, float, float], xobject_ref: object
-    ) -> DictionaryObject:
+    def _create_custom_appearance(self, writer: PdfWriter, rect: tuple[float, float, float, float], xobject_ref: object) -> DictionaryObject:
         """
         Create a custom appearance stream for an annotation using an embedded image.
 
@@ -226,9 +256,7 @@ class NotesProcessor:
         appearance_stream[NameObject("/Type")] = NameObject("/XObject")
         appearance_stream[NameObject("/Subtype")] = NameObject("/Form")
         appearance_stream[NameObject("/BBox")] = ArrayObject([NumberObject(0), NumberObject(0), NumberObject(width), NumberObject(height)])
-        appearance_stream[NameObject("/Resources")] = DictionaryObject(
-            {NameObject("/XObject"): DictionaryObject({NameObject("/Img"): xobject_ref})}
-        )
+        appearance_stream[NameObject("/Resources")] = DictionaryObject({NameObject("/XObject"): DictionaryObject({NameObject("/Img"): xobject_ref})})
         appearance_stream.set_data(content.encode("latin-1"))
 
         # Add the appearance stream to the PDF
@@ -240,9 +268,7 @@ class NotesProcessor:
 
         return appearance_dict
 
-    def _create_note_annotation_with_replies(
-        self, writer: PdfWriter, page_number: int, note: Note, rect: tuple[float, float, float, float], parent_ref: object | None = None
-    ) -> object:
+    def _create_note_annotation_with_replies(self, writer: PdfWriter, page_number: int, note: Note, rect: tuple[float, float, float, float], parent_ref: object | None = None) -> object:
         """
         Recursively create note annotations with proper parent-child relationships using /IRT field.
 
@@ -339,7 +365,7 @@ class NotesProcessor:
             dt = datetime.fromisoformat(time_str)
 
             # Build PDF date format: D:YYYYMMDDHHmmSSOHH'mm
-            base_date = dt.strftime('%Y%m%d%H%M%S')
+            base_date = dt.strftime("%Y%m%d%H%M%S")
 
             # Extract timezone offset
             if dt.tzinfo is not None:

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.chromium_manager import ChromiumManager, get_chromium_manager
+from app.chromium_manager import ChromiumConfig, ChromiumManager, get_chromium_manager
 
 
 @pytest.mark.asyncio
@@ -77,7 +77,7 @@ async def test_chromium_manager_convert_svg_not_started():
 @pytest.mark.asyncio
 async def test_chromium_manager_device_scale_factor():
     """Test that device scale factor is respected."""
-    manager = ChromiumManager(device_scale_factor=2.0)
+    manager = ChromiumManager(config=ChromiumConfig(device_scale_factor=2.0))
     await manager.start()
 
     try:
@@ -302,7 +302,7 @@ async def test_chromium_manager_stop_when_not_running():
 @pytest.mark.asyncio
 async def test_chromium_manager_convert_with_custom_scale_factor():
     """Test SVG conversion with per-conversion scale factor override."""
-    manager = ChromiumManager(device_scale_factor=1.0)
+    manager = ChromiumManager(config=ChromiumConfig(device_scale_factor=1.0))
     await manager.start()
 
     try:
@@ -397,7 +397,7 @@ async def test_chromium_manager_get_page_without_browser():
 @pytest.mark.asyncio
 async def test_chromium_manager_get_page_with_custom_scale():
     """Test _get_page with custom device scale factor."""
-    manager = ChromiumManager(device_scale_factor=1.0)
+    manager = ChromiumManager(config=ChromiumConfig(device_scale_factor=1.0))
     await manager.start()
 
     try:
@@ -495,7 +495,7 @@ async def test_chromium_manager_concurrent_limit():
     import asyncio
 
     # Set a low limit to test semaphore behavior
-    manager = ChromiumManager(max_concurrent_conversions=3)
+    manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=3))
     await manager.start()
 
     try:
@@ -537,7 +537,7 @@ async def test_chromium_manager_max_concurrent_from_env():
 @pytest.mark.asyncio
 async def test_chromium_manager_restart_after_n_conversions():
     """Test that Chromium automatically restarts after N conversions."""
-    manager = ChromiumManager(restart_after_n_conversions=3)
+    manager = ChromiumManager(config=ChromiumConfig(restart_after_n_conversions=3))
     await manager.start()
 
     try:
@@ -567,7 +567,7 @@ async def test_chromium_manager_restart_after_n_conversions():
 @pytest.mark.asyncio
 async def test_chromium_manager_restart_disabled_by_default():
     """Test that auto-restart is disabled when restart_after_n_conversions is 0."""
-    manager = ChromiumManager(restart_after_n_conversions=0)
+    manager = ChromiumManager(config=ChromiumConfig(restart_after_n_conversions=0))
     await manager.start()
 
     try:
@@ -880,7 +880,7 @@ async def test_chromium_manager_concurrent_restart_during_conversions():
     import asyncio
 
     # Set low restart threshold to trigger restart quickly
-    manager = ChromiumManager(restart_after_n_conversions=2, max_concurrent_conversions=5)
+    manager = ChromiumManager(config=ChromiumConfig(restart_after_n_conversions=2, max_concurrent_conversions=5))
     await manager.start()
 
     try:
@@ -921,7 +921,7 @@ async def test_chromium_manager_cancellation_handling():
     """
     import asyncio
 
-    manager = ChromiumManager(max_concurrent_conversions=2, conversion_timeout=5)
+    manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=2, conversion_timeout=5))
     await manager.start()
 
     try:
@@ -1000,7 +1000,7 @@ async def test_chromium_manager_browser_crash_simulation():
 
     This ensures the retry mechanism works correctly when the browser crashes.
     """
-    manager = ChromiumManager(max_conversion_retries=3)
+    manager = ChromiumManager(config=ChromiumConfig(max_conversion_retries=3))
     await manager.start()
 
     try:
@@ -1039,7 +1039,7 @@ async def test_chromium_manager_semaphore_exhaustion_prevented():
     """
     import asyncio
 
-    manager = ChromiumManager(max_concurrent_conversions=3, conversion_timeout=5)
+    manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=3, conversion_timeout=5))
     await manager.start()
 
     try:
@@ -1159,7 +1159,7 @@ async def test_chromium_manager_health_monitoring_from_env():
 @pytest.mark.asyncio
 async def test_chromium_manager_health_monitoring_starts_with_browser():
     """Test that health monitoring starts when browser starts."""
-    manager = ChromiumManager(health_check_enabled=True, health_check_interval=10)
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))
     assert manager._health_monitor_task is None
 
     await manager.start()
@@ -1176,7 +1176,7 @@ async def test_chromium_manager_health_monitoring_starts_with_browser():
 @pytest.mark.asyncio
 async def test_chromium_manager_health_monitoring_disabled():
     """Test that health monitoring can be disabled."""
-    manager = ChromiumManager(health_check_enabled=False)
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=False))
     await manager.start()
 
     try:
@@ -1244,7 +1244,7 @@ async def test_chromium_manager_metrics_after_conversion():
 @pytest.mark.asyncio
 async def test_chromium_manager_metrics_after_failure():
     """Test that metrics are updated after conversion failures."""
-    manager = ChromiumManager(max_conversion_retries=1)
+    manager = ChromiumManager(config=ChromiumConfig(max_conversion_retries=1))
     await manager.start()
 
     try:
@@ -1276,7 +1276,7 @@ async def test_chromium_manager_health_monitoring_interval():
     """Test that health monitoring runs at specified interval."""
     import asyncio
 
-    manager = ChromiumManager(health_check_enabled=True, health_check_interval=10)  # 10 second interval (minimum)
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))  # 10 second interval (minimum)
     await manager.start()
 
     try:
@@ -1362,7 +1362,7 @@ async def test_chromium_manager_auto_restart_on_health_degradation():
     import asyncio
     from unittest.mock import AsyncMock, patch
 
-    manager = ChromiumManager(health_check_enabled=True, health_check_interval=10)
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))
     await manager.start()
 
     try:
@@ -1448,7 +1448,7 @@ async def test_chromium_manager_concurrent_conversions_metrics():
     """Test that metrics are correctly tracked with concurrent conversions."""
     import asyncio
 
-    manager = ChromiumManager(max_concurrent_conversions=5)
+    manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=5))
     await manager.start()
 
     try:
@@ -1477,7 +1477,7 @@ async def test_chromium_manager_concurrent_conversions_metrics():
 @pytest.mark.asyncio
 async def test_chromium_manager_metrics_with_disabled_health_monitoring():
     """Test that metrics collection works even when health monitoring is disabled."""
-    manager = ChromiumManager(health_check_enabled=False)
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=False))
     await manager.start()
 
     try:
@@ -1503,7 +1503,7 @@ async def test_chromium_manager_metrics_with_disabled_health_monitoring():
 @pytest.mark.asyncio
 async def test_chromium_manager_error_rate_calculation():
     """Test error rate calculation with various success/failure combinations."""
-    manager = ChromiumManager(max_conversion_retries=1)
+    manager = ChromiumManager(config=ChromiumConfig(max_conversion_retries=1))
     await manager.start()
 
     try:
@@ -1551,7 +1551,7 @@ async def test_chromium_manager_error_rate_calculation():
 @pytest.mark.asyncio
 async def test_chromium_manager_consecutive_failures_reset():
     """Test that consecutive failures counter resets after successful conversion."""
-    manager = ChromiumManager(max_conversion_retries=1)
+    manager = ChromiumManager(config=ChromiumConfig(max_conversion_retries=1))
     await manager.start()
 
     try:

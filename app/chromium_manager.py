@@ -27,6 +27,33 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class ChromiumConfig:
+    """
+    Configuration settings for ChromiumManager.
+
+    Groups all configuration parameters into a single dataclass to improve
+    maintainability and reduce constructor parameter count.
+
+    Attributes:
+        device_scale_factor: Device scale factor for rendering (1.0-10.0, default 1.0).
+        max_concurrent_conversions: Maximum concurrent SVG conversions (1-100, default 10).
+        restart_after_n_conversions: Restart Chromium after N conversions (0-10000, default 0 = disabled).
+        max_conversion_retries: Maximum retry attempts on conversion failure (1-10, default 2).
+        conversion_timeout: Timeout in seconds for each conversion (5-300, default 30).
+        health_check_interval: Interval in seconds for background health checks (10-300, default 30).
+        health_check_enabled: Enable background health monitoring (default True).
+    """
+
+    device_scale_factor: float | None = None
+    max_concurrent_conversions: int | None = None
+    restart_after_n_conversions: int | None = None
+    max_conversion_retries: int | None = None
+    conversion_timeout: int | None = None
+    health_check_interval: int | None = None
+    health_check_enabled: bool | None = None
+
+
+@dataclass
 class ChromiumMetrics:
     """
     Metrics for Chromium browser health and performance monitoring.
@@ -101,43 +128,35 @@ class ChromiumManager:
     SVG images to PNG using Chrome DevTools Protocol via Playwright.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
-        device_scale_factor: float | None = None,
+        config: ChromiumConfig | None = None,
         logger: logging.Logger | None = None,
-        max_concurrent_conversions: int | None = None,
-        restart_after_n_conversions: int | None = None,
-        max_conversion_retries: int | None = None,
-        conversion_timeout: int | None = None,
-        health_check_interval: int | None = None,
-        health_check_enabled: bool | None = None,
     ) -> None:
         """
         Initialize ChromiumManager.
 
         Args:
-            device_scale_factor: Device scale factor for rendering. If None, reads DEVICE_SCALE_FACTOR (default 1.0).
+            config: Configuration settings. If None, creates default config from environment variables.
             logger: Optional logger; if None, a module-level logger is used.
-            max_concurrent_conversions: Maximum concurrent SVG conversions (1-100). If None, reads MAX_CONCURRENT_CONVERSIONS (default 10).
-            restart_after_n_conversions: Restart Chromium after N conversions (0-10000). If None, reads CHROMIUM_RESTART_AFTER_N_CONVERSIONS (default 0 = disabled).
-            max_conversion_retries: Maximum retry attempts on conversion failure (1-10). If None, reads CHROMIUM_MAX_CONVERSION_RETRIES (default 2).
-            conversion_timeout: Timeout in seconds for each conversion (5-300). If None, reads CHROMIUM_CONVERSION_TIMEOUT (default 30).
-            health_check_interval: Interval in seconds for background health checks (10-300). If None, reads CHROMIUM_HEALTH_CHECK_INTERVAL (default 30).
-            health_check_enabled: Enable background health monitoring. If None, reads CHROMIUM_HEALTH_CHECK_ENABLED (default True).
 
         Raises:
             ValueError: If any configuration parameter is out of valid range.
         """
         self.log = logger or logging.getLogger(__name__)
 
+        # Use provided config or create default
+        if config is None:
+            config = ChromiumConfig()
+
         # Parse and validate all configuration parameters
-        self.device_scale_factor = self._validate_device_scale_factor(device_scale_factor)
-        self.max_concurrent_conversions = self._validate_max_concurrent_conversions(max_concurrent_conversions)
-        self.restart_after_n_conversions = self._validate_restart_after_n_conversions(restart_after_n_conversions)
-        self.max_conversion_retries = self._validate_max_conversion_retries(max_conversion_retries)
-        self.conversion_timeout = self._validate_conversion_timeout(conversion_timeout)
-        self.health_check_interval = self._validate_health_check_interval(health_check_interval)
-        self.health_check_enabled = self._validate_health_check_enabled(health_check_enabled)
+        self.device_scale_factor = self._validate_device_scale_factor(config.device_scale_factor)
+        self.max_concurrent_conversions = self._validate_max_concurrent_conversions(config.max_concurrent_conversions)
+        self.restart_after_n_conversions = self._validate_restart_after_n_conversions(config.restart_after_n_conversions)
+        self.max_conversion_retries = self._validate_max_conversion_retries(config.max_conversion_retries)
+        self.conversion_timeout = self._validate_conversion_timeout(config.conversion_timeout)
+        self.health_check_interval = self._validate_health_check_interval(config.health_check_interval)
+        self.health_check_enabled = self._validate_health_check_enabled(config.health_check_enabled)
 
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None

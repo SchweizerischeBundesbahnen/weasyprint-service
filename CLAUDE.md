@@ -53,6 +53,49 @@ poetry run mypy .
 scripts/precommit_generate_openapi.sh
 ```
 
+### Load Testing
+The repository includes a comprehensive load testing script for performance evaluation and stress testing.
+
+```bash
+# Basic load test (100 requests, 10 concurrent workers)
+poetry run python scripts/load_test.py
+
+# Custom configuration
+poetry run python scripts/load_test.py --requests 1000 --concurrency 50
+
+# Test specific scenario
+poetry run python scripts/load_test.py --scenario simple    # Basic HTML conversion
+poetry run python scripts/load_test.py --scenario complex  # Complex HTML with tables
+poetry run python scripts/load_test.py --scenario svg      # SVG to PNG conversion
+
+# Export results to JSON
+poetry run python scripts/load_test.py --requests 500 --concurrency 20 --output results.json
+
+# Export results to CSV
+poetry run python scripts/load_test.py --requests 500 --concurrency 20 --output results.csv --format csv
+
+# Test against custom URL
+poetry run python scripts/load_test.py --url http://localhost:9080 --requests 200 --concurrency 10
+
+# Stress test with high concurrency
+poetry run python scripts/load_test.py --scenario svg --requests 2000 --concurrency 100 --timeout 60
+```
+
+**Load Test Features:**
+- Real-time progress display with success/failure counts
+- Comprehensive metrics: min/max/avg/p50/p95/p99 response times
+- Requests per second calculation
+- Status code and error distribution
+- Configurable scenarios (simple, complex, SVG)
+- Export to JSON or CSV format
+- Async/concurrent request execution using httpx
+
+**Use Cases:**
+- Validate service behavior under load
+- Identify performance bottlenecks
+- Test Chromium browser pool behavior with SVG conversions
+- Generate performance baselines for CI/CD
+
 ### Local Development Server
 ```bash
 # Start FastAPI development server

@@ -11,22 +11,271 @@
           "meta"
         ],
         "summary": "Health check",
-        "description": "Returns 200 OK if service is healthy, 503 if unhealthy.",
+        "description": "Returns health status with optional detailed metrics. Use ?detailed=true for JSON response with metrics.",
         "operationId": "getHealth",
+        "parameters": [
+          {
+            "name": "detailed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Return detailed JSON response with metrics",
+              "default": false,
+              "title": "Detailed"
+            },
+            "description": "Return detailed JSON response with metrics"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Service is healthy",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$defs": {
+                    "ChromiumMetricsSchema": {
+                      "description": "Schema for Chromium performance and health metrics",
+                      "properties": {
+                        "total_conversions": {
+                          "description": "Total successful SVG to PNG conversions",
+                          "title": "Total Conversions",
+                          "type": "integer"
+                        },
+                        "failed_conversions": {
+                          "description": "Total failed conversion attempts",
+                          "title": "Failed Conversions",
+                          "type": "integer"
+                        },
+                        "error_rate_percent": {
+                          "description": "Error rate as percentage",
+                          "title": "Error Rate Percent",
+                          "type": "number"
+                        },
+                        "total_restarts": {
+                          "description": "Total browser restarts since startup",
+                          "title": "Total Restarts",
+                          "type": "integer"
+                        },
+                        "avg_conversion_time_ms": {
+                          "description": "Average conversion time in milliseconds",
+                          "title": "Avg Conversion Time Ms",
+                          "type": "number"
+                        },
+                        "last_health_check": {
+                          "description": "Timestamp of last health check (Unix time)",
+                          "title": "Last Health Check",
+                          "type": "number"
+                        },
+                        "last_health_status": {
+                          "description": "Result of last health check (true=healthy)",
+                          "title": "Last Health Status",
+                          "type": "boolean"
+                        },
+                        "consecutive_failures": {
+                          "description": "Current consecutive conversion failures",
+                          "title": "Consecutive Failures",
+                          "type": "integer"
+                        },
+                        "uptime_seconds": {
+                          "description": "Browser uptime in seconds",
+                          "title": "Uptime Seconds",
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "total_conversions",
+                        "failed_conversions",
+                        "error_rate_percent",
+                        "total_restarts",
+                        "avg_conversion_time_ms",
+                        "last_health_check",
+                        "last_health_status",
+                        "consecutive_failures",
+                        "uptime_seconds"
+                      ],
+                      "title": "ChromiumMetricsSchema",
+                      "type": "object"
+                    }
+                  },
+                  "description": "Schema for detailed health status response",
+                  "properties": {
+                    "status": {
+                      "description": "Overall health status: healthy or unhealthy",
+                      "title": "Status",
+                      "type": "string"
+                    },
+                    "chromium_running": {
+                      "description": "Whether Chromium browser is running",
+                      "title": "Chromium Running",
+                      "type": "boolean"
+                    },
+                    "chromium_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Chromium version if available",
+                      "title": "Chromium Version"
+                    },
+                    "health_monitoring_enabled": {
+                      "description": "Whether background health monitoring is active",
+                      "title": "Health Monitoring Enabled",
+                      "type": "boolean"
+                    },
+                    "metrics": {
+                      "$ref": "#/$defs/ChromiumMetricsSchema",
+                      "description": "Performance and health metrics"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "chromium_running",
+                    "chromium_version",
+                    "health_monitoring_enabled",
+                    "metrics"
+                  ],
+                  "title": "HealthSchema",
+                  "type": "object"
+                }
               },
-              "text/plain": {}
+              "text/plain": {
+                "example": "OK"
+              }
             }
           },
           "503": {
-            "description": "Service is unhealthy",
             "content": {
-              "text/plain": {}
+              "text/plain": {
+                "example": "Service Unavailable"
+              },
+              "application/json": {
+                "schema": {
+                  "$defs": {
+                    "ChromiumMetricsSchema": {
+                      "description": "Schema for Chromium performance and health metrics",
+                      "properties": {
+                        "total_conversions": {
+                          "description": "Total successful SVG to PNG conversions",
+                          "title": "Total Conversions",
+                          "type": "integer"
+                        },
+                        "failed_conversions": {
+                          "description": "Total failed conversion attempts",
+                          "title": "Failed Conversions",
+                          "type": "integer"
+                        },
+                        "error_rate_percent": {
+                          "description": "Error rate as percentage",
+                          "title": "Error Rate Percent",
+                          "type": "number"
+                        },
+                        "total_restarts": {
+                          "description": "Total browser restarts since startup",
+                          "title": "Total Restarts",
+                          "type": "integer"
+                        },
+                        "avg_conversion_time_ms": {
+                          "description": "Average conversion time in milliseconds",
+                          "title": "Avg Conversion Time Ms",
+                          "type": "number"
+                        },
+                        "last_health_check": {
+                          "description": "Timestamp of last health check (Unix time)",
+                          "title": "Last Health Check",
+                          "type": "number"
+                        },
+                        "last_health_status": {
+                          "description": "Result of last health check (true=healthy)",
+                          "title": "Last Health Status",
+                          "type": "boolean"
+                        },
+                        "consecutive_failures": {
+                          "description": "Current consecutive conversion failures",
+                          "title": "Consecutive Failures",
+                          "type": "integer"
+                        },
+                        "uptime_seconds": {
+                          "description": "Browser uptime in seconds",
+                          "title": "Uptime Seconds",
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "total_conversions",
+                        "failed_conversions",
+                        "error_rate_percent",
+                        "total_restarts",
+                        "avg_conversion_time_ms",
+                        "last_health_check",
+                        "last_health_status",
+                        "consecutive_failures",
+                        "uptime_seconds"
+                      ],
+                      "title": "ChromiumMetricsSchema",
+                      "type": "object"
+                    }
+                  },
+                  "description": "Schema for detailed health status response",
+                  "properties": {
+                    "status": {
+                      "description": "Overall health status: healthy or unhealthy",
+                      "title": "Status",
+                      "type": "string"
+                    },
+                    "chromium_running": {
+                      "description": "Whether Chromium browser is running",
+                      "title": "Chromium Running",
+                      "type": "boolean"
+                    },
+                    "chromium_version": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Chromium version if available",
+                      "title": "Chromium Version"
+                    },
+                    "health_monitoring_enabled": {
+                      "description": "Whether background health monitoring is active",
+                      "title": "Health Monitoring Enabled",
+                      "type": "boolean"
+                    },
+                    "metrics": {
+                      "$ref": "#/$defs/ChromiumMetricsSchema",
+                      "description": "Performance and health metrics"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "chromium_running",
+                    "chromium_version",
+                    "health_monitoring_enabled",
+                    "metrics"
+                  ],
+                  "title": "HealthSchema",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Service is unhealthy"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
             }
           }
         }

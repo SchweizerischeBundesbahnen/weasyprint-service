@@ -18,7 +18,7 @@ from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
-from app.schemas import VersionSchema
+from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
 
 
@@ -65,26 +65,69 @@ app = FastAPI(
 @app.get(
     "/health",
     summary="Health check",
-    description="Returns 200 OK if service is healthy, 503 if unhealthy.",
+    description="Returns health status with optional detailed metrics. Use ?detailed=true for JSON response with metrics.",
     operation_id="getHealth",
     tags=["meta"],
+    response_model=None,
     responses={
-        200: {"content": {"text/plain": {}}, "description": "Service is healthy"},
-        503: {"content": {"text/plain": {}}, "description": "Service is unhealthy"},
+        200: {
+            "content": {
+                "text/plain": {"example": "OK"},
+                "application/json": {
+                    "schema": HealthSchema.model_json_schema(),
+                },
+            },
+            "description": "Service is healthy",
+        },
+        503: {
+            "content": {
+                "text/plain": {"example": "Service Unavailable"},
+                "application/json": {
+                    "schema": HealthSchema.model_json_schema(),
+                },
+            },
+            "description": "Service is unhealthy",
+        },
     },
 )
-async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> Response:
+async def health(
+    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
+    detailed: bool = Query(False, description="Return detailed JSON response with metrics"),
+) -> Response:
     """
     Health check endpoint that verifies service and Chromium browser status.
 
+    Args:
+        detailed: If True, returns detailed JSON response with metrics. If False, returns simple text response.
+
     Returns:
-        - 200 with "OK" if Chromium is running and healthy
-        - 503 with "Service Unavailable" if Chromium is not healthy
+        - Simple mode: 200 with "OK" text or 503 with "Service Unavailable" text
+        - Detailed mode: 200/503 with JSON containing status, metrics, and browser info
 
     Note: If Chromium is not healthy, the service should have failed to start.
     This endpoint primarily serves as a runtime health verification.
     """
     chromium_healthy = chromium_manager.health_check()
+
+    if detailed:
+        # Return detailed JSON response with metrics
+        metrics_data = chromium_manager.get_metrics()
+        health_response = HealthSchema(
+            status="healthy" if chromium_healthy else "unhealthy",
+            chromium_running=chromium_manager.is_running(),
+            chromium_version=chromium_manager.get_version(),
+            health_monitoring_enabled=chromium_manager.health_check_enabled,
+            metrics=ChromiumMetricsSchema(**metrics_data),  # type: ignore[arg-type]
+        )
+        # Return with appropriate status code
+        status_code = 200 if chromium_healthy else 503
+        return Response(
+            content=health_response.model_dump_json(),
+            media_type="application/json",
+            status_code=status_code,
+        )
+
+    # Return simple text response
     if chromium_healthy:
         return Response("OK", media_type="text/plain", status_code=200)
     return Response("Service Unavailable", media_type="text/plain", status_code=503)

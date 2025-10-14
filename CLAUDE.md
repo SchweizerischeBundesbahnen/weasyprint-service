@@ -132,24 +132,44 @@ grype weasyprint-service:0.0.0
 - **FormParser** (`app/form_parser.py`): Parses multipart/form-data with configurable limits via environment variables
 - **HtmlParser** (`app/html_parser.py`): Processes HTML content and handles embedded resources
 - **SvgProcessor** (`app/svg_processor.py`): Converts SVG to PNG via CDP (Chrome DevTools Protocol) with configurable device scaling (`DEVICE_SCALE_FACTOR` env var)
-- **ChromiumManager** (`app/chromium_manager.py`): Manages persistent Chromium browser instance for SVG to PNG conversion via CDP
+- **ChromiumManager** (`app/chromium_manager.py`): Manages persistent Chromium browser instance for SVG to PNG conversion via CDP with proactive health monitoring
+  - Background health monitoring: Periodic checks (configurable interval) to detect browser issues
+  - Auto-restart on degraded health: Automatically restarts browser after 3 consecutive health check failures
+  - Metrics collection: Tracks conversions, errors, response times, restarts, and uptime
+  - Configurable retry logic: Automatic retry with browser restart on conversion failures
 - **Schemas** (`app/schemas.py`): Pydantic models for API request/response validation
 
 ### API Endpoints Architecture
-- `/health` - Health check endpoint (returns service status)
-- `/version` - Service version information (Python, WeasyPrint, service versions)
+- `/health` - Health check endpoint with optional detailed metrics
+  - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
+  - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, and health monitoring info
+- `/version` - Service version information (Python, WeasyPrint, Chromium, service versions)
 - `/convert/html` - Basic HTML to PDF conversion (accepts HTML string, returns PDF binary)
 - `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data, for embedded resources)
 
 ### Configuration and Environment Variables
+
+**General Configuration:**
 - `LOG_LEVEL`: Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) - defaults to INFO
 - `LOG_DIR`: Directory for log files (defaults to `/opt/weasyprint/logs`)
-- `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor via CDP (float, e.g., 2.0, default: 1.0)
+- `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
+- `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
+
+**Form Processing:**
 - `FORM_MAX_FIELDS`: Maximum number of form fields (default: 1000)
 - `FORM_MAX_FILES`: Maximum number of file uploads (default: 1000)
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)
-- `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
-- `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
+
+**Chromium/SVG Processing:**
+- `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor via CDP (float, 1.0-10.0, default: 1.0)
+- `MAX_CONCURRENT_CONVERSIONS`: Max concurrent SVG conversions (1-100, default: 10)
+- `CHROMIUM_RESTART_AFTER_N_CONVERSIONS`: Restart Chromium after N conversions (0-10000, default: 0 = disabled)
+- `CHROMIUM_MAX_CONVERSION_RETRIES`: Max retry attempts on conversion failure (1-10, default: 2)
+- `CHROMIUM_CONVERSION_TIMEOUT`: Timeout in seconds for each conversion (5-300, default: 30)
+
+**Health Monitoring (New):**
+- `CHROMIUM_HEALTH_CHECK_ENABLED`: Enable background health monitoring (true/false, default: true)
+- `CHROMIUM_HEALTH_CHECK_INTERVAL`: Interval in seconds for background health checks (10-300, default: 30)
 
 ## Development Practices
 
@@ -344,4 +364,71 @@ The repository uses extensive pre-commit hooks including:
 1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → SvgProcessor converts SVG to PNG via CDP → WeasyPrint renders → PDF returned
 2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → SvgProcessor converts SVG → WeasyPrint renders → PDF returned
 3. **SVG Processing via CDP**: SVG detected → SvgProcessor uses ChromiumManager (persistent Chromium instance) → CDP creates browser tab → Renders SVG → Screenshots as PNG → Tab closed → PNG embedded in PDF
-4. **Application Lifecycle**: FastAPI startup → ChromiumManager starts persistent Chromium browser → Handles all SVG conversions → FastAPI shutdown → ChromiumManager stops Chromium gracefully
+4. **Application Lifecycle**:
+   - FastAPI startup → ChromiumManager starts persistent Chromium browser
+   - Background health monitor starts (if enabled) → Periodic health checks every 30s (configurable)
+   - Handles all SVG conversions with automatic retry and metrics collection
+   - Auto-restart on health degradation (3 consecutive failures)
+   - FastAPI shutdown → Health monitor stops → Chromium stops gracefully
+
+### Chromium Health Monitoring
+
+The ChromiumManager includes proactive health monitoring to ensure reliability:
+
+**Features:**
+- **Background Health Checks**: Runs every 30 seconds (configurable via `CHROMIUM_HEALTH_CHECK_INTERVAL`)
+- **Automatic Recovery**: Restarts browser after 3 consecutive health check failures
+- **Metrics Collection**: Tracks all conversions, failures, response times, and system uptime
+- **Retry Logic**: Automatic retry with browser restart on conversion errors (configurable via `CHROMIUM_MAX_CONVERSION_RETRIES`)
+- **Detailed Health Endpoint**: Access `/health?detailed=true` for JSON metrics including:
+  - Total conversions and failures
+  - Error rate percentage
+  - Average conversion time
+  - Browser restarts count
+  - Uptime and last health check status
+
+**Configuration:**
+```bash
+# Enable/disable health monitoring (default: true)
+CHROMIUM_HEALTH_CHECK_ENABLED=true
+
+# Health check interval in seconds (10-300, default: 30)
+CHROMIUM_HEALTH_CHECK_INTERVAL=30
+
+# Auto-restart after N conversions (0=disabled, default: 0)
+CHROMIUM_RESTART_AFTER_N_CONVERSIONS=1000
+
+# Max retry attempts on failure (1-10, default: 2)
+CHROMIUM_MAX_CONVERSION_RETRIES=3
+
+# Conversion timeout in seconds (5-300, default: 30)
+CHROMIUM_CONVERSION_TIMEOUT=30
+```
+
+**Monitoring Example:**
+```bash
+# Simple health check
+curl http://localhost:9080/health
+# Response: OK (200) or Service Unavailable (503)
+
+# Detailed health with metrics
+curl http://localhost:9080/health?detailed=true
+# Response (JSON):
+{
+  "status": "healthy",
+  "chromium_running": true,
+  "chromium_version": "131.0.6778.69",
+  "health_monitoring_enabled": true,
+  "metrics": {
+    "total_conversions": 1523,
+    "failed_conversions": 2,
+    "error_rate_percent": 0.13,
+    "total_restarts": 0,
+    "avg_conversion_time_ms": 145.23,
+    "last_health_check": 1760450132.61,
+    "last_health_status": true,
+    "consecutive_failures": 0,
+    "uptime_seconds": 3600.45
+  }
+}
+```

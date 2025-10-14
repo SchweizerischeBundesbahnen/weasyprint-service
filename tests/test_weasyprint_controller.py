@@ -1,7 +1,7 @@
 import os
 import platform
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -89,3 +89,195 @@ def test_health_with_chromium_unhealthy():
 
             assert result.status_code == 503
             assert result.text == "Service Unavailable"
+
+
+def test_health_detailed_healthy():
+    """Test /health?detailed=true returns JSON with metrics when healthy."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+
+    # Create mock manager
+    mock_manager = AsyncMock()
+    # Mock lifespan methods (start/stop are async)
+    mock_manager.start = AsyncMock()
+    mock_manager.stop = AsyncMock()
+    # health_check() and other sync methods use MagicMock
+    mock_manager.health_check = MagicMock(return_value=True)
+    mock_manager.is_running = MagicMock(return_value=True)
+    mock_manager.get_version = MagicMock(return_value="131.0.6778.33")
+    mock_manager.health_check_enabled = True
+    mock_manager.get_metrics = MagicMock(
+        return_value={
+            "total_conversions": 42,
+            "failed_conversions": 3,
+            "error_rate_percent": 7.14,
+            "total_restarts": 1,
+            "avg_conversion_time_ms": 123.45,
+            "last_health_check": 1234567890.0,
+            "last_health_status": True,
+            "consecutive_failures": 0,
+            "uptime_seconds": 3600.0,
+        }
+    )
+
+    # Patch the singleton instance directly
+    with patch("app.chromium_manager._chromium_manager", mock_manager):
+        with TestClient(app) as test_client:
+            result = test_client.get("/health?detailed=true")
+
+            assert result.status_code == 200
+            assert result.headers["content-type"] == "application/json"
+
+            data = result.json()
+            assert data["status"] == "healthy"
+            assert data["chromium_running"] is True
+            assert data["chromium_version"] == "131.0.6778.33"
+            assert data["health_monitoring_enabled"] is True
+
+            metrics = data["metrics"]
+            assert metrics["total_conversions"] == 42
+            assert metrics["failed_conversions"] == 3
+            assert metrics["error_rate_percent"] == 7.14
+            assert metrics["total_restarts"] == 1
+            assert metrics["avg_conversion_time_ms"] == 123.45
+            assert metrics["last_health_check"] == 1234567890.0
+            assert metrics["last_health_status"] is True
+            assert metrics["consecutive_failures"] == 0
+            assert metrics["uptime_seconds"] == 3600.0
+
+
+def test_health_detailed_unhealthy():
+    """Test /health?detailed=true returns 503 with JSON when unhealthy."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+
+    # Create mock manager
+    mock_manager = AsyncMock()
+    # Mock lifespan methods (start/stop are async)
+    mock_manager.start = AsyncMock()
+    mock_manager.stop = AsyncMock()
+    # health_check() and other sync methods use MagicMock
+    mock_manager.health_check = MagicMock(return_value=False)
+    mock_manager.is_running = MagicMock(return_value=False)
+    mock_manager.get_version = MagicMock(return_value=None)
+    mock_manager.health_check_enabled = True
+    mock_manager.get_metrics = MagicMock(
+        return_value={
+            "total_conversions": 10,
+            "failed_conversions": 5,
+            "error_rate_percent": 50.0,
+            "total_restarts": 3,
+            "avg_conversion_time_ms": 0.0,
+            "last_health_check": 1234567890.0,
+            "last_health_status": False,
+            "consecutive_failures": 3,
+            "uptime_seconds": 0.0,
+        }
+    )
+
+    # Patch the singleton instance directly
+    with patch("app.chromium_manager._chromium_manager", mock_manager):
+        with TestClient(app) as test_client:
+            result = test_client.get("/health?detailed=true")
+
+            assert result.status_code == 503
+            assert result.headers["content-type"] == "application/json"
+
+            data = result.json()
+            assert data["status"] == "unhealthy"
+            assert data["chromium_running"] is False
+            assert data["chromium_version"] is None
+            assert data["health_monitoring_enabled"] is True
+
+            metrics = data["metrics"]
+            assert metrics["total_conversions"] == 10
+            assert metrics["failed_conversions"] == 5
+            assert metrics["error_rate_percent"] == 50.0
+            assert metrics["total_restarts"] == 3
+            assert metrics["consecutive_failures"] == 3
+            assert metrics["last_health_status"] is False
+
+
+def test_health_detailed_false():
+    """Test /health?detailed=false returns simple text response."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+
+    # Create mock manager
+    mock_manager = AsyncMock()
+    # Mock lifespan methods (start/stop are async)
+    mock_manager.start = AsyncMock()
+    mock_manager.stop = AsyncMock()
+    # health_check() is a regular method, not async
+    mock_manager.health_check = MagicMock(return_value=True)
+
+    # Patch the singleton instance directly
+    with patch("app.chromium_manager._chromium_manager", mock_manager):
+        with TestClient(app) as test_client:
+            result = test_client.get("/health?detailed=false")
+
+            assert result.status_code == 200
+            assert result.headers["content-type"] == "text/plain; charset=utf-8"
+            assert result.text == "OK"
+
+
+def test_health_default_no_parameter():
+    """Test /health without detailed parameter returns simple text response (default behavior)."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+
+    # Create mock manager
+    mock_manager = AsyncMock()
+    # Mock lifespan methods (start/stop are async)
+    mock_manager.start = AsyncMock()
+    mock_manager.stop = AsyncMock()
+    # health_check() is a regular method, not async
+    mock_manager.health_check = MagicMock(return_value=True)
+
+    # Patch the singleton instance directly
+    with patch("app.chromium_manager._chromium_manager", mock_manager):
+        with TestClient(app) as test_client:
+            result = test_client.get("/health")
+
+            assert result.status_code == 200
+            assert result.headers["content-type"] == "text/plain; charset=utf-8"
+            assert result.text == "OK"
+
+
+def test_health_detailed_with_health_monitoring_disabled():
+    """Test /health?detailed=true when health monitoring is disabled."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+
+    # Create mock manager
+    mock_manager = AsyncMock()
+    # Mock lifespan methods (start/stop are async)
+    mock_manager.start = AsyncMock()
+    mock_manager.stop = AsyncMock()
+    # health_check() and other sync methods use MagicMock
+    mock_manager.health_check = MagicMock(return_value=True)
+    mock_manager.is_running = MagicMock(return_value=True)
+    mock_manager.get_version = MagicMock(return_value="131.0.6778.33")
+    mock_manager.health_check_enabled = False
+    mock_manager.get_metrics = MagicMock(
+        return_value={
+            "total_conversions": 5,
+            "failed_conversions": 0,
+            "error_rate_percent": 0.0,
+            "total_restarts": 0,
+            "avg_conversion_time_ms": 100.0,
+            "last_health_check": 0.0,
+            "last_health_status": False,
+            "consecutive_failures": 0,
+            "uptime_seconds": 1800.0,
+        }
+    )
+
+    # Patch the singleton instance directly
+    with patch("app.chromium_manager._chromium_manager", mock_manager):
+        with TestClient(app) as test_client:
+            result = test_client.get("/health?detailed=true")
+
+            assert result.status_code == 200
+            assert result.headers["content-type"] == "application/json"
+
+            data = result.json()
+            assert data["status"] == "healthy"
+            assert data["health_monitoring_enabled"] is False
+            assert data["metrics"]["last_health_check"] == 0.0
+            assert data["metrics"]["total_conversions"] == 5

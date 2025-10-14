@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import time
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -950,12 +951,12 @@ async def test_chromium_manager_large_svg_stress_test():
             y = (i // 1000) * 2
             circles.append(f'<circle cx="{x}" cy="{y}" r="1" fill="blue"/>')
 
-        svg_content = f'''<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="2000" viewBox="0 0 2000 2000">
+        svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="2000" viewBox="0 0 2000 2000">
             {"".join(circles)}
-        </svg>'''
+        </svg>"""
 
         # Verify SVG is actually large
-        svg_size_mb = len(svg_content.encode('utf-8')) / (1024 * 1024)
+        svg_size_mb = len(svg_content.encode("utf-8")) / (1024 * 1024)
         assert svg_size_mb >= 8, f"SVG should be ~10MB, got {svg_size_mb:.2f}MB"
 
         # Conversion should succeed without memory issues
@@ -1260,8 +1261,6 @@ async def test_chromium_manager_health_monitoring_interval():
         metrics = manager.get_metrics()
 
         # Last health check should be recent
-        import time
-
         time_since_last_check = time.time() - metrics["last_health_check"]
         assert time_since_last_check < 11.0  # Should have checked within last 11 seconds
 
@@ -1362,9 +1361,15 @@ async def test_chromium_manager_auto_restart_on_health_degradation():
 
         manager.health_check = mock_health_check
 
-        # Wait for health monitor to detect failures and trigger restart
-        # Need to wait for: 3 failed checks + restart trigger
-        await asyncio.sleep(35)  # 3 intervals + some buffer
+        # Poll for restart completion instead of fixed sleep
+        # Maximum wait time: 40 seconds (3 intervals @ 10s + buffer)
+        max_wait_time = 40
+        poll_interval = 0.5
+        elapsed = 0
+
+        while restart_count < 1 and elapsed < max_wait_time:
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
 
         # Should have triggered auto-restart after 3 consecutive failures
         assert restart_count >= 1, f"Expected at least 1 restart, got {restart_count}"

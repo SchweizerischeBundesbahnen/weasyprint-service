@@ -29,7 +29,7 @@ packages = [{include = "app"}]
 python = ">=3.13"
 weasyprint = "66.0"
 defusedxml = "0.7.1"
-fastapi = "0.118.2"
+fastapi = "0.119.0"
 uvicorn = "0.37.0"
 requests = "2.32.5"
 starlette = "^0.47.2"
@@ -52,7 +52,8 @@ tox = "4.31.0"
 docker = "7.1.0"
 pytest = "8.4.2"
 pytest-asyncio = "^1.0.0"
-pymupdf = "1.26.4"
+pymupdf = "1.26.5"
+pypdf = "6.1.1"
 httpx = "0.28.1"
 coverage = "7.10.7"
 
@@ -94,6 +95,12 @@ extend-select = [
     "F405", # undefined-local-with-import-star-usage (pyflakes)
     "F403", # No import * (pyflakes)
 ]
+"scripts/load_test.py" = [
+    "T201", # print statements allowed in CLI scripts
+    "PLR2004", # magic values allowed (HTTP status codes, percentiles)
+    "PLC0415", # import location flexible for optional dependencies
+    "C901", # complexity allowed in CLI main function
+]
 
 [tool.ruff.format]
 line-ending = "lf"
@@ -104,6 +111,6 @@ max-args = 7
 [tool.mypy]
 explicit_package_bases = true
 disallow_untyped_defs = true
-exclude = ["tests/.*", "examples/.*"]
+exclude = ["tests/.*", "examples/.*", "scripts/.*"]
 install_types = true
 non_interactive = true

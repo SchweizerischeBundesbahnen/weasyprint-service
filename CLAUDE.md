@@ -53,6 +53,49 @@ poetry run mypy .
 scripts/precommit_generate_openapi.sh
 ```
 
+### Load Testing
+The repository includes a comprehensive load testing script for performance evaluation and stress testing.
+
+```bash
+# Basic load test (100 requests, 10 concurrent workers)
+poetry run python scripts/load_test.py
+
+# Custom configuration
+poetry run python scripts/load_test.py --requests 1000 --concurrency 50
+
+# Test specific scenario
+poetry run python scripts/load_test.py --scenario simple    # Basic HTML conversion
+poetry run python scripts/load_test.py --scenario complex  # Complex HTML with tables
+poetry run python scripts/load_test.py --scenario svg      # SVG to PNG conversion
+
+# Export results to JSON
+poetry run python scripts/load_test.py --requests 500 --concurrency 20 --output results.json
+
+# Export results to CSV
+poetry run python scripts/load_test.py --requests 500 --concurrency 20 --output results.csv --format csv
+
+# Test against custom URL
+poetry run python scripts/load_test.py --url http://localhost:9080 --requests 200 --concurrency 10
+
+# Stress test with high concurrency
+poetry run python scripts/load_test.py --scenario svg --requests 2000 --concurrency 100 --timeout 60
+```
+
+**Load Test Features:**
+- Real-time progress display with success/failure counts
+- Comprehensive metrics: min/max/avg/p50/p95/p99 response times
+- Requests per second calculation
+- Status code and error distribution
+- Configurable scenarios (simple, complex, SVG)
+- Export to JSON or CSV format
+- Async/concurrent request execution using httpx
+
+**Use Cases:**
+- Validate service behavior under load
+- Identify performance bottlenecks
+- Test Chromium browser pool behavior with SVG conversions
+- Generate performance baselines for CI/CD
+
 ### Local Development Server
 ```bash
 # Start FastAPI development server
@@ -107,6 +150,137 @@ grype weasyprint-service:0.0.0
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)
 - `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
 - `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
+
+## Development Practices
+
+- Check IDE diagnostics for errors before running tools manually
+- **Context Window Optimization Strategy:**
+  - We optimize for CLEAN main context, not token cost (Claude Code Plan 5x)
+  - Use agents liberally to keep main context focused on implementation
+  - Time for agent spawning is acceptable trade-off for context clarity
+- **Use agents for these tasks:**
+  - **context7-docs agent** - All documentation lookups (libraries, frameworks, APIs)
+  - **ansible-expert agent** - Ansible-specific tasks (if applicable)
+  - **docker-optimizer agent** - Docker optimization questions
+  - Never use WebFetch for technical documentation - always use appropriate agent
+- **Keep in main context:**
+  - Direct code edits and bug fixes
+  - Quick tool calls (Read, Write, Edit)
+  - Implementation work
+  - Simple clarifications
+- ALWAYS run `pre-commit run -a` after implementation
+- NEVER suppress or comment lint or test errors or problems
+
+### Before Committing Changes (MANDATORY)
+
+**ALWAYS perform these steps BEFORE creating any git commit:**
+
+1. **Update TODO.md**:
+   - Move completed tasks from "Current Work" to "Completed Tasks"
+   - Condense descriptions (keep key points only)
+   - Ensure "Current Work" reflects actual current state
+
+2. **Update CLAUDE.md** (if applicable):
+   - Add new commands or patterns discovered during implementation
+   - Update technical details if architecture changed
+   - Document new development practices or gotchas
+   - Update dependency versions in examples if changed
+
+3. **Review changes**:
+   - Run `git status` and `git diff` to verify what will be committed
+   - Ensure TODO.md is NOT staged (it should never be committed)
+   - Ensure CLAUDE.md changes (if any) ARE staged
+
+**This check is MANDATORY before every commit. Do not skip these steps.**
+
+### GitHub PR Code Reviews (Automated Workflow)
+
+**Philosophy**: Reviews should be **terse, actionable, and problem-focused**. No praise, no analysis of unchanged code.
+
+**When reviewing PRs via the automated workflow:**
+- ONLY review lines changed in the PR diff
+- ONLY report actual problems (bugs, security issues, breaking changes, missing tests)
+- Use terse format: `[file:line] Problem - Fix: Solution`
+- If no issues found, say "No issues found." and stop
+- Do NOT: praise code quality, review unchanged code, suggest optional improvements, analyze performance if not changed
+
+**Review categories:**
+- 🔴 **Critical**: Bugs, security vulnerabilities, breaking changes
+- 🟡 **Important**: Missing tests for new functionality, significant issues
+
+### Skip Reviews For (Automated Tools Handle These)
+
+**The following are already checked by automated tools - DO NOT comment on them:**
+
+**Formatting & Style** (handled by Ruff):
+- Line length (configured to 240 characters)
+- Import ordering and organization
+- Indentation and whitespace
+- Quotation mark consistency
+- Trailing commas
+- Line breaks and blank lines
+
+**Type Checking** (handled by MyPy):
+- Type annotations and hints
+- Type compatibility
+- Return type correctness
+- Optional/None handling
+
+**Code Quality** (handled by Ruff linter):
+- Unused imports and variables
+- Undefined names
+- F-string usage
+- List/dict comprehension simplification
+- Mutable default arguments
+- Shadowed variables
+
+**Testing** (handled by Pytest + Coverage):
+- Test coverage (minimum 90% required)
+- Async test configuration
+- Test discovery and execution
+
+**Pre-commit Hooks**:
+- YAML formatting (yamlfix)
+- General formatting issues
+- Trailing whitespace
+- OpenAPI schema generation
+- Security checks (gitleaks)
+
+**Don't suggest these common patterns (already established in codebase):**
+- Using Ruff instead of Black/isort/flake8
+- Using Poetry for package management
+- Python 3.13+ syntax and features
+- FastAPI patterns already in use
+- Temporary file handling patterns
+- Playwright Chromium for SVG conversion
+
+### Project-Specific Review Focus
+
+**DO focus on:**
+1. **Security**:
+   - Input validation and sanitization
+   - Path traversal prevention
+   - File upload size limits enforcement
+   - Secrets exposure in logs
+   - SVG/HTML injection attacks
+
+2. **WeasyPrint/Chromium Integration**:
+   - Proper error handling for PDF generation failures
+   - ChromiumManager lifecycle management
+   - CDP connection handling
+   - Resource cleanup (browser tabs, temporary files)
+
+3. **Resource Management**:
+   - Temporary file cleanup
+   - Proper async/await patterns
+   - Memory leaks in PDF/SVG processing
+   - Browser instance cleanup
+
+4. **Breaking Changes**:
+   - API endpoint changes
+   - Response format changes
+   - Docker image compatibility
+   - Environment variable changes
 
 ## Development Workflow
 

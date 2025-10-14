@@ -1,5 +1,21 @@
 # Changelog
 
+## [66.0.6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.5...v66.0.6) (2025-10-14)
+
+
+### Features
+
+* add configurable subprocess timeout ([#228](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/228)) ([5a0fe99](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/5a0fe99a90fc7fb0e2d1559bd702dfe0233777f1))
+* enhance logging across all components ([#219](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/219)) ([4ccf718](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4ccf7180e5c5524833e8c6a951f361180b5d221d))
+* performance improvements ([#230](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/230)) ([7111857](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7111857d371b85b380dd1adcf526add1873ce7ef))
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.118.2 ([26e8899](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/26e88998daf3a4c09083d06c14bfbb54568b9f33))
+* **deps:** update dependency fastapi to v0.118.3 ([3d5dd4d](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/3d5dd4d275d25bcd5f79d42f73e0b4efd6f82481))
+* **deps:** update dependency fastapi to v0.119.0 ([6707907](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/670790720c5eca165ae9a62eca3a0cf549315197))
+
 ## [66.0.5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.4...v66.0.5) (2025-10-02)
 
 

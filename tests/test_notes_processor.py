@@ -97,7 +97,7 @@ def test_parse_notes_with_nested_replies():
     assert len(anchor_tags) == 1, "Should have 1 anchor tag (for the top-level note)"
 
 
-def test_process_pdf_with_notes():
+def test_process_pdf_with_notes(save_test_outputs: bool):
     """
     Test PDF processing by loading a PDF with fake note links and replacing them with annotations.
 
@@ -105,6 +105,9 @@ def test_process_pdf_with_notes():
     - Replaces fake note links with PDF annotations
     - Creates nested reply annotations using /IRT field
     - Preserves other annotations and page content
+
+    Args:
+        save_test_outputs: If True, saves the output PDF for manual inspection
     """
     # Create test note structure
     html = """
@@ -154,10 +157,11 @@ def test_process_pdf_with_notes():
     assert len(updated_pdf) > 0, "Updated PDF should not be empty"
     assert len(updated_pdf) != len(pdf_bytes), "Updated PDF should differ from original"
 
-    # Save the updated PDF for manual inspection (optional)
-    output_path = test_pdf_path.parent / "notes_link_to_replace_output.pdf"
-    with open(output_path, "wb") as f:
-        f.write(updated_pdf)
+    # Save the updated PDF for manual inspection (only if --save-test-outputs flag is used)
+    if save_test_outputs:
+        output_path = test_pdf_path.parent / "notes_link_to_replace_output.pdf"
+        with open(output_path, "wb") as f:
+            f.write(updated_pdf)
 
 
 def test_format_pdf_date():

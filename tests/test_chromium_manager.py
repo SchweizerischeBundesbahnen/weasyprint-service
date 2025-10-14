@@ -1,11 +1,14 @@
 """Tests for ChromiumManager CDP-based SVG conversion."""
 
+import asyncio
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
 from app.chromium_manager import ChromiumConfig, ChromiumManager, get_chromium_manager
+from app.html_parser import HtmlParser
+from app.svg_processor import SvgProcessor
 
 
 @pytest.mark.asyncio
@@ -146,8 +149,6 @@ async def test_chromium_manager_get_version():
 @pytest.mark.asyncio
 async def test_chromium_manager_concurrent_conversions():
     """Test that concurrent SVG conversions work correctly."""
-    import asyncio
-
     manager = ChromiumManager()
     await manager.start()
 
@@ -182,9 +183,6 @@ def test_get_chromium_manager_singleton():
 @pytest.mark.asyncio
 async def test_svg_processor_with_chromium_manager():
     """Test SvgProcessor integration with ChromiumManager."""
-    from app.html_parser import HtmlParser
-    from app.svg_processor import SvgProcessor
-
     chromium_manager = ChromiumManager()
     await chromium_manager.start()
 
@@ -209,9 +207,6 @@ async def test_svg_processor_with_chromium_manager():
 @pytest.mark.asyncio
 async def test_svg_processor_multiple_svgs():
     """Test async processing of multiple SVGs."""
-    from app.html_parser import HtmlParser
-    from app.svg_processor import SvgProcessor
-
     chromium_manager = ChromiumManager()
     await chromium_manager.start()
 
@@ -238,9 +233,6 @@ async def test_svg_processor_multiple_svgs():
 @pytest.mark.asyncio
 async def test_svg_processor_without_chromium_manager():
     """Test that SvgProcessor returns original SVG without ChromiumManager."""
-    from app.html_parser import HtmlParser
-    from app.svg_processor import SvgProcessor
-
     html_parser = HtmlParser()
     svg_processor = SvgProcessor()  # No chromium_manager
 
@@ -259,9 +251,6 @@ async def test_svg_processor_without_chromium_manager():
 @pytest.mark.asyncio
 async def test_svg_processor_invalid_inputs():
     """Test async processing with invalid inputs."""
-    from app.html_parser import HtmlParser
-    from app.svg_processor import SvgProcessor
-
     chromium_manager = ChromiumManager()
     await chromium_manager.start()
 
@@ -322,8 +311,6 @@ async def test_chromium_manager_convert_with_custom_scale_factor():
 @pytest.mark.asyncio
 async def test_chromium_manager_parse_float_from_env():
     """Test device_scale_factor parsing from environment variable."""
-    import os
-
     # Test valid float from env
     os.environ["DEVICE_SCALE_FACTOR"] = "2.5"
     manager = ChromiumManager()
@@ -365,8 +352,6 @@ async def test_chromium_manager_get_version_extraction():
 @pytest.mark.asyncio
 async def test_chromium_manager_get_version_without_slash():
     """Test Chromium version when format doesn't contain '/'."""
-    from unittest.mock import PropertyMock
-
     manager = ChromiumManager()
     await manager.start()
 
@@ -492,8 +477,6 @@ async def test_chromium_manager_get_version_with_error():
 @pytest.mark.asyncio
 async def test_chromium_manager_concurrent_limit():
     """Test that semaphore limits concurrent conversions and prevents resource exhaustion."""
-    import asyncio
-
     # Set a low limit to test semaphore behavior
     manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=3))
     await manager.start()
@@ -517,8 +500,6 @@ async def test_chromium_manager_concurrent_limit():
 @pytest.mark.asyncio
 async def test_chromium_manager_max_concurrent_from_env():
     """Test that MAX_CONCURRENT_CONVERSIONS env var is respected."""
-    import os
-
     # Set environment variable
     os.environ["MAX_CONCURRENT_CONVERSIONS"] = "5"
     try:
@@ -877,8 +858,6 @@ async def test_chromium_manager_concurrent_restart_during_conversions():
 
     This tests the race condition fix where restart must happen outside the counter lock.
     """
-    import asyncio
-
     # Set low restart threshold to trigger restart quickly
     manager = ChromiumManager(config=ChromiumConfig(restart_after_n_conversions=2, max_concurrent_conversions=5))
     await manager.start()
@@ -919,8 +898,6 @@ async def test_chromium_manager_cancellation_handling():
 
     This tests the semaphore leak fix - ensures semaphore is released even on cancellation.
     """
-    import asyncio
-
     manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=2, conversion_timeout=5))
     await manager.start()
 
@@ -1037,8 +1014,6 @@ async def test_chromium_manager_semaphore_exhaustion_prevented():
 
     This is a comprehensive test of the semaphore leak fix.
     """
-    import asyncio
-
     manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=3, conversion_timeout=5))
     await manager.start()
 
@@ -1274,8 +1249,6 @@ async def test_chromium_manager_metrics_after_failure():
 @pytest.mark.asyncio
 async def test_chromium_manager_health_monitoring_interval():
     """Test that health monitoring runs at specified interval."""
-    import asyncio
-
     manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))  # 10 second interval (minimum)
     await manager.start()
 
@@ -1359,9 +1332,6 @@ async def test_chromium_manager_health_enabled_boolean_parsing():
 @pytest.mark.asyncio
 async def test_chromium_manager_auto_restart_on_health_degradation():
     """Test that Chromium automatically restarts when health degrades (3 consecutive failures)."""
-    import asyncio
-    from unittest.mock import AsyncMock, patch
-
     manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))
     await manager.start()
 
@@ -1446,8 +1416,6 @@ async def test_chromium_manager_metrics_survive_restart():
 @pytest.mark.asyncio
 async def test_chromium_manager_concurrent_conversions_metrics():
     """Test that metrics are correctly tracked with concurrent conversions."""
-    import asyncio
-
     manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=5))
     await manager.start()
 
@@ -1595,8 +1563,6 @@ async def test_chromium_manager_consecutive_failures_reset():
 @pytest.mark.asyncio
 async def test_chromium_manager_uptime_tracking():
     """Test that uptime is tracked correctly."""
-    import asyncio
-
     manager = ChromiumManager()
     await manager.start()
 

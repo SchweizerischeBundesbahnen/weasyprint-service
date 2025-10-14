@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from io import BytesIO
 from pathlib import Path
 from typing import Iterator, List, Optional
 
@@ -69,9 +71,6 @@ def assert_png_pages_equal_to_refs(
         update_env_var: Environment variable name to check for update mode
         pdf_bytes: Optional PDF bytes to save alongside PNG references when updating
     """
-    import os
-    from io import BytesIO
-
     n_pages = len(produced_pages)
 
     def page_ref_path(i: int) -> Path:

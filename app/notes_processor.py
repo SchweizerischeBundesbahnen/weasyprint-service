@@ -33,6 +33,11 @@ logger = logging.getLogger(__name__)
 # Constants for image processing
 RGBA_CHANNEL_COUNT = 4  # RGBA images have 4 channels (Red, Green, Blue, Alpha)
 
+# PDF dictionary key constants
+PDF_ANNOTS = "/Annots"
+PDF_SUBTYPE = "/Subtype"
+PDF_XOBJECT = "/XObject"
+
 
 @dataclass
 class Note:
@@ -54,7 +59,7 @@ class NotesProcessor:
     - Embeds notes as native PDF annotations, supporting custom icons.
     """
 
-    def replaceNotes(self, parsed_html: BeautifulSoup) -> list[Note]:
+    def replace_notes(self, parsed_html: BeautifulSoup) -> list[Note]:
         """Parse note trees from HTML and return structured Note objects."""
         notes: list[Note] = []
         for node in parsed_html.find_all(class_="sticky-note"):
@@ -93,7 +98,7 @@ class NotesProcessor:
 
         return Note(time=time, username=username, text=text, title=title, replies=replies)
 
-    def processPdf(self, pdf_content: bytes, notes: list[Note]) -> bytes:
+    def process_pdf(self, pdf_content: bytes, notes: list[Note]) -> bytes:
         """Process PDF to replace fake note links with actual PDF sticky note annotations with nested replies."""
         # Create a UUID to Note mapping for quick lookup (only top-level notes)
         note_map: dict[str, Note] = {note.uuid: note for note in notes}
@@ -124,11 +129,11 @@ class NotesProcessor:
         """Extract note annotations from page and remove fake links."""
         notes_to_create: list[tuple[Note, tuple[float, float, float, float]]] = []
 
-        if "/Annots" not in page:  # type: ignore[operator]
+        if PDF_ANNOTS not in page:  # type: ignore[operator]
             return notes_to_create
 
         annots_to_keep = []
-        annots_array = page["/Annots"]  # type: ignore[index]
+        annots_array = page[PDF_ANNOTS]  # type: ignore[index]
         # Type check: ensure annots_array is iterable
         if not isinstance(annots_array, list):
             annots_array = list(annots_array) if hasattr(annots_array, "__iter__") else []  # type: ignore[assignment]
@@ -146,15 +151,15 @@ class NotesProcessor:
 
         # Update annotations list with kept annotations
         if annots_to_keep:
-            page[NameObject("/Annots")] = ArrayObject(annots_to_keep)  # type: ignore[index]
+            page[NameObject(PDF_ANNOTS)] = ArrayObject(annots_to_keep)  # type: ignore[index]
         else:
-            del page["/Annots"]  # type: ignore[attr-defined]
+            del page[PDF_ANNOTS]  # type: ignore[attr-defined]
 
         return notes_to_create
 
     def _extract_note_from_annotation(self, annot_obj: object, note_map: dict[str, Note]) -> tuple[Note, tuple[float, float, float, float]] | None:
         """Extract note data from a link annotation if it's a sticky note link."""
-        if annot_obj.get("/Subtype") != "/Link" or "/A" not in annot_obj:  # type: ignore[attr-defined,operator]
+        if annot_obj.get(PDF_SUBTYPE) != "/Link" or "/A" not in annot_obj:  # type: ignore[attr-defined,operator]
             return None
 
         action = annot_obj["/A"]  # type: ignore[index]
@@ -211,8 +216,8 @@ class NotesProcessor:
 
             # Create the XObject dictionary
             xobject = DecodedStreamObject()
-            xobject[NameObject("/Type")] = NameObject("/XObject")
-            xobject[NameObject("/Subtype")] = NameObject("/Image")
+            xobject[NameObject("/Type")] = NameObject(PDF_XOBJECT)
+            xobject[NameObject(PDF_SUBTYPE)] = NameObject("/Image")
             xobject[NameObject("/Width")] = NumberObject(width)
             xobject[NameObject("/Height")] = NumberObject(height)
             xobject[NameObject("/ColorSpace")] = NameObject("/DeviceRGB" if img.mode == "RGB" else "/DeviceGray")
@@ -256,10 +261,10 @@ class NotesProcessor:
 
         # Create the appearance stream
         appearance_stream = DecodedStreamObject()
-        appearance_stream[NameObject("/Type")] = NameObject("/XObject")
-        appearance_stream[NameObject("/Subtype")] = NameObject("/Form")
+        appearance_stream[NameObject("/Type")] = NameObject(PDF_XOBJECT)
+        appearance_stream[NameObject(PDF_SUBTYPE)] = NameObject("/Form")
         appearance_stream[NameObject("/BBox")] = ArrayObject([NumberObject(0), NumberObject(0), NumberObject(width), NumberObject(height)])
-        appearance_stream[NameObject("/Resources")] = DictionaryObject({NameObject("/XObject"): DictionaryObject({NameObject("/Img"): xobject_ref})})
+        appearance_stream[NameObject("/Resources")] = DictionaryObject({NameObject(PDF_XOBJECT): DictionaryObject({NameObject("/Img"): xobject_ref})})
         appearance_stream.set_data(content.encode("latin-1"))
 
         # Add the appearance stream to the PDF
@@ -272,6 +277,30 @@ class NotesProcessor:
         appearance_dict[NameObject("/N")] = appearance_ref  # /N = Normal appearance
 
         return appearance_dict
+
+    def _set_annotation_metadata(self, annot_dict: DictionaryObject, note: Note) -> None:
+        """Set metadata fields (username, title, dates) on annotation dictionary."""
+        annot_dict[NameObject("/T")] = TextStringObject(note.username)
+
+        if note.title:
+            annot_dict[NameObject("/Subj")] = TextStringObject(note.title)
+
+        # Only set date fields if we have a valid date
+        if note.time:
+            pdf_date = self._format_pdf_date(note.time)
+            # Only set if we got a valid PDF date (starts with "D:")
+            if pdf_date and pdf_date.startswith("D:"):
+                annot_dict[NameObject("/CreationDate")] = TextStringObject(pdf_date)
+                annot_dict[NameObject("/M")] = TextStringObject(pdf_date)
+
+    def _set_custom_icon(self, writer: PdfWriter, annot_dict: DictionaryObject, rect: tuple[float, float, float, float]) -> None:
+        """Set custom icon appearance for annotation if available."""
+        custom_icon_path = str(Path(__file__).parent / "static" / "note.png")
+        if Path(custom_icon_path).exists():
+            xobject_ref = self._embed_png_as_xobject(writer, custom_icon_path)
+            if xobject_ref is not None:
+                appearance_dict = self._create_custom_appearance(writer, rect, xobject_ref)
+                annot_dict[NameObject("/AP")] = appearance_dict
 
     def _create_note_annotation_with_replies(self, writer: PdfWriter, page_number: int, note: Note, rect: tuple[float, float, float, float], parent_ref: object | None = None) -> object | None:
         """
@@ -294,33 +323,10 @@ class NotesProcessor:
             open=False,
         )
 
-        # Manually set PDF annotation fields using proper PDF objects
-        # /T = Author/username
-        # /Subj = Subject/title
-        # /AP = Custom appearance (icon)
-        # /CreationDate = Creation date in PDF format
-        # /M = Modification date in PDF format
+        # Set metadata and appearance
         annot_dict = text_annot
-        annot_dict[NameObject("/T")] = TextStringObject(note.username)
-
-        # Always use custom icon from static folder
-        custom_icon_path = str(Path(__file__).parent / "static" / "note.png")
-        if Path(custom_icon_path).exists():
-            xobject_ref = self._embed_png_as_xobject(writer, custom_icon_path)
-            if xobject_ref is not None:
-                appearance_dict = self._create_custom_appearance(writer, rect, xobject_ref)
-                annot_dict[NameObject("/AP")] = appearance_dict
-
-        # Only set date fields if we have a valid date
-        if note.time:
-            pdf_date = self._format_pdf_date(note.time)
-            # Only set if we got a valid PDF date (starts with "D:")
-            if pdf_date and pdf_date.startswith("D:"):
-                annot_dict[NameObject("/CreationDate")] = TextStringObject(pdf_date)
-                annot_dict[NameObject("/M")] = TextStringObject(pdf_date)
-
-        if note.title:
-            annot_dict[NameObject("/Subj")] = TextStringObject(note.title)
+        self._set_annotation_metadata(annot_dict, note)
+        self._set_custom_icon(writer, annot_dict, rect)
 
         # If this is a reply, set the /IRT (In Reply To) field
         if parent_ref is not None:
@@ -334,9 +340,9 @@ class NotesProcessor:
         # Get reference to the annotation we just added
         # The annotation is now in the page's annotation array
         page = writer.pages[page_number]
-        if "/Annots" in page:
+        if PDF_ANNOTS in page:
             # The last annotation in the list is the one we just added
-            annots = page["/Annots"]
+            annots = page[PDF_ANNOTS]
             if isinstance(annots, list) and len(annots) > 0:
                 current_annot_ref = annots[-1]
             else:

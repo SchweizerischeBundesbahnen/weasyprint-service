@@ -247,7 +247,7 @@ async def convert_html(
         parsed_html = html_parser.parse(html)
 
         notes_processor = NotesProcessor()
-        notes = notes_processor.replaceNotes(parsed_html)
+        notes = notes_processor.replace_notes(parsed_html)
 
         # Use CDP-based async SVG processing
         svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
@@ -273,7 +273,7 @@ async def convert_html(
         if len(notes) > 0:
             try:
                 logger.debug("Processing %d notes for PDF annotation", len(notes))
-                output_pdf = notes_processor.processPdf(output_pdf, notes)
+                output_pdf = notes_processor.process_pdf(output_pdf, notes)
                 logger.debug("Notes processed successfully")
             except Exception as e:
                 logger.error("Failed to process PDF notes: %s", str(e), exc_info=True)

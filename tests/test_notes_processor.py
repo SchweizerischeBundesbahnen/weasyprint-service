@@ -11,7 +11,7 @@ def test_parse_notes_with_nested_replies():
     """
     Test parsing of HTML sticky notes with nested replies.
 
-    This test verifies that replaceNotes correctly:
+    This test verifies that replace_notes correctly:
     - Extracts note metadata (username, title, text, time)
     - Builds proper parent-child relationships for replies
     - Generates unique UUIDs for all notes
@@ -48,7 +48,7 @@ def test_parse_notes_with_nested_replies():
     soup = BeautifulSoup(html, "html.parser")
     processor = NotesProcessor()
 
-    notes = processor.replaceNotes(soup)
+    notes = processor.replace_notes(soup)
 
     # Verify structure
     assert len(notes) == 1, "Should have 1 top-level note"
@@ -101,7 +101,7 @@ def test_process_pdf_with_notes(save_test_outputs: bool):
     """
     Test PDF processing by loading a PDF with fake note links and replacing them with annotations.
 
-    This test verifies that processPdf correctly:
+    This test verifies that process_pdf correctly:
     - Replaces fake note links with PDF annotations
     - Creates nested reply annotations using /IRT field
     - Preserves other annotations and page content
@@ -140,7 +140,7 @@ def test_process_pdf_with_notes(save_test_outputs: bool):
     """
     soup = BeautifulSoup(html, "html.parser")
     processor = NotesProcessor()
-    notes = processor.replaceNotes(soup)
+    notes = processor.replace_notes(soup)
 
     # Override the UUID of the main note to match the one in notes_link_to_replace.pdf
     notes[0].uuid = "24925f16-d2a8-4000-b181-a909b9f04ed6"
@@ -151,7 +151,7 @@ def test_process_pdf_with_notes(save_test_outputs: bool):
         pdf_bytes = f.read()
 
     # Process the PDF with notes
-    updated_pdf = processor.processPdf(pdf_bytes, notes)
+    updated_pdf = processor.process_pdf(pdf_bytes, notes)
 
     # Verify the PDF was processed
     assert len(updated_pdf) > 0, "Updated PDF should not be empty"
@@ -206,7 +206,7 @@ def test_parse_note_without_optional_fields():
     soup = BeautifulSoup(html, "html.parser")
     processor = NotesProcessor()
 
-    notes = processor.replaceNotes(soup)
+    notes = processor.replace_notes(soup)
 
     assert len(notes) == 1
     assert notes[0].username == "User"
@@ -237,7 +237,7 @@ def test_multiple_top_level_notes():
     soup = BeautifulSoup(html, "html.parser")
     processor = NotesProcessor()
 
-    notes = processor.replaceNotes(soup)
+    notes = processor.replace_notes(soup)
 
     assert len(notes) == 2
     assert notes[0].username == "User 1"

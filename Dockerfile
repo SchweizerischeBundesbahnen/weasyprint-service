@@ -27,6 +27,7 @@ RUN apt-get update && \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
+    procps \
     python3-brotli \
     python3-cffi && \
     apt-get clean autoclean && \

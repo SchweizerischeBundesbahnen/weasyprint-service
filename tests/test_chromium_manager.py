@@ -1175,7 +1175,7 @@ async def test_chromium_manager_get_metrics():
         assert "total_conversions" in metrics
         assert "failed_conversions" in metrics
         assert "error_rate_percent" in metrics
-        assert "total_restarts" in metrics
+        assert "total_chromium_restarts" in metrics
         assert "avg_conversion_time_ms" in metrics
         assert "last_health_check" in metrics
         assert "last_health_status" in metrics
@@ -1183,10 +1183,10 @@ async def test_chromium_manager_get_metrics():
         assert "uptime_seconds" in metrics
 
         # Initial values
-        assert metrics["total_conversions"] == 0
-        assert metrics["failed_conversions"] == 0
+        assert metrics["total_svg_conversions"] == 0
+        assert metrics["failed_svg_conversions"] == 0
         assert metrics["error_rate_percent"] == 0.0
-        assert metrics["total_restarts"] == 0
+        assert metrics["total_chromium_restarts"] == 0
         assert metrics["uptime_seconds"] >= 0.0
 
     finally:
@@ -1207,10 +1207,10 @@ async def test_chromium_manager_metrics_after_conversion():
 
         # Check metrics
         metrics = manager.get_metrics()
-        assert metrics["total_conversions"] == 1
-        assert metrics["failed_conversions"] == 0
+        assert metrics["total_svg_conversions"] == 1
+        assert metrics["failed_svg_conversions"] == 0
         assert metrics["error_rate_percent"] == 0.0
-        assert metrics["avg_conversion_time_ms"] > 0.0
+        assert metrics["avg_svg_conversion_time_ms"] > 0.0
         assert metrics["consecutive_failures"] == 0
 
     finally:
@@ -1238,8 +1238,8 @@ async def test_chromium_manager_metrics_after_failure():
 
         # Check metrics
         metrics = manager.get_metrics()
-        assert metrics["total_conversions"] == 0
-        assert metrics["failed_conversions"] == 1
+        assert metrics["total_svg_conversions"] == 0
+        assert metrics["failed_svg_conversions"] == 1
         assert metrics["error_rate_percent"] == 100.0
         assert metrics["consecutive_failures"] == 1
 
@@ -1260,9 +1260,9 @@ async def test_chromium_manager_health_monitoring_interval():
         # Get metrics
         metrics = manager.get_metrics()
 
-        # Last health check should be recent
-        time_since_last_check = time.time() - metrics["last_health_check"]
-        assert time_since_last_check < 11.0  # Should have checked within last 11 seconds
+        # Last health check should be a non-empty string (formatted timestamp)
+        assert metrics["last_health_check"] != ""
+        assert isinstance(metrics["last_health_check"], str)
 
         # Health should be passing
         assert metrics["last_health_status"] is True
@@ -1398,8 +1398,8 @@ async def test_chromium_manager_metrics_survive_restart():
 
         # Get metrics before restart
         metrics_before = manager.get_metrics()
-        assert metrics_before["total_conversions"] == 2
-        assert metrics_before["total_restarts"] == 0
+        assert metrics_before["total_svg_conversions"] == 2
+        assert metrics_before["total_chromium_restarts"] == 0
 
         # Restart browser
         await manager.restart()
@@ -1408,9 +1408,9 @@ async def test_chromium_manager_metrics_survive_restart():
         metrics_after = manager.get_metrics()
 
         # Conversions should persist
-        assert metrics_after["total_conversions"] == 2
+        assert metrics_after["total_svg_conversions"] == 2
         # Restarts should increment
-        assert metrics_after["total_restarts"] == 1
+        assert metrics_after["total_chromium_restarts"] == 1
         # Uptime should reset
         assert metrics_after["uptime_seconds"] < metrics_before["uptime_seconds"]
 
@@ -1437,10 +1437,10 @@ async def test_chromium_manager_concurrent_conversions_metrics():
 
         # Check metrics
         metrics = manager.get_metrics()
-        assert metrics["total_conversions"] == 10
-        assert metrics["failed_conversions"] == 0
+        assert metrics["total_svg_conversions"] == 10
+        assert metrics["failed_svg_conversions"] == 0
         assert metrics["error_rate_percent"] == 0.0
-        assert metrics["avg_conversion_time_ms"] > 0.0
+        assert metrics["avg_svg_conversion_time_ms"] > 0.0
         assert metrics["consecutive_failures"] == 0
 
     finally:
@@ -1464,9 +1464,9 @@ async def test_chromium_manager_metrics_with_disabled_health_monitoring():
 
         # Metrics should still work
         metrics = manager.get_metrics()
-        assert metrics["total_conversions"] == 1
-        assert metrics["failed_conversions"] == 0
-        assert metrics["avg_conversion_time_ms"] > 0.0
+        assert metrics["total_svg_conversions"] == 1
+        assert metrics["failed_svg_conversions"] == 0
+        assert metrics["avg_svg_conversion_time_ms"] > 0.0
         assert metrics["uptime_seconds"] >= 0.0
 
     finally:
@@ -1504,8 +1504,8 @@ async def test_chromium_manager_error_rate_calculation():
 
         # Check error rate: 1 success, 1 failure = 50%
         metrics = manager.get_metrics()
-        assert metrics["total_conversions"] == 1
-        assert metrics["failed_conversions"] == 1
+        assert metrics["total_svg_conversions"] == 1
+        assert metrics["failed_svg_conversions"] == 1
         assert metrics["error_rate_percent"] == 50.0
 
         # Another successful conversion
@@ -1513,8 +1513,8 @@ async def test_chromium_manager_error_rate_calculation():
 
         # Check error rate: 2 success, 1 failure = 33.33%
         metrics = manager.get_metrics()
-        assert metrics["total_conversions"] == 2
-        assert metrics["failed_conversions"] == 1
+        assert metrics["total_svg_conversions"] == 2
+        assert metrics["failed_svg_conversions"] == 1
         assert 33.0 <= metrics["error_rate_percent"] <= 34.0
 
     finally:
@@ -1558,8 +1558,8 @@ async def test_chromium_manager_consecutive_failures_reset():
 
         metrics = manager.get_metrics()
         assert metrics["consecutive_failures"] == 0
-        assert metrics["total_conversions"] == 1
-        assert metrics["failed_conversions"] == 1
+        assert metrics["total_svg_conversions"] == 1
+        assert metrics["failed_svg_conversions"] == 1
 
     finally:
         await manager.stop()
@@ -1599,12 +1599,12 @@ async def test_chromium_manager_metrics_initial_state():
 
     # Before starting
     metrics = manager.get_metrics()
-    assert metrics["total_conversions"] == 0
-    assert metrics["failed_conversions"] == 0
+    assert metrics["total_svg_conversions"] == 0
+    assert metrics["failed_svg_conversions"] == 0
     assert metrics["error_rate_percent"] == 0.0
-    assert metrics["total_restarts"] == 0
-    assert metrics["avg_conversion_time_ms"] == 0.0
-    assert metrics["last_health_check"] == 0.0
+    assert metrics["total_chromium_restarts"] == 0
+    assert metrics["avg_svg_conversion_time_ms"] == 0.0
+    assert metrics["last_health_check"] == ""
     assert metrics["last_health_status"] is False
     assert metrics["consecutive_failures"] == 0
     assert metrics["uptime_seconds"] >= 0.0
@@ -1633,7 +1633,53 @@ async def test_chromium_manager_multiple_restarts_tracking():
 
         # Check restart counter
         metrics = manager.get_metrics()
-        assert metrics["total_restarts"] == 3
+        assert metrics["total_chromium_restarts"] == 3
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_resource_usage_metrics():
+    """Test that CPU and memory usage metrics are collected and exposed."""
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))
+    await manager.start()
+
+    try:
+        # Get initial metrics
+        metrics = manager.get_metrics()
+
+        # Resource metrics should be present
+        assert "current_cpu_percent" in metrics
+        assert "avg_cpu_percent" in metrics
+        assert "current_chromium_memory_mb" in metrics
+        assert "avg_chromium_memory_mb" in metrics
+
+        # Initial values should be 0.0 (no samples yet if browser process not found or health check hasn't run)
+        assert isinstance(metrics["current_cpu_percent"], float)
+        assert isinstance(metrics["avg_cpu_percent"], float)
+        assert isinstance(metrics["current_chromium_memory_mb"], float)
+        assert isinstance(metrics["avg_chromium_memory_mb"], float)
+
+        # All should be non-negative
+        assert metrics["current_cpu_percent"] >= 0.0
+        assert metrics["avg_cpu_percent"] >= 0.0
+        assert metrics["current_chromium_memory_mb"] >= 0.0
+        assert metrics["avg_chromium_memory_mb"] >= 0.0
+
+        # Wait for at least one health check to run (which collects resource metrics)
+        await asyncio.sleep(11)
+
+        # Get metrics again
+        metrics_after = manager.get_metrics()
+
+        # If browser process was found, metrics should potentially have values
+        # Note: On some systems pgrep may not find the process, so we check if values exist
+        # but don't assert they are > 0 since that depends on OS capabilities
+        assert "current_cpu_percent" in metrics_after
+        assert "avg_cpu_percent" in metrics_after
+        assert "current_chromium_memory_mb" in metrics_after
+        assert "avg_chromium_memory_mb" in metrics_after
 
     finally:
         await manager.stop()

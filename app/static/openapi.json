@@ -38,34 +38,49 @@
                       "description": "Schema for Chromium performance and health metrics",
                       "properties": {
                         "total_conversions": {
-                          "description": "Total successful SVG to PNG conversions",
+                          "description": "Total successful HTML to PDF conversions",
                           "title": "Total Conversions",
                           "type": "integer"
                         },
                         "failed_conversions": {
-                          "description": "Total failed conversion attempts",
+                          "description": "Total failed HTML to PDF conversion attempts",
                           "title": "Failed Conversions",
                           "type": "integer"
                         },
-                        "error_rate_percent": {
-                          "description": "Error rate as percentage",
-                          "title": "Error Rate Percent",
-                          "type": "number"
-                        },
-                        "total_restarts": {
-                          "description": "Total browser restarts since startup",
-                          "title": "Total Restarts",
-                          "type": "integer"
-                        },
                         "avg_conversion_time_ms": {
-                          "description": "Average conversion time in milliseconds",
+                          "description": "Average HTML to PDF conversion time in milliseconds",
                           "title": "Avg Conversion Time Ms",
                           "type": "number"
                         },
-                        "last_health_check": {
-                          "description": "Timestamp of last health check (Unix time)",
-                          "title": "Last Health Check",
+                        "total_svg_conversions": {
+                          "description": "Total successful SVG to PNG conversions",
+                          "title": "Total Svg Conversions",
+                          "type": "integer"
+                        },
+                        "failed_svg_conversions": {
+                          "description": "Total failed SVG to PNG conversion attempts",
+                          "title": "Failed Svg Conversions",
+                          "type": "integer"
+                        },
+                        "avg_svg_conversion_time_ms": {
+                          "description": "Average SVG to PNG conversion time in milliseconds",
+                          "title": "Avg Svg Conversion Time Ms",
                           "type": "number"
+                        },
+                        "error_rate_percent": {
+                          "description": "Overall conversion error rate as percentage (includes both HTML->PDF and SVG->PNG)",
+                          "title": "Error Rate Percent",
+                          "type": "number"
+                        },
+                        "total_chromium_restarts": {
+                          "description": "Total Chromium browser restarts since startup",
+                          "title": "Total Chromium Restarts",
+                          "type": "integer"
+                        },
+                        "last_health_check": {
+                          "description": "Formatted timestamp of last health check (HH:MM:SS DD.MM.YYYY)",
+                          "title": "Last Health Check",
+                          "type": "string"
                         },
                         "last_health_status": {
                           "description": "Result of last health check (true=healthy)",
@@ -81,18 +96,57 @@
                           "description": "Browser uptime in seconds",
                           "title": "Uptime Seconds",
                           "type": "number"
+                        },
+                        "current_cpu_percent": {
+                          "description": "Current CPU usage percentage",
+                          "title": "Current Cpu Percent",
+                          "type": "number"
+                        },
+                        "avg_cpu_percent": {
+                          "description": "Average CPU usage percentage",
+                          "title": "Avg Cpu Percent",
+                          "type": "number"
+                        },
+                        "total_memory_mb": {
+                          "description": "Total system memory in MB",
+                          "title": "Total Memory Mb",
+                          "type": "number"
+                        },
+                        "available_memory_mb": {
+                          "description": "Available system memory in MB",
+                          "title": "Available Memory Mb",
+                          "type": "number"
+                        },
+                        "current_chromium_memory_mb": {
+                          "description": "Current Chromium physical memory usage in MB",
+                          "title": "Current Chromium Memory Mb",
+                          "type": "number"
+                        },
+                        "avg_chromium_memory_mb": {
+                          "description": "Average Chromium physical memory usage in MB",
+                          "title": "Avg Chromium Memory Mb",
+                          "type": "number"
                         }
                       },
                       "required": [
                         "total_conversions",
                         "failed_conversions",
-                        "error_rate_percent",
-                        "total_restarts",
                         "avg_conversion_time_ms",
+                        "total_svg_conversions",
+                        "failed_svg_conversions",
+                        "avg_svg_conversion_time_ms",
+                        "error_rate_percent",
+                        "total_chromium_restarts",
                         "last_health_check",
                         "last_health_status",
                         "consecutive_failures",
-                        "uptime_seconds"
+                        "uptime_seconds",
+                        "current_cpu_percent",
+                        "avg_cpu_percent",
+                        "total_memory_mb",
+                        "available_memory_mb",
+                        "current_chromium_memory_mb",
+                        "avg_chromium_memory_mb"
                       ],
                       "title": "ChromiumMetricsSchema",
                       "type": "object"
@@ -103,6 +157,16 @@
                     "status": {
                       "description": "Overall health status: healthy or unhealthy",
                       "title": "Status",
+                      "type": "string"
+                    },
+                    "version": {
+                      "description": "WeasyPrint service version",
+                      "title": "Version",
+                      "type": "string"
+                    },
+                    "weasyprint_version": {
+                      "description": "WeasyPrint library version",
+                      "title": "Weasyprint Version",
                       "type": "string"
                     },
                     "chromium_running": {
@@ -134,6 +198,8 @@
                   },
                   "required": [
                     "status",
+                    "version",
+                    "weasyprint_version",
                     "chromium_running",
                     "chromium_version",
                     "health_monitoring_enabled",
@@ -160,34 +226,49 @@
                       "description": "Schema for Chromium performance and health metrics",
                       "properties": {
                         "total_conversions": {
-                          "description": "Total successful SVG to PNG conversions",
+                          "description": "Total successful HTML to PDF conversions",
                           "title": "Total Conversions",
                           "type": "integer"
                         },
                         "failed_conversions": {
-                          "description": "Total failed conversion attempts",
+                          "description": "Total failed HTML to PDF conversion attempts",
                           "title": "Failed Conversions",
                           "type": "integer"
                         },
-                        "error_rate_percent": {
-                          "description": "Error rate as percentage",
-                          "title": "Error Rate Percent",
-                          "type": "number"
-                        },
-                        "total_restarts": {
-                          "description": "Total browser restarts since startup",
-                          "title": "Total Restarts",
-                          "type": "integer"
-                        },
                         "avg_conversion_time_ms": {
-                          "description": "Average conversion time in milliseconds",
+                          "description": "Average HTML to PDF conversion time in milliseconds",
                           "title": "Avg Conversion Time Ms",
                           "type": "number"
                         },
-                        "last_health_check": {
-                          "description": "Timestamp of last health check (Unix time)",
-                          "title": "Last Health Check",
+                        "total_svg_conversions": {
+                          "description": "Total successful SVG to PNG conversions",
+                          "title": "Total Svg Conversions",
+                          "type": "integer"
+                        },
+                        "failed_svg_conversions": {
+                          "description": "Total failed SVG to PNG conversion attempts",
+                          "title": "Failed Svg Conversions",
+                          "type": "integer"
+                        },
+                        "avg_svg_conversion_time_ms": {
+                          "description": "Average SVG to PNG conversion time in milliseconds",
+                          "title": "Avg Svg Conversion Time Ms",
                           "type": "number"
+                        },
+                        "error_rate_percent": {
+                          "description": "Overall conversion error rate as percentage (includes both HTML->PDF and SVG->PNG)",
+                          "title": "Error Rate Percent",
+                          "type": "number"
+                        },
+                        "total_chromium_restarts": {
+                          "description": "Total Chromium browser restarts since startup",
+                          "title": "Total Chromium Restarts",
+                          "type": "integer"
+                        },
+                        "last_health_check": {
+                          "description": "Formatted timestamp of last health check (HH:MM:SS DD.MM.YYYY)",
+                          "title": "Last Health Check",
+                          "type": "string"
                         },
                         "last_health_status": {
                           "description": "Result of last health check (true=healthy)",
@@ -203,18 +284,57 @@
                           "description": "Browser uptime in seconds",
                           "title": "Uptime Seconds",
                           "type": "number"
+                        },
+                        "current_cpu_percent": {
+                          "description": "Current CPU usage percentage",
+                          "title": "Current Cpu Percent",
+                          "type": "number"
+                        },
+                        "avg_cpu_percent": {
+                          "description": "Average CPU usage percentage",
+                          "title": "Avg Cpu Percent",
+                          "type": "number"
+                        },
+                        "total_memory_mb": {
+                          "description": "Total system memory in MB",
+                          "title": "Total Memory Mb",
+                          "type": "number"
+                        },
+                        "available_memory_mb": {
+                          "description": "Available system memory in MB",
+                          "title": "Available Memory Mb",
+                          "type": "number"
+                        },
+                        "current_chromium_memory_mb": {
+                          "description": "Current Chromium physical memory usage in MB",
+                          "title": "Current Chromium Memory Mb",
+                          "type": "number"
+                        },
+                        "avg_chromium_memory_mb": {
+                          "description": "Average Chromium physical memory usage in MB",
+                          "title": "Avg Chromium Memory Mb",
+                          "type": "number"
                         }
                       },
                       "required": [
                         "total_conversions",
                         "failed_conversions",
-                        "error_rate_percent",
-                        "total_restarts",
                         "avg_conversion_time_ms",
+                        "total_svg_conversions",
+                        "failed_svg_conversions",
+                        "avg_svg_conversion_time_ms",
+                        "error_rate_percent",
+                        "total_chromium_restarts",
                         "last_health_check",
                         "last_health_status",
                         "consecutive_failures",
-                        "uptime_seconds"
+                        "uptime_seconds",
+                        "current_cpu_percent",
+                        "avg_cpu_percent",
+                        "total_memory_mb",
+                        "available_memory_mb",
+                        "current_chromium_memory_mb",
+                        "avg_chromium_memory_mb"
                       ],
                       "title": "ChromiumMetricsSchema",
                       "type": "object"
@@ -225,6 +345,16 @@
                     "status": {
                       "description": "Overall health status: healthy or unhealthy",
                       "title": "Status",
+                      "type": "string"
+                    },
+                    "version": {
+                      "description": "WeasyPrint service version",
+                      "title": "Version",
+                      "type": "string"
+                    },
+                    "weasyprint_version": {
+                      "description": "WeasyPrint library version",
+                      "title": "Weasyprint Version",
                       "type": "string"
                     },
                     "chromium_running": {
@@ -256,6 +386,8 @@
                   },
                   "required": [
                     "status",
+                    "version",
+                    "weasyprint_version",
                     "chromium_running",
                     "chromium_version",
                     "health_monitoring_enabled",

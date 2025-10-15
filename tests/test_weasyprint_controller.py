@@ -109,13 +109,22 @@ def test_health_detailed_healthy():
         return_value={
             "total_conversions": 42,
             "failed_conversions": 3,
+            "total_svg_conversions": 100,
+            "failed_svg_conversions": 5,
             "error_rate_percent": 7.14,
-            "total_restarts": 1,
+            "total_chromium_restarts": 1,
             "avg_conversion_time_ms": 123.45,
-            "last_health_check": 1234567890.0,
+            "avg_svg_conversion_time_ms": 50.12,
+            "last_health_check": "12:34:56 01.02.2024",
             "last_health_status": True,
             "consecutive_failures": 0,
             "uptime_seconds": 3600.0,
+            "current_cpu_percent": 5.5,
+            "avg_cpu_percent": 3.2,
+            "total_memory_mb": 16384.0,
+            "available_memory_mb": 8192.0,
+            "current_chromium_memory_mb": 128.5,
+            "avg_chromium_memory_mb": 120.3,
         }
     )
 
@@ -129,6 +138,8 @@ def test_health_detailed_healthy():
 
             data = result.json()
             assert data["status"] == "healthy"
+            assert data["version"] == "test1"
+            assert data["weasyprint_version"] is not None
             assert data["chromium_running"] is True
             assert data["chromium_version"] == "131.0.6778.33"
             assert data["health_monitoring_enabled"] is True
@@ -136,13 +147,22 @@ def test_health_detailed_healthy():
             metrics = data["metrics"]
             assert metrics["total_conversions"] == 42
             assert metrics["failed_conversions"] == 3
+            assert metrics["total_svg_conversions"] == 100
+            assert metrics["failed_svg_conversions"] == 5
             assert metrics["error_rate_percent"] == 7.14
-            assert metrics["total_restarts"] == 1
+            assert metrics["total_chromium_restarts"] == 1
             assert metrics["avg_conversion_time_ms"] == 123.45
-            assert metrics["last_health_check"] == 1234567890.0
+            assert metrics["avg_svg_conversion_time_ms"] == 50.12
+            assert metrics["last_health_check"] == "12:34:56 01.02.2024"
             assert metrics["last_health_status"] is True
             assert metrics["consecutive_failures"] == 0
             assert metrics["uptime_seconds"] == 3600.0
+            assert metrics["current_cpu_percent"] == 5.5
+            assert metrics["avg_cpu_percent"] == 3.2
+            assert metrics["total_memory_mb"] == 16384.0
+            assert metrics["available_memory_mb"] == 8192.0
+            assert metrics["current_chromium_memory_mb"] == 128.5
+            assert metrics["avg_chromium_memory_mb"] == 120.3
 
 
 def test_health_detailed_unhealthy():
@@ -163,13 +183,22 @@ def test_health_detailed_unhealthy():
         return_value={
             "total_conversions": 10,
             "failed_conversions": 5,
+            "total_svg_conversions": 20,
+            "failed_svg_conversions": 10,
             "error_rate_percent": 50.0,
-            "total_restarts": 3,
+            "total_chromium_restarts": 3,
             "avg_conversion_time_ms": 0.0,
-            "last_health_check": 1234567890.0,
+            "avg_svg_conversion_time_ms": 0.0,
+            "last_health_check": "",
             "last_health_status": False,
             "consecutive_failures": 3,
             "uptime_seconds": 0.0,
+            "current_cpu_percent": 0.0,
+            "avg_cpu_percent": 0.0,
+            "total_memory_mb": 16384.0,
+            "available_memory_mb": 2048.0,
+            "current_chromium_memory_mb": 0.0,
+            "avg_chromium_memory_mb": 0.0,
         }
     )
 
@@ -183,6 +212,8 @@ def test_health_detailed_unhealthy():
 
             data = result.json()
             assert data["status"] == "unhealthy"
+            assert data["version"] == "test1"
+            assert data["weasyprint_version"] is not None
             assert data["chromium_running"] is False
             assert data["chromium_version"] is None
             assert data["health_monitoring_enabled"] is True
@@ -190,10 +221,13 @@ def test_health_detailed_unhealthy():
             metrics = data["metrics"]
             assert metrics["total_conversions"] == 10
             assert metrics["failed_conversions"] == 5
+            assert metrics["total_svg_conversions"] == 20
+            assert metrics["failed_svg_conversions"] == 10
             assert metrics["error_rate_percent"] == 50.0
-            assert metrics["total_restarts"] == 3
+            assert metrics["total_chromium_restarts"] == 3
             assert metrics["consecutive_failures"] == 3
             assert metrics["last_health_status"] is False
+            assert metrics["last_health_check"] == ""
 
 
 def test_health_detailed_false():
@@ -258,13 +292,22 @@ def test_health_detailed_with_health_monitoring_disabled():
         return_value={
             "total_conversions": 5,
             "failed_conversions": 0,
+            "total_svg_conversions": 15,
+            "failed_svg_conversions": 0,
             "error_rate_percent": 0.0,
-            "total_restarts": 0,
+            "total_chromium_restarts": 0,
             "avg_conversion_time_ms": 100.0,
-            "last_health_check": 0.0,
+            "avg_svg_conversion_time_ms": 45.0,
+            "last_health_check": "",
             "last_health_status": False,
             "consecutive_failures": 0,
             "uptime_seconds": 1800.0,
+            "current_cpu_percent": 2.5,
+            "avg_cpu_percent": 1.8,
+            "total_memory_mb": 16384.0,
+            "available_memory_mb": 10240.0,
+            "current_chromium_memory_mb": 95.5,
+            "avg_chromium_memory_mb": 90.2,
         }
     )
 
@@ -278,6 +321,9 @@ def test_health_detailed_with_health_monitoring_disabled():
 
             data = result.json()
             assert data["status"] == "healthy"
+            assert data["version"] == "test1"
+            assert data["weasyprint_version"] is not None
             assert data["health_monitoring_enabled"] is False
-            assert data["metrics"]["last_health_check"] == 0.0
+            assert data["metrics"]["last_health_check"] == ""
             assert data["metrics"]["total_conversions"] == 5
+            assert data["metrics"]["total_svg_conversions"] == 15

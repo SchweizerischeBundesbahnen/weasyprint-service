@@ -114,6 +114,8 @@ async def health(
         metrics_data = chromium_manager.get_metrics()
         health_response = HealthSchema(
             status="healthy" if chromium_healthy else "unhealthy",
+            version=os.environ.get("WEASYPRINT_SERVICE_VERSION", "unknown"),
+            weasyprint_version=weasyprint.__version__,
             chromium_running=chromium_manager.is_running(),
             chromium_version=chromium_manager.get_version(),
             health_monitoring_enabled=chromium_manager.health_check_enabled,

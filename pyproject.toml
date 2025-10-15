@@ -40,7 +40,7 @@ test = [
     "pymupdf==1.26.5",
     "pypdf==6.1.1",
     "httpx==0.28.1",
-    "coverage==7.10.7",
+    "coverage==7.11.0",
 ]
 
 [build-system]

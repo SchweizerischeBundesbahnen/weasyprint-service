@@ -71,7 +71,7 @@ class NotesProcessor:
                 fake_a_href: Tag = parsed_html.new_tag("a")
                 fake_a_href.attrs["href"] = f"https://sticky.note/{note.uuid}"
                 fake_a_href.attrs["style"] = "display: inline-block; width: 20px; height: 20px; text-decoration: none; color: transparent; background: transparent;"
-                fake_a_href.string = " "  # Empty string
+                fake_a_href.string = " "  # Single space character
                 node.replace_with(fake_a_href)
 
         return notes
@@ -327,9 +327,9 @@ class NotesProcessor:
 
     def _set_custom_icon(self, writer: PdfWriter, annot_dict: DictionaryObject, rect: tuple[float, float, float, float]) -> None:
         """Set custom icon appearance for annotation if available."""
-        custom_icon_path = str(Path(__file__).parent / "static" / "note.png")
-        if Path(custom_icon_path).exists():
-            xobject_ref = self._embed_png_as_xobject(writer, custom_icon_path)
+        custom_icon_path = Path(__file__).parent.resolve() / "static" / "note.png"
+        if custom_icon_path.exists():
+            xobject_ref = self._embed_png_as_xobject(writer, str(custom_icon_path))
             if xobject_ref is not None:
                 appearance_dict = self._create_custom_appearance(writer, rect, xobject_ref)
                 annot_dict[NameObject("/AP")] = appearance_dict

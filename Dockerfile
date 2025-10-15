@@ -52,6 +52,7 @@ RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
 COPY requirements.txt ${WORKING_DIR}/requirements.txt
 
 COPY ./app/*.py ${WORKING_DIR}/app/
+COPY ./app/static/ ${WORKING_DIR}/app/static/
 COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
 COPY ./poetry.lock ${WORKING_DIR}/poetry.lock
 

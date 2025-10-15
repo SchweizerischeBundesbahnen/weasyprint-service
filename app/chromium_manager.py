@@ -13,7 +13,6 @@ import base64
 import contextlib
 import logging
 import os
-import subprocess
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -199,7 +198,7 @@ class ChromiumMetrics:
             self.total_memory_sum += memory_mb
             self.avg_chromium_memory_mb = self.total_memory_sum / self.total_memory_samples
 
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
             # Process no longer exists or we don't have access
             pass
 
@@ -295,16 +294,19 @@ class ChromiumManager:
                 if self._browser:
                     # Try to get process info from browser service workers
                     # This is a workaround since Playwright doesn't expose PID
-                    # We'll use psutil to find the chromium process
-                    result = subprocess.run(
-                        ["pgrep", "-f", "chrome.*--headless"],  # noqa: S607
-                        capture_output=True,
-                        text=True,
-                        check=False,
+                    # We'll use pgrep to find the chromium process asynchronously
+                    process = await asyncio.create_subprocess_exec(
+                        "pgrep",
+                        "-f",
+                        "chrome.*--headless",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
                     )
-                    if result.returncode == 0 and result.stdout.strip():
+                    stdout, _ = await process.communicate()
+
+                    if process.returncode == 0 and stdout.strip():
                         # Get the first (oldest) chromium process PID
-                        pids = [int(pid) for pid in result.stdout.strip().split("\n")]
+                        pids = [int(pid) for pid in stdout.decode().strip().split("\n")]
                         if pids:
                             self._browser_process = psutil.Process(pids[0])
                             self.log.debug("Found Chromium process PID: %d", pids[0])

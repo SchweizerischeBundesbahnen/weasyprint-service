@@ -49,16 +49,15 @@ WORKDIR ${WORKING_DIR}
 RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
     echo "${BUILD_TIMESTAMP}" > "${WORKING_DIR}/.build_timestamp"
 
-COPY requirements.txt ${WORKING_DIR}/requirements.txt
-
 COPY ./app/*.py ${WORKING_DIR}/app/
 COPY ./app/static/ ${WORKING_DIR}/app/static/
 COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
-COPY ./poetry.lock ${WORKING_DIR}/poetry.lock
+COPY ./uv.lock ${WORKING_DIR}/uv.lock
 
-RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && \
-    poetry install --no-root --only main && \
-    poetry run playwright install chromium --with-deps
+# Install uv and dependencies
+COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /usr/local/bin/uv
+RUN uv sync --frozen --no-dev && \
+    uv run playwright install chromium --with-deps
 
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh

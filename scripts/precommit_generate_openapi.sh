@@ -50,10 +50,9 @@ trap cleanup EXIT
 LOG_DIR_LOCAL="$(mktemp -d 2>/dev/null || mktemp -d -t weasyprint-logs)"
 export LOG_DIR="$LOG_DIR_LOCAL"
 
-# Enforce running from local virtual environment's python
-VENV_PYTHON="${ROOT_DIR}/.venv/bin/python"
-if [ ! -x "$VENV_PYTHON" ]; then
-  echo "Error: Local virtual environment python not found at $VENV_PYTHON. Please create and activate a local venv (.venv)." >&2
+# Ensure uv is available
+if ! command -v uv >/dev/null 2>&1; then
+  echo "Error: uv not found. Please install uv: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2
   exit 1
 fi
 
@@ -63,8 +62,8 @@ if lsof -ti :"${PORT}" >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Starting local FastAPI app via local venv python on port ${PORT}..."
-(cd "$ROOT_DIR" && LOG_DIR="$LOG_DIR_LOCAL" "$VENV_PYTHON" -m app.weasyprint_service_application --port "${PORT}") >/dev/null 2>&1 &
+echo "Starting local FastAPI app via uv on port ${PORT}..."
+(cd "$ROOT_DIR" && LOG_DIR="$LOG_DIR_LOCAL" uv run python -m app.weasyprint_service_application --port "${PORT}") >/dev/null 2>&1 &
 
 wait_for_url "$URL" 60
 

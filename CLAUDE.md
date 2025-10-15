@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Run complete test suite (optimized sequence, no redundancy)
 # 1. Run tox - handles linting, formatting, type checking, and tests with coverage
-poetry run tox
+uv run tox
 
 # 2. Run pre-commit hooks - final validation including security checks and commit format
-poetry run pre-commit run --all
+uv run pre-commit run --all
 ```
 
 ### Commit Convention
@@ -32,22 +32,22 @@ Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
 
 ### Development Environment Setup
 ```bash
-# Install dependencies using Poetry
-poetry install --with=dev,test
+# Install dependencies using uv
+uv sync --all-extras
 ```
 
 ### Testing and Quality Assurance
 ```bash
 # Quick test during development
-poetry run pytest tests/test_specific_file.py -v
+uv run pytest tests/test_specific_file.py -v
 
 # Run specific test within a file
-poetry run pytest tests/test_svg_processor.py::test_process_valid_svg -v
+uv run pytest tests/test_svg_processor.py::test_process_valid_svg -v
 
 # Manual linting/formatting (if needed outside of tox/pre-commit)
-poetry run ruff format
-poetry run ruff check --fix
-poetry run mypy .
+uv run ruff format
+uv run ruff check --fix
+uv run mypy .
 
 # Generate/update OpenAPI schema (auto-runs in pre-commit)
 scripts/precommit_generate_openapi.sh
@@ -58,27 +58,27 @@ The repository includes a comprehensive load testing script for performance eval
 
 ```bash
 # Basic load test (100 requests, 10 concurrent workers)
-poetry run python scripts/load_test.py
+uv run python scripts/load_test.py
 
 # Custom configuration
-poetry run python scripts/load_test.py --requests 1000 --concurrency 50
+uv run python scripts/load_test.py --requests 1000 --concurrency 50
 
 # Test specific scenario
-poetry run python scripts/load_test.py --scenario simple    # Basic HTML conversion
-poetry run python scripts/load_test.py --scenario complex  # Complex HTML with tables
-poetry run python scripts/load_test.py --scenario svg      # SVG to PNG conversion
+uv run python scripts/load_test.py --scenario simple    # Basic HTML conversion
+uv run python scripts/load_test.py --scenario complex  # Complex HTML with tables
+uv run python scripts/load_test.py --scenario svg      # SVG to PNG conversion
 
 # Export results to JSON
-poetry run python scripts/load_test.py --requests 500 --concurrency 20 --output results.json
+uv run python scripts/load_test.py --requests 500 --concurrency 20 --output results.json
 
 # Export results to CSV
-poetry run python scripts/load_test.py --requests 500 --concurrency 20 --output results.csv --format csv
+uv run python scripts/load_test.py --requests 500 --concurrency 20 --output results.csv --format csv
 
 # Test against custom URL
-poetry run python scripts/load_test.py --url http://localhost:9080 --requests 200 --concurrency 10
+uv run python scripts/load_test.py --url http://localhost:9080 --requests 200 --concurrency 10
 
 # Stress test with high concurrency
-poetry run python scripts/load_test.py --scenario svg --requests 2000 --concurrency 100 --timeout 60
+uv run python scripts/load_test.py --scenario svg --requests 2000 --concurrency 100 --timeout 60
 ```
 
 **Load Test Features:**
@@ -99,7 +99,7 @@ poetry run python scripts/load_test.py --scenario svg --requests 2000 --concurre
 ### Local Development Server
 ```bash
 # Start FastAPI development server
-poetry run python -m app.weasyprint_service_application --port 9080
+uv run python -m app.weasyprint_service_application --port 9080
 
 # Access API documentation
 # http://localhost:9080/api/docs
@@ -339,8 +339,10 @@ The repository uses extensive pre-commit hooks including:
 ## Important Notes
 
 ### Dependency Management
-- Uses Poetry for Python dependency management
-- Dependencies defined in both `pyproject.toml` and `[tool.poetry.dependencies]` due to Renovate compatibility requirements
+- Uses uv for Python dependency management
+- Dependencies defined in standard `[project.dependencies]` format in `pyproject.toml`
+- Fully compatible with Renovate for automated dependency updates
+- Lock file: `uv.lock` (replaces `poetry.lock`)
 - Renovate handles automated dependency updates
 - Python 3.13+ required
 

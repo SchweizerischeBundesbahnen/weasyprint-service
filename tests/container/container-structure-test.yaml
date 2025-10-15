@@ -9,28 +9,26 @@ commandTests:
     command: python
     args: [--version]
     expectedOutput: [Python 3.13.*]
-  - name: Poetry version is correct
-    command: poetry
+  - name: uv version is correct
+    command: uv
     args: [--version]
-    expectedOutput: [version 2.*.*]
+    expectedOutput: [uv 0.*.*]
   - name: Weasyprint version is correct
-    command: poetry
+    command: uv
     args: [run, weasyprint, --version]
-    expectedOutput: [65.1]
+    expectedOutput: [66.0]
   - name: Chromium version is correct
     command: chromium
     args: [--version]
     expectedOutput: [Chromium 135.*.*.*]
   - name: Tox should not be installed
-    command: poetry
-    args: [run, tox, --version]
+    command: uv
+    args: [run, --no-sync, tox, --version]
     exitCode: 1
-    expectedError: ['Command not found: tox']
   - name: Pytest should not be installed
-    command: poetry
-    args: [run, pytest, --version]
+    command: uv
+    args: [run, --no-sync, pytest, --version]
     exitCode: 1
-    expectedError: ['Command not found: pytest']
   - name: Log directory exists
     command: test
     args: [-d, /opt/weasyprint/logs]

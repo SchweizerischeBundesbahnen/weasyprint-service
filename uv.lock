@@ -1041,6 +1041,15 @@ wheels = [
 ]
 
 [[package]]
+name = "types-psutil"
+version = "7.0.0.20251001"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9e/91/b020f9100b196a1f247cd12575f68dcdad94f032c1e0c42987d7632142ce/types_psutil-7.0.0.20251001.tar.gz", hash = "sha256:60d696200ddae28677e7d88cdebd6e960294e85adefbaafe0f6e5d0e7b4c1963", size = 20469, upload-time = "2025-10-01T03:04:21.292Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c0/99/50f30e0b648e6f583165cb2e535b0256a02a03efa4868cb2f017ad25b3d8/types_psutil-7.0.0.20251001-py3-none-any.whl", hash = "sha256:adc31de8386d31c61bd4123112fd51e2c700c7502a001cad72a3d56ba6b463d1", size = 23164, upload-time = "2025-10-01T03:04:20.089Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1142,6 +1151,7 @@ dev = [
     { name = "pre-commit" },
     { name = "ruff" },
     { name = "types-defusedxml" },
+    { name = "types-psutil" },
 ]
 test = [
     { name = "coverage" },
@@ -1179,6 +1189,7 @@ requires-dist = [
     { name = "starlette", specifier = ">=0.47.2,<0.48" },
     { name = "tox", marker = "extra == 'test'", specifier = "==4.31.0" },
     { name = "types-defusedxml", marker = "extra == 'dev'", specifier = "==0.7.0.20250822" },
+    { name = "types-psutil", marker = "extra == 'dev'", specifier = "==7.0.0.20251001" },
     { name = "uvicorn", specifier = "==0.37.0" },
     { name = "weasyprint", specifier = "==66.0" },
 ]

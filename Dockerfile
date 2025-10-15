@@ -1,7 +1,6 @@
 FROM python:3.13.7-slim@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689
 LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
 
-
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -49,15 +48,16 @@ WORKDIR ${WORKING_DIR}
 RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
     echo "${BUILD_TIMESTAMP}" > "${WORKING_DIR}/.build_timestamp"
 
-COPY ./app/*.py ${WORKING_DIR}/app/
-COPY ./app/static/ ${WORKING_DIR}/app/static/
 COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
 COPY ./uv.lock ${WORKING_DIR}/uv.lock
 
 # Install uv and dependencies
 COPY --from=ghcr.io/astral-sh/uv:0.6 /uv /usr/local/bin/uv
-RUN uv sync --frozen --no-dev && \
+RUN uv sync --frozen --no-dev --no-install-project && \
     uv run playwright install chromium --with-deps
+
+COPY ./app/*.py ${WORKING_DIR}/app/
+COPY ./app/static/ ${WORKING_DIR}/app/static/
 
 COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh

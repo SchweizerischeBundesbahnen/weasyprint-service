@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 import tempfile
+import time
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Annotated
@@ -17,9 +18,8 @@ from app.attachment_manager import AttachmentManager
 from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
-from app.notes_processor import NotesProcessor
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
-from app.schemas import VersionSchema
+from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
 
 
@@ -66,26 +66,71 @@ app = FastAPI(
 @app.get(
     "/health",
     summary="Health check",
-    description="Returns 200 OK if service is healthy, 503 if unhealthy.",
+    description="Returns health status with optional detailed metrics. Use ?detailed=true for JSON response with metrics.",
     operation_id="getHealth",
     tags=["meta"],
+    response_model=None,
     responses={
-        200: {"content": {"text/plain": {}}, "description": "Service is healthy"},
-        503: {"content": {"text/plain": {}}, "description": "Service is unhealthy"},
+        200: {
+            "content": {
+                "text/plain": {"example": "OK"},
+                "application/json": {
+                    "schema": HealthSchema.model_json_schema(),
+                },
+            },
+            "description": "Service is healthy",
+        },
+        503: {
+            "content": {
+                "text/plain": {"example": "Service Unavailable"},
+                "application/json": {
+                    "schema": HealthSchema.model_json_schema(),
+                },
+            },
+            "description": "Service is unhealthy",
+        },
     },
 )
-async def health(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> Response:
+async def health(
+    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
+    detailed: bool = Query(False, description="Return detailed JSON response with metrics"),
+) -> Response:
     """
     Health check endpoint that verifies service and Chromium browser status.
 
+    Args:
+        detailed: If True, returns detailed JSON response with metrics. If False, returns simple text response.
+
     Returns:
-        - 200 with "OK" if Chromium is running and healthy
-        - 503 with "Service Unavailable" if Chromium is not healthy
+        - Simple mode: 200 with "OK" text or 503 with "Service Unavailable" text
+        - Detailed mode: 200/503 with JSON containing status, metrics, and browser info
 
     Note: If Chromium is not healthy, the service should have failed to start.
     This endpoint primarily serves as a runtime health verification.
     """
     chromium_healthy = chromium_manager.health_check()
+
+    if detailed:
+        # Return detailed JSON response with metrics
+        metrics_data = chromium_manager.get_metrics()
+        health_response = HealthSchema(
+            status="healthy" if chromium_healthy else "unhealthy",
+            version=os.environ.get("WEASYPRINT_SERVICE_VERSION", "unknown"),
+            weasyprint_version=weasyprint.__version__,
+            chromium_running=chromium_manager.is_running(),
+            chromium_version=chromium_manager.get_version(),
+            health_monitoring_enabled=chromium_manager.health_check_enabled,
+            metrics=ChromiumMetricsSchema(**metrics_data),  # type: ignore[arg-type]
+        )
+        # Return with appropriate status code
+        status_code = 200 if chromium_healthy else 503
+        return Response(
+            content=health_response.model_dump_json(),
+            media_type="application/json",
+            status_code=status_code,
+        )
+
+    # Return simple text response
     if chromium_healthy:
         return Response("OK", media_type="text/plain", status_code=200)
     return Response("Service Unavailable", media_type="text/plain", status_code=503)
@@ -232,6 +277,7 @@ async def convert_html(
     """
     Convert HTML content from the request body to a PDF document.
     """
+    start_time = time.time()
     logger.info("HTML to PDF conversion requested")
     raw: bytes = await request.body()
     logger.debug("Received HTML body of size: %d bytes", len(raw))
@@ -245,9 +291,6 @@ async def convert_html(
         html = raw.decode(encoding)
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-
-        notes_processor = NotesProcessor()
-        notes = notes_processor.replace_notes(parsed_html)
 
         # Use CDP-based async SVG processing
         svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
@@ -270,18 +313,23 @@ async def convert_html(
         )
         logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
-        output_pdf = notes_processor.process_pdf_with_notes(output_pdf, notes)
+        # Record conversion success metrics
+        duration_ms = (time.time() - start_time) * 1000
+        chromium_manager._metrics.record_success(duration_ms)
 
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
         logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
         logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
         logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Unexpected error due converting to PDF", 500)
 
 
@@ -341,6 +389,7 @@ async def convert_html_with_attachments(
       - field 'html' contains the HTML content
       - remaining file parts are treated as attachments
     """
+    start_time = time.time()
     logger.info("HTML to PDF with attachments conversion requested")
     tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
     logger.debug("Created temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))
@@ -356,9 +405,6 @@ async def convert_html_with_attachments(
 
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-
-        notes_processor = NotesProcessor()
-        notes = notes_processor.replace_notes(parsed_html)
 
         # Use CDP-based async SVG processing
         svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
@@ -389,18 +435,23 @@ async def convert_html_with_attachments(
         )
         logger.info("PDF with attachments generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
-        output_pdf = notes_processor.process_pdf_with_notes(output_pdf, notes)
+        # Record conversion success metrics
+        duration_ms = (time.time() - start_time) * 1000
+        chromium_manager._metrics.record_success(duration_ms)
 
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
         logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
         logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
         logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Unexpected error due converting to PDF", 500)
     finally:
         logger.debug("Cleaning up temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))

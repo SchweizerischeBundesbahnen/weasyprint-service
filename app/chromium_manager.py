@@ -10,17 +10,197 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import TYPE_CHECKING
 
+import psutil
 from playwright.async_api import ViewportSize, async_playwright
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from playwright.async_api import Browser, BrowserContext, Page, Playwright
+
+
+@dataclass
+class ChromiumConfig:
+    """
+    Configuration settings for ChromiumManager.
+
+    Groups all configuration parameters into a single dataclass to improve
+    maintainability and reduce constructor parameter count.
+
+    Attributes:
+        device_scale_factor: Device scale factor for rendering (1.0-10.0, default 1.0).
+        max_concurrent_conversions: Maximum concurrent SVG conversions (1-100, default 10).
+        restart_after_n_conversions: Restart Chromium after N conversions (0-10000, default 0 = disabled).
+        max_conversion_retries: Maximum retry attempts on conversion failure (1-10, default 2).
+        conversion_timeout: Timeout in seconds for each conversion (5-300, default 30).
+        health_check_interval: Interval in seconds for background health checks (10-300, default 30).
+        health_check_enabled: Enable background health monitoring (default True).
+    """
+
+    device_scale_factor: float | None = None
+    max_concurrent_conversions: int | None = None
+    restart_after_n_conversions: int | None = None
+    max_conversion_retries: int | None = None
+    conversion_timeout: int | None = None
+    health_check_interval: int | None = None
+    health_check_enabled: bool | None = None
+
+
+@dataclass
+class ChromiumMetrics:
+    """
+    Metrics for Chromium browser health and performance monitoring.
+
+    Attributes:
+        total_conversions: Total number of successful HTML to PDF conversions since start.
+        failed_conversions: Total number of failed HTML to PDF conversions since start.
+        total_svg_conversions: Total number of successful SVG to PNG conversions since start.
+        failed_svg_conversions: Total number of failed SVG to PNG conversions since start.
+        total_chromium_restarts: Total number of browser restarts since start.
+        last_health_check: Timestamp of last health check.
+        last_health_status: Result of last health check (True=healthy, False=unhealthy).
+        consecutive_failures: Number of consecutive conversion failures.
+        uptime_seconds: Time since browser was started (in seconds).
+        avg_conversion_time_ms: Average HTML to PDF conversion time in milliseconds.
+        total_conversion_time_ms: Total time spent on HTML to PDF conversions (for averaging).
+        avg_svg_conversion_time_ms: Average SVG to PNG conversion time in milliseconds.
+        total_svg_conversion_time_ms: Total time spent on SVG conversions (for averaging).
+        current_cpu_percent: Current CPU usage percentage.
+        avg_cpu_percent: Average CPU usage percentage.
+        current_chromium_memory_mb: Current Chromium physical memory usage in MB.
+        avg_chromium_memory_mb: Average Chromium physical memory usage in MB.
+        total_cpu_samples: Total CPU samples collected (for averaging).
+        total_cpu_sum: Total CPU sum (for averaging).
+        total_memory_samples: Total memory samples collected (for averaging).
+        total_memory_sum: Total memory sum in MB (for averaging).
+    """
+
+    # HTML to PDF conversion metrics
+    total_conversions: int = 0
+    failed_conversions: int = 0
+    avg_conversion_time_ms: float = 0.0
+    total_conversion_time_ms: float = 0.0
+
+    # SVG to PNG conversion metrics
+    total_svg_conversions: int = 0
+    failed_svg_conversions: int = 0
+    avg_svg_conversion_time_ms: float = 0.0
+    total_svg_conversion_time_ms: float = 0.0
+
+    # Browser health metrics
+    total_chromium_restarts: int = 0
+    last_health_check: float = 0.0
+    last_health_status: bool = False
+    consecutive_failures: int = 0
+    uptime_seconds: float = 0.0
+    start_time: float = field(default_factory=time.time)
+
+    # Resource usage metrics
+    current_cpu_percent: float = 0.0
+    avg_cpu_percent: float = 0.0
+    current_chromium_memory_mb: float = 0.0
+    avg_chromium_memory_mb: float = 0.0
+    total_cpu_samples: int = 0
+    total_cpu_sum: float = 0.0
+    total_memory_samples: int = 0
+    total_memory_sum: float = 0.0
+
+    def record_success(self, duration_ms: float) -> None:
+        """Record a successful HTML to PDF conversion."""
+        self.total_conversions += 1
+        self.consecutive_failures = 0
+        self.total_conversion_time_ms += duration_ms
+        if self.total_conversions > 0:
+            self.avg_conversion_time_ms = self.total_conversion_time_ms / self.total_conversions
+
+    def record_svg_success(self, duration_ms: float) -> None:
+        """Record a successful SVG to PNG conversion."""
+        self.total_svg_conversions += 1
+        self.consecutive_failures = 0
+        self.total_svg_conversion_time_ms += duration_ms
+        if self.total_svg_conversions > 0:
+            self.avg_svg_conversion_time_ms = self.total_svg_conversion_time_ms / self.total_svg_conversions
+
+    def record_failure(self) -> None:
+        """Record a failed HTML to PDF conversion."""
+        self.failed_conversions += 1
+        self.consecutive_failures += 1
+
+    def record_svg_failure(self) -> None:
+        """Record a failed SVG to PNG conversion."""
+        self.failed_svg_conversions += 1
+        self.consecutive_failures += 1
+
+    def record_restart(self) -> None:
+        """Record a browser restart."""
+        self.total_chromium_restarts += 1
+
+    def record_health_check(self, is_healthy: bool) -> None:
+        """Record a health check result."""
+        self.last_health_check = time.time()
+        self.last_health_status = is_healthy
+
+    def update_uptime(self) -> None:
+        """Update uptime calculation."""
+        self.uptime_seconds = time.time() - self.start_time
+
+    def reset_start_time(self) -> None:
+        """Reset start time (used after restart)."""
+        self.start_time = time.time()
+        self.uptime_seconds = 0.0
+
+    def get_error_rate(self) -> float:
+        """Calculate error rate as percentage (considers both HTML->PDF and SVG->PNG conversions)."""
+        total_successful = self.total_conversions + self.total_svg_conversions
+        total_failed = self.failed_conversions + self.failed_svg_conversions
+        total_attempts = total_successful + total_failed
+        if total_attempts == 0:
+            return 0.0
+        return (total_failed / total_attempts) * 100.0
+
+    def record_resource_usage(self, browser_process: psutil.Process | None) -> None:
+        """
+        Record CPU and memory usage for the browser process.
+
+        Args:
+            browser_process: psutil.Process object for the browser, or None if not available.
+        """
+        if browser_process is None:
+            return
+
+        try:
+            # Get CPU and memory usage
+            # cpu_percent() returns percentage since last call (or since process start if first call)
+            # For accurate measurement, we need to call it with interval or multiple times
+            cpu_percent = browser_process.cpu_percent()
+            memory_info = browser_process.memory_info()
+            memory_mb = memory_info.rss / (1024 * 1024)  # Convert bytes to MB
+
+            # Update current values
+            self.current_cpu_percent = cpu_percent
+            self.current_chromium_memory_mb = memory_mb
+
+            # Update averages
+            self.total_cpu_samples += 1
+            self.total_cpu_sum += cpu_percent
+            self.avg_cpu_percent = self.total_cpu_sum / self.total_cpu_samples
+
+            self.total_memory_samples += 1
+            self.total_memory_sum += memory_mb
+            self.avg_chromium_memory_mb = self.total_memory_sum / self.total_memory_samples
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            # Process no longer exists or we don't have access
+            pass
 
 
 class ChromiumManager:
@@ -33,43 +213,47 @@ class ChromiumManager:
 
     def __init__(
         self,
-        device_scale_factor: float | None = None,
+        config: ChromiumConfig | None = None,
         logger: logging.Logger | None = None,
-        max_concurrent_conversions: int | None = None,
-        restart_after_n_conversions: int | None = None,
-        max_conversion_retries: int | None = None,
-        conversion_timeout: int | None = None,
     ) -> None:
         """
         Initialize ChromiumManager.
 
         Args:
-            device_scale_factor: Device scale factor for rendering. If None, reads DEVICE_SCALE_FACTOR (default 1.0).
+            config: Configuration settings. If None, creates default config from environment variables.
             logger: Optional logger; if None, a module-level logger is used.
-            max_concurrent_conversions: Maximum concurrent SVG conversions (1-100). If None, reads MAX_CONCURRENT_CONVERSIONS (default 10).
-            restart_after_n_conversions: Restart Chromium after N conversions (0-10000). If None, reads CHROMIUM_RESTART_AFTER_N_CONVERSIONS (default 0 = disabled).
-            max_conversion_retries: Maximum retry attempts on conversion failure (1-10). If None, reads CHROMIUM_MAX_CONVERSION_RETRIES (default 2).
-            conversion_timeout: Timeout in seconds for each conversion (5-300). If None, reads CHROMIUM_CONVERSION_TIMEOUT (default 30).
 
         Raises:
             ValueError: If any configuration parameter is out of valid range.
         """
         self.log = logger or logging.getLogger(__name__)
 
+        # Use provided config or create default
+        if config is None:
+            config = ChromiumConfig()
+
         # Parse and validate all configuration parameters
-        self.device_scale_factor = self._validate_device_scale_factor(device_scale_factor)
-        self.max_concurrent_conversions = self._validate_max_concurrent_conversions(max_concurrent_conversions)
-        self.restart_after_n_conversions = self._validate_restart_after_n_conversions(restart_after_n_conversions)
-        self.max_conversion_retries = self._validate_max_conversion_retries(max_conversion_retries)
-        self.conversion_timeout = self._validate_conversion_timeout(conversion_timeout)
+        self.device_scale_factor = self._validate_device_scale_factor(config.device_scale_factor)
+        self.max_concurrent_conversions = self._validate_max_concurrent_conversions(config.max_concurrent_conversions)
+        self.restart_after_n_conversions = self._validate_restart_after_n_conversions(config.restart_after_n_conversions)
+        self.max_conversion_retries = self._validate_max_conversion_retries(config.max_conversion_retries)
+        self.conversion_timeout = self._validate_conversion_timeout(config.conversion_timeout)
+        self.health_check_interval = self._validate_health_check_interval(config.health_check_interval)
+        self.health_check_enabled = self._validate_health_check_enabled(config.health_check_enabled)
 
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
+        self._browser_process: psutil.Process | None = None
         self._lock = asyncio.Lock()
         self._counter_lock = asyncio.Lock()  # Separate lock for conversion counter
         self._semaphore = asyncio.Semaphore(self.max_concurrent_conversions)
         self._started = False
         self._conversion_count = 0
+
+        # Metrics and health monitoring
+        self._metrics = ChromiumMetrics()
+        self._health_monitor_task: asyncio.Task | None = None
+        self._shutdown_event = asyncio.Event()
 
     async def start(self) -> None:
         """Start the persistent Chromium browser process."""
@@ -100,7 +284,44 @@ class ChromiumManager:
             )
 
             self._started = True
+            self._metrics.reset_start_time()
+
+            # Get browser process for resource monitoring
+            try:
+                # Get browser process PID from Playwright
+                # Note: Playwright doesn't expose PID directly, so we need to find it
+                # The browser process is the parent of CDP websocket connections
+                if self._browser:
+                    # Try to get process info from browser service workers
+                    # This is a workaround since Playwright doesn't expose PID
+                    # We'll use pgrep to find the chromium process asynchronously
+                    process = await asyncio.create_subprocess_exec(
+                        "pgrep",
+                        "-f",
+                        "chrome.*--headless",
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    stdout, _ = await process.communicate()
+
+                    if process.returncode == 0 and stdout.strip():
+                        # Get the first (oldest) chromium process PID
+                        pids = [int(pid) for pid in stdout.decode().strip().split("\n")]
+                        if pids:
+                            self._browser_process = psutil.Process(pids[0])
+                            self.log.debug("Found Chromium process PID: %d", pids[0])
+            except Exception as e:  # noqa: BLE001
+                self.log.warning("Could not attach to Chromium process for resource monitoring: %s", e)
+                self._browser_process = None
+
             self.log.info("Chromium browser started successfully")
+
+            # Start background health monitoring if enabled
+            if self.health_check_enabled and self._health_monitor_task is None:
+                self._shutdown_event.clear()
+                self._health_monitor_task = asyncio.create_task(self._health_monitor_loop())
+                self.log.info("Background health monitoring started (interval: %ds)", self.health_check_interval)
+
         except ImportError as e:
             self.log.error("Playwright not installed: %s", e)
             raise RuntimeError("Playwright library is required for ChromiumManager") from e
@@ -120,6 +341,23 @@ class ChromiumManager:
             return
 
         try:
+            # Stop health monitoring first
+            if self._health_monitor_task is not None:
+                self.log.info("Stopping background health monitoring...")
+                self._shutdown_event.set()
+                try:
+                    await asyncio.wait_for(self._health_monitor_task, timeout=5.0)
+                except TimeoutError:
+                    self.log.warning("Health monitor task did not stop within timeout, cancelling...")
+                    self._health_monitor_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await self._health_monitor_task
+                except Exception as e:  # noqa: BLE001
+                    self.log.error("Error stopping health monitor: %s", e)
+                finally:
+                    self._health_monitor_task = None
+                    self.log.info("Background health monitoring stopped")
+
             if self._browser:
                 try:
                     await self._browser.close()
@@ -142,6 +380,7 @@ class ChromiumManager:
             self._started = False
             self._browser = None
             self._playwright = None
+            self._browser_process = None
 
     def is_running(self) -> bool:
         """Check if the Chromium browser is running."""
@@ -156,9 +395,12 @@ class ChromiumManager:
         """
         try:
             # Check if browser is running and connection is active
-            return self.is_running() and self._browser is not None and self._browser.is_connected()
+            is_healthy = self.is_running() and self._browser is not None and self._browser.is_connected()
+            self._metrics.record_health_check(is_healthy)
+            return is_healthy
         except Exception as e:  # noqa: BLE001
             self.log.error("Health check failed: %s", e)
+            self._metrics.record_health_check(False)
             return False
 
     def get_version(self) -> str | None:
@@ -209,6 +451,9 @@ class ChromiumManager:
                 await self._stop_internal()
                 await self._start_internal()
 
+                # Record restart in metrics
+                self._metrics.record_restart()
+
             finally:
                 # Always release all acquired permits, even if restart fails
                 for _ in permits_acquired:
@@ -258,14 +503,19 @@ class ChromiumManager:
 
         # Try conversion with automatic recovery on failure
         last_error: Exception | None = None
+        start_time = time.time()
 
         for attempt in range(self.max_conversion_retries):
             try:
                 # Apply timeout to prevent hanging conversions
-                return await asyncio.wait_for(
+                result = await asyncio.wait_for(
                     self._perform_conversion(svg_content, width, height, device_scale_factor),
                     timeout=self.conversion_timeout,
                 )
+                # Record SVG success metrics
+                duration_ms = (time.time() - start_time) * 1000
+                self._metrics.record_svg_success(duration_ms)
+                return result
             except TimeoutError:
                 last_error = TimeoutError(f"Conversion timed out after {self.conversion_timeout} seconds")
                 self.log.error("SVG conversion timed out (attempt %d/%d): %d seconds", attempt + 1, self.max_conversion_retries, self.conversion_timeout)
@@ -281,6 +531,7 @@ class ChromiumManager:
                 await self._handle_conversion_retry(attempt, e, "conversion error")
 
         # If we get here, all retries failed
+        self._metrics.record_svg_failure()
         self.log.error("SVG conversion failed after %d attempts: %s", self.max_conversion_retries, str(last_error))
         raise RuntimeError(f"SVG to PNG conversion failed after {self.max_conversion_retries} attempts") from last_error
 
@@ -427,6 +678,129 @@ class ChromiumManager:
                 # Clean up: close page and context to prevent memory leaks (for normal exit path)
                 # Note: If CancelledError was caught above, these will be None and skip cleanup
                 await self._cleanup_page_resources(page, context, is_cancelled=False)
+
+    async def _health_monitor_loop(self) -> None:
+        """
+        Background task that periodically checks Chromium health.
+
+        This runs in the background while the browser is running and:
+        - Performs periodic health checks
+        - Updates metrics (uptime, etc.)
+        - Automatically restarts browser if health degrades
+
+        The loop exits when _shutdown_event is set.
+        """
+        self.log.info("Health monitor loop started")
+        consecutive_failures = 0
+        max_consecutive_failures = 3
+
+        try:
+            while not self._shutdown_event.is_set():
+                try:
+                    # Wait for interval or shutdown signal
+                    await asyncio.wait_for(
+                        self._shutdown_event.wait(),
+                        timeout=self.health_check_interval,
+                    )
+                    # If we get here, shutdown was signaled
+                    break
+                except TimeoutError:
+                    # Timeout is expected - time to perform health check
+                    pass
+
+                # Update metrics
+                self._metrics.update_uptime()
+
+                # Record resource usage (CPU and memory)
+                self._metrics.record_resource_usage(self._browser_process)
+
+                # Perform health check
+                is_healthy = self.health_check()
+
+                if is_healthy:
+                    consecutive_failures = 0
+                    self.log.debug("Health check passed (uptime: %.1fs, conversions: %d, errors: %d)", self._metrics.uptime_seconds, self._metrics.total_conversions, self._metrics.failed_conversions)
+                else:
+                    consecutive_failures += 1
+                    self.log.warning("Health check failed (%d/%d consecutive failures)", consecutive_failures, max_consecutive_failures)
+
+                    # Auto-restart if consecutive failures exceed threshold
+                    if consecutive_failures >= max_consecutive_failures:
+                        self.log.error("Chromium health degraded after %d consecutive failures, restarting...", consecutive_failures)
+                        try:
+                            await self.restart()
+                            consecutive_failures = 0
+                            self.log.info("Chromium restarted successfully after health check failure")
+                        except Exception as e:
+                            self.log.error("Failed to restart Chromium after health check failure: %s", e)
+                            # Continue monitoring even if restart fails
+
+        except asyncio.CancelledError:
+            self.log.info("Health monitor loop cancelled")
+            raise
+        except Exception as e:  # noqa: BLE001
+            self.log.error("Unexpected error in health monitor loop: %s", e)
+        finally:
+            self.log.info("Health monitor loop stopped")
+
+    def get_metrics(self) -> dict[str, float | int | bool | str]:
+        """
+        Get current metrics for monitoring and observability.
+
+        Returns:
+            Dictionary containing current metrics:
+            - total_conversions: Total successful HTML to PDF conversions
+            - failed_conversions: Total failed HTML to PDF conversions
+            - total_svg_conversions: Total successful SVG to PNG conversions
+            - failed_svg_conversions: Total failed SVG to PNG conversions
+            - error_rate_percent: Overall conversion error rate as percentage (includes both HTML->PDF and SVG->PNG)
+            - total_chromium_restarts: Total browser restarts
+            - avg_conversion_time_ms: Average HTML to PDF conversion time
+            - avg_svg_conversion_time_ms: Average SVG to PNG conversion time
+            - last_health_check: Formatted timestamp of last health check
+            - last_health_status: Result of last health check
+            - consecutive_failures: Current consecutive failures count
+            - uptime_seconds: Browser uptime in seconds
+            - current_cpu_percent: Current CPU usage percentage
+            - avg_cpu_percent: Average CPU usage percentage
+            - total_memory_mb: Total system memory in MB
+            - available_memory_mb: Available system memory in MB
+            - current_chromium_memory_mb: Current Chromium physical memory usage in MB
+            - avg_chromium_memory_mb: Average Chromium physical memory usage in MB
+        """
+        self._metrics.update_uptime()
+
+        # Get system memory info
+        system_memory = psutil.virtual_memory()
+        total_memory_mb = system_memory.total / (1024 * 1024)
+        available_memory_mb = system_memory.available / (1024 * 1024)
+
+        # Format last_health_check as readable timestamp
+        last_health_check_str = ""
+        if self._metrics.last_health_check > 0:
+            dt = datetime.fromtimestamp(self._metrics.last_health_check)
+            last_health_check_str = dt.strftime("%H:%M:%S %d.%m.%Y")
+
+        return {
+            "total_conversions": self._metrics.total_conversions,
+            "failed_conversions": self._metrics.failed_conversions,
+            "total_svg_conversions": self._metrics.total_svg_conversions,
+            "failed_svg_conversions": self._metrics.failed_svg_conversions,
+            "error_rate_percent": round(self._metrics.get_error_rate(), 2),
+            "total_chromium_restarts": self._metrics.total_chromium_restarts,
+            "avg_conversion_time_ms": round(self._metrics.avg_conversion_time_ms, 2),
+            "avg_svg_conversion_time_ms": round(self._metrics.avg_svg_conversion_time_ms, 2),
+            "last_health_check": last_health_check_str,
+            "last_health_status": self._metrics.last_health_status,
+            "consecutive_failures": self._metrics.consecutive_failures,
+            "uptime_seconds": round(self._metrics.uptime_seconds, 2),
+            "current_cpu_percent": round(self._metrics.current_cpu_percent, 2),
+            "avg_cpu_percent": round(self._metrics.avg_cpu_percent, 2),
+            "total_memory_mb": round(total_memory_mb, 2),
+            "available_memory_mb": round(available_memory_mb, 2),
+            "current_chromium_memory_mb": round(self._metrics.current_chromium_memory_mb, 2),
+            "avg_chromium_memory_mb": round(self._metrics.avg_chromium_memory_mb, 2),
+        }
 
     def _validate_int_config(
         self,
@@ -587,6 +961,44 @@ class ChromiumManager:
             min_value=5,
             max_value=300,
         )
+
+    def _validate_health_check_interval(self, value: int | None) -> int:
+        """
+        Validate health check interval.
+
+        Args:
+            value: Interval in seconds or None to read from env.
+
+        Returns:
+            Validated interval in seconds (10 - 300).
+        """
+        return self._validate_int_config(
+            value=value,
+            env_var="CHROMIUM_HEALTH_CHECK_INTERVAL",
+            default=30,
+            min_value=10,
+            max_value=300,
+        )
+
+    def _validate_health_check_enabled(self, value: bool | None) -> bool:
+        """
+        Validate health check enabled flag.
+
+        Args:
+            value: Enable flag or None to read from env.
+
+        Returns:
+            Validated enable flag (default True).
+        """
+        if value is not None:
+            return bool(value)
+
+        env_value = os.environ.get("CHROMIUM_HEALTH_CHECK_ENABLED")
+        if env_value is None:
+            return True  # Default to enabled
+
+        # Parse boolean from string (case-insensitive)
+        return env_value.lower() in ("true", "1", "yes", "on")
 
     @staticmethod
     def _parse_float(value: str | None, default: float) -> float:

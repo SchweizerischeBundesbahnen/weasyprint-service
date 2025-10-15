@@ -1,11 +1,15 @@
 """Tests for ChromiumManager CDP-based SVG conversion."""
 
+import asyncio
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+import time
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from app.chromium_manager import ChromiumManager, get_chromium_manager
+from app.chromium_manager import ChromiumConfig, ChromiumManager, get_chromium_manager
+from app.html_parser import HtmlParser
+from app.svg_processor import SvgProcessor
 
 
 @pytest.mark.asyncio
@@ -77,7 +81,7 @@ async def test_chromium_manager_convert_svg_not_started():
 @pytest.mark.asyncio
 async def test_chromium_manager_device_scale_factor():
     """Test that device scale factor is respected."""
-    manager = ChromiumManager(device_scale_factor=2.0)
+    manager = ChromiumManager(config=ChromiumConfig(device_scale_factor=2.0))
     await manager.start()
 
     try:
@@ -146,8 +150,6 @@ async def test_chromium_manager_get_version():
 @pytest.mark.asyncio
 async def test_chromium_manager_concurrent_conversions():
     """Test that concurrent SVG conversions work correctly."""
-    import asyncio
-
     manager = ChromiumManager()
     await manager.start()
 
@@ -182,9 +184,6 @@ def test_get_chromium_manager_singleton():
 @pytest.mark.asyncio
 async def test_svg_processor_with_chromium_manager():
     """Test SvgProcessor integration with ChromiumManager."""
-    from app.html_parser import HtmlParser
-    from app.svg_processor import SvgProcessor
-
     chromium_manager = ChromiumManager()
     await chromium_manager.start()
 
@@ -209,9 +208,6 @@ async def test_svg_processor_with_chromium_manager():
 @pytest.mark.asyncio
 async def test_svg_processor_multiple_svgs():
     """Test async processing of multiple SVGs."""
-    from app.html_parser import HtmlParser
-    from app.svg_processor import SvgProcessor
-
     chromium_manager = ChromiumManager()
     await chromium_manager.start()
 
@@ -238,9 +234,6 @@ async def test_svg_processor_multiple_svgs():
 @pytest.mark.asyncio
 async def test_svg_processor_without_chromium_manager():
     """Test that SvgProcessor returns original SVG without ChromiumManager."""
-    from app.html_parser import HtmlParser
-    from app.svg_processor import SvgProcessor
-
     html_parser = HtmlParser()
     svg_processor = SvgProcessor()  # No chromium_manager
 
@@ -259,9 +252,6 @@ async def test_svg_processor_without_chromium_manager():
 @pytest.mark.asyncio
 async def test_svg_processor_invalid_inputs():
     """Test async processing with invalid inputs."""
-    from app.html_parser import HtmlParser
-    from app.svg_processor import SvgProcessor
-
     chromium_manager = ChromiumManager()
     await chromium_manager.start()
 
@@ -302,7 +292,7 @@ async def test_chromium_manager_stop_when_not_running():
 @pytest.mark.asyncio
 async def test_chromium_manager_convert_with_custom_scale_factor():
     """Test SVG conversion with per-conversion scale factor override."""
-    manager = ChromiumManager(device_scale_factor=1.0)
+    manager = ChromiumManager(config=ChromiumConfig(device_scale_factor=1.0))
     await manager.start()
 
     try:
@@ -322,8 +312,6 @@ async def test_chromium_manager_convert_with_custom_scale_factor():
 @pytest.mark.asyncio
 async def test_chromium_manager_parse_float_from_env():
     """Test device_scale_factor parsing from environment variable."""
-    import os
-
     # Test valid float from env
     os.environ["DEVICE_SCALE_FACTOR"] = "2.5"
     manager = ChromiumManager()
@@ -365,8 +353,6 @@ async def test_chromium_manager_get_version_extraction():
 @pytest.mark.asyncio
 async def test_chromium_manager_get_version_without_slash():
     """Test Chromium version when format doesn't contain '/'."""
-    from unittest.mock import PropertyMock
-
     manager = ChromiumManager()
     await manager.start()
 
@@ -397,7 +383,7 @@ async def test_chromium_manager_get_page_without_browser():
 @pytest.mark.asyncio
 async def test_chromium_manager_get_page_with_custom_scale():
     """Test _get_page with custom device scale factor."""
-    manager = ChromiumManager(device_scale_factor=1.0)
+    manager = ChromiumManager(config=ChromiumConfig(device_scale_factor=1.0))
     await manager.start()
 
     try:
@@ -492,10 +478,8 @@ async def test_chromium_manager_get_version_with_error():
 @pytest.mark.asyncio
 async def test_chromium_manager_concurrent_limit():
     """Test that semaphore limits concurrent conversions and prevents resource exhaustion."""
-    import asyncio
-
     # Set a low limit to test semaphore behavior
-    manager = ChromiumManager(max_concurrent_conversions=3)
+    manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=3))
     await manager.start()
 
     try:
@@ -517,8 +501,6 @@ async def test_chromium_manager_concurrent_limit():
 @pytest.mark.asyncio
 async def test_chromium_manager_max_concurrent_from_env():
     """Test that MAX_CONCURRENT_CONVERSIONS env var is respected."""
-    import os
-
     # Set environment variable
     os.environ["MAX_CONCURRENT_CONVERSIONS"] = "5"
     try:
@@ -537,7 +519,7 @@ async def test_chromium_manager_max_concurrent_from_env():
 @pytest.mark.asyncio
 async def test_chromium_manager_restart_after_n_conversions():
     """Test that Chromium automatically restarts after N conversions."""
-    manager = ChromiumManager(restart_after_n_conversions=3)
+    manager = ChromiumManager(config=ChromiumConfig(restart_after_n_conversions=3))
     await manager.start()
 
     try:
@@ -567,7 +549,7 @@ async def test_chromium_manager_restart_after_n_conversions():
 @pytest.mark.asyncio
 async def test_chromium_manager_restart_disabled_by_default():
     """Test that auto-restart is disabled when restart_after_n_conversions is 0."""
-    manager = ChromiumManager(restart_after_n_conversions=0)
+    manager = ChromiumManager(config=ChromiumConfig(restart_after_n_conversions=0))
     await manager.start()
 
     try:
@@ -877,10 +859,8 @@ async def test_chromium_manager_concurrent_restart_during_conversions():
 
     This tests the race condition fix where restart must happen outside the counter lock.
     """
-    import asyncio
-
     # Set low restart threshold to trigger restart quickly
-    manager = ChromiumManager(restart_after_n_conversions=2, max_concurrent_conversions=5)
+    manager = ChromiumManager(config=ChromiumConfig(restart_after_n_conversions=2, max_concurrent_conversions=5))
     await manager.start()
 
     try:
@@ -919,9 +899,7 @@ async def test_chromium_manager_cancellation_handling():
 
     This tests the semaphore leak fix - ensures semaphore is released even on cancellation.
     """
-    import asyncio
-
-    manager = ChromiumManager(max_concurrent_conversions=2, conversion_timeout=5)
+    manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=2, conversion_timeout=5))
     await manager.start()
 
     try:
@@ -973,12 +951,12 @@ async def test_chromium_manager_large_svg_stress_test():
             y = (i // 1000) * 2
             circles.append(f'<circle cx="{x}" cy="{y}" r="1" fill="blue"/>')
 
-        svg_content = f'''<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="2000" viewBox="0 0 2000 2000">
+        svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="2000" viewBox="0 0 2000 2000">
             {"".join(circles)}
-        </svg>'''
+        </svg>"""
 
         # Verify SVG is actually large
-        svg_size_mb = len(svg_content.encode('utf-8')) / (1024 * 1024)
+        svg_size_mb = len(svg_content.encode("utf-8")) / (1024 * 1024)
         assert svg_size_mb >= 8, f"SVG should be ~10MB, got {svg_size_mb:.2f}MB"
 
         # Conversion should succeed without memory issues
@@ -1000,7 +978,7 @@ async def test_chromium_manager_browser_crash_simulation():
 
     This ensures the retry mechanism works correctly when the browser crashes.
     """
-    manager = ChromiumManager(max_conversion_retries=3)
+    manager = ChromiumManager(config=ChromiumConfig(max_conversion_retries=3))
     await manager.start()
 
     try:
@@ -1037,9 +1015,7 @@ async def test_chromium_manager_semaphore_exhaustion_prevented():
 
     This is a comprehensive test of the semaphore leak fix.
     """
-    import asyncio
-
-    manager = ChromiumManager(max_concurrent_conversions=3, conversion_timeout=5)
+    manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=3, conversion_timeout=5))
     await manager.start()
 
     try:
@@ -1128,3 +1104,582 @@ async def test_chromium_manager_timeout_validation_out_of_range():
         assert manager.conversion_timeout == 300  # Maximum valid value
     finally:
         del os.environ["CHROMIUM_CONVERSION_TIMEOUT"]
+
+
+# Background health monitoring tests
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_health_monitoring_enabled_by_default():
+    """Test that health monitoring is enabled by default."""
+    manager = ChromiumManager()
+    assert manager.health_check_enabled is True
+    assert manager.health_check_interval == 30
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_health_monitoring_from_env():
+    """Test health monitoring configuration from environment variables."""
+    os.environ["CHROMIUM_HEALTH_CHECK_ENABLED"] = "false"
+    os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"] = "60"
+
+    try:
+        manager = ChromiumManager()
+        assert manager.health_check_enabled is False
+        assert manager.health_check_interval == 60
+    finally:
+        del os.environ["CHROMIUM_HEALTH_CHECK_ENABLED"]
+        del os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"]
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_health_monitoring_starts_with_browser():
+    """Test that health monitoring starts when browser starts."""
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))
+    assert manager._health_monitor_task is None
+
+    await manager.start()
+    try:
+        # Health monitor task should be running
+        assert manager._health_monitor_task is not None
+        assert not manager._health_monitor_task.done()
+    finally:
+        await manager.stop()
+        # Health monitor task should be stopped
+        assert manager._health_monitor_task is None
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_health_monitoring_disabled():
+    """Test that health monitoring can be disabled."""
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=False))
+    await manager.start()
+
+    try:
+        # Health monitor task should not be created
+        assert manager._health_monitor_task is None
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_get_metrics():
+    """Test metrics collection and retrieval."""
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        # Get initial metrics
+        metrics = manager.get_metrics()
+
+        assert "total_conversions" in metrics
+        assert "failed_conversions" in metrics
+        assert "error_rate_percent" in metrics
+        assert "total_chromium_restarts" in metrics
+        assert "avg_conversion_time_ms" in metrics
+        assert "last_health_check" in metrics
+        assert "last_health_status" in metrics
+        assert "consecutive_failures" in metrics
+        assert "uptime_seconds" in metrics
+
+        # Initial values
+        assert metrics["total_svg_conversions"] == 0
+        assert metrics["failed_svg_conversions"] == 0
+        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["total_chromium_restarts"] == 0
+        assert metrics["uptime_seconds"] >= 0.0
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_metrics_after_conversion():
+    """Test that metrics are updated after conversions."""
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Perform conversion
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        # Check metrics
+        metrics = manager.get_metrics()
+        assert metrics["total_svg_conversions"] == 1
+        assert metrics["failed_svg_conversions"] == 0
+        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["avg_svg_conversion_time_ms"] > 0.0
+        assert metrics["consecutive_failures"] == 0
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_metrics_after_failure():
+    """Test that metrics are updated after conversion failures."""
+    manager = ChromiumManager(config=ChromiumConfig(max_conversion_retries=1))
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Mock _perform_conversion to always fail
+        async def mock_perform_conversion(*args, **kwargs):
+            raise Exception("Simulated failure")
+
+        manager._perform_conversion = mock_perform_conversion
+
+        # Attempt conversion (should fail)
+        with pytest.raises(RuntimeError, match="SVG to PNG conversion failed"):
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        # Check metrics
+        metrics = manager.get_metrics()
+        assert metrics["total_svg_conversions"] == 0
+        assert metrics["failed_svg_conversions"] == 1
+        assert metrics["error_rate_percent"] == 100.0
+        assert metrics["consecutive_failures"] == 1
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_health_monitoring_interval():
+    """Test that health monitoring runs at specified interval."""
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))  # 10 second interval (minimum)
+    await manager.start()
+
+    try:
+        # Wait for at least 1 health check
+        await asyncio.sleep(11)
+
+        # Get metrics
+        metrics = manager.get_metrics()
+
+        # Last health check should be a non-empty string (formatted timestamp)
+        assert metrics["last_health_check"] != ""
+        assert isinstance(metrics["last_health_check"], str)
+
+        # Health should be passing
+        assert metrics["last_health_status"] is True
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_health_monitoring_validation():
+    """Test validation of health monitoring configuration."""
+    # Test interval too low
+    os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"] = "5"
+    try:
+        manager = ChromiumManager()
+        assert manager.health_check_interval == 30  # Should fall back to default
+    finally:
+        del os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"]
+
+    # Test interval too high
+    os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"] = "500"
+    try:
+        manager = ChromiumManager()
+        assert manager.health_check_interval == 30  # Should fall back to default
+    finally:
+        del os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"]
+
+    # Test valid values
+    os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"] = "10"
+    try:
+        manager = ChromiumManager()
+        assert manager.health_check_interval == 10  # Minimum valid value
+    finally:
+        del os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"]
+
+    os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"] = "300"
+    try:
+        manager = ChromiumManager()
+        assert manager.health_check_interval == 300  # Maximum valid value
+    finally:
+        del os.environ["CHROMIUM_HEALTH_CHECK_INTERVAL"]
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_health_enabled_boolean_parsing():
+    """Test parsing of CHROMIUM_HEALTH_CHECK_ENABLED from various string values."""
+    # Test "true" (case-insensitive)
+    for value in ["true", "True", "TRUE", "1", "yes", "YES", "on", "ON"]:
+        os.environ["CHROMIUM_HEALTH_CHECK_ENABLED"] = value
+        try:
+            manager = ChromiumManager()
+            assert manager.health_check_enabled is True
+        finally:
+            del os.environ["CHROMIUM_HEALTH_CHECK_ENABLED"]
+
+    # Test "false" (case-insensitive)
+    for value in ["false", "False", "FALSE", "0", "no", "NO", "off", "OFF"]:
+        os.environ["CHROMIUM_HEALTH_CHECK_ENABLED"] = value
+        try:
+            manager = ChromiumManager()
+            assert manager.health_check_enabled is False
+        finally:
+            del os.environ["CHROMIUM_HEALTH_CHECK_ENABLED"]
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_auto_restart_on_health_degradation():
+    """Test that Chromium automatically restarts when health degrades (3 consecutive failures)."""
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))
+    await manager.start()
+
+    try:
+        # Track restart calls
+        restart_count = 0
+        original_restart = manager.restart
+
+        async def mock_restart():
+            nonlocal restart_count
+            restart_count += 1
+            await original_restart()
+
+        manager.restart = mock_restart
+
+        # Mock health_check to fail 3 times, then succeed
+        health_check_calls = 0
+        original_health_check = manager.health_check
+
+        def mock_health_check():
+            nonlocal health_check_calls
+            health_check_calls += 1
+            # Fail first 3 times, then succeed
+            if health_check_calls <= 3:
+                manager._metrics.record_health_check(False)
+                return False
+            return original_health_check()
+
+        manager.health_check = mock_health_check
+
+        # Poll for restart completion instead of fixed sleep
+        # Maximum wait time: 40 seconds (3 intervals @ 10s + buffer)
+        max_wait_time = 40
+        poll_interval = 0.5
+        elapsed = 0
+
+        while restart_count < 1 and elapsed < max_wait_time:
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+
+        # Should have triggered auto-restart after 3 consecutive failures
+        assert restart_count >= 1, f"Expected at least 1 restart, got {restart_count}"
+        assert health_check_calls >= 3, f"Expected at least 3 health checks, got {health_check_calls}"
+
+        # Restore original methods
+        manager.restart = original_restart
+        manager.health_check = original_health_check
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_metrics_survive_restart():
+    """Test that metrics persist correctly across browser restarts."""
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Perform some conversions
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        # Get metrics before restart
+        metrics_before = manager.get_metrics()
+        assert metrics_before["total_svg_conversions"] == 2
+        assert metrics_before["total_chromium_restarts"] == 0
+
+        # Restart browser
+        await manager.restart()
+
+        # Get metrics after restart
+        metrics_after = manager.get_metrics()
+
+        # Conversions should persist
+        assert metrics_after["total_svg_conversions"] == 2
+        # Restarts should increment
+        assert metrics_after["total_chromium_restarts"] == 1
+        # Uptime should reset
+        assert metrics_after["uptime_seconds"] < metrics_before["uptime_seconds"]
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_concurrent_conversions_metrics():
+    """Test that metrics are correctly tracked with concurrent conversions."""
+    manager = ChromiumManager(config=ChromiumConfig(max_concurrent_conversions=5))
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><circle cx="25" cy="25" r="20" fill="blue"/></svg>'
+
+        # Perform many concurrent conversions
+        tasks = [manager.convert_svg_to_png(svg_content, 50, 50) for _ in range(10)]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # All should succeed
+        successful = [r for r in results if isinstance(r, bytes)]
+        assert len(successful) == 10
+
+        # Check metrics
+        metrics = manager.get_metrics()
+        assert metrics["total_svg_conversions"] == 10
+        assert metrics["failed_svg_conversions"] == 0
+        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["avg_svg_conversion_time_ms"] > 0.0
+        assert metrics["consecutive_failures"] == 0
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_metrics_with_disabled_health_monitoring():
+    """Test that metrics collection works even when health monitoring is disabled."""
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=False))
+    await manager.start()
+
+    try:
+        # Health monitor task should not be running
+        assert manager._health_monitor_task is None
+
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Perform conversion
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        # Metrics should still work
+        metrics = manager.get_metrics()
+        assert metrics["total_svg_conversions"] == 1
+        assert metrics["failed_svg_conversions"] == 0
+        assert metrics["avg_svg_conversion_time_ms"] > 0.0
+        assert metrics["uptime_seconds"] >= 0.0
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_calculation():
+    """Test error rate calculation with various success/failure combinations."""
+    manager = ChromiumManager(config=ChromiumConfig(max_conversion_retries=1))
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Successful conversion
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+        metrics = manager.get_metrics()
+        assert metrics["error_rate_percent"] == 0.0
+
+        # Mock failure
+        original_perform = manager._perform_conversion
+
+        async def mock_perform_failure(*args, **kwargs):
+            raise Exception("Simulated failure")
+
+        manager._perform_conversion = mock_perform_failure
+
+        # Failed conversion
+        with pytest.raises(RuntimeError):
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        # Restore
+        manager._perform_conversion = original_perform
+
+        # Check error rate: 1 success, 1 failure = 50%
+        metrics = manager.get_metrics()
+        assert metrics["total_svg_conversions"] == 1
+        assert metrics["failed_svg_conversions"] == 1
+        assert metrics["error_rate_percent"] == 50.0
+
+        # Another successful conversion
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        # Check error rate: 2 success, 1 failure = 33.33%
+        metrics = manager.get_metrics()
+        assert metrics["total_svg_conversions"] == 2
+        assert metrics["failed_svg_conversions"] == 1
+        assert 33.0 <= metrics["error_rate_percent"] <= 34.0
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_consecutive_failures_reset():
+    """Test that consecutive failures counter resets after successful conversion."""
+    manager = ChromiumManager(config=ChromiumConfig(max_conversion_retries=1))
+    await manager.start()
+
+    try:
+        svg_content = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"></svg>'
+
+        # Mock to fail once
+        original_perform = manager._perform_conversion
+        fail_next = True
+
+        async def mock_perform_sometimes_fail(*args, **kwargs):
+            nonlocal fail_next
+            if fail_next:
+                fail_next = False
+                raise Exception("Simulated failure")
+            return await original_perform(*args, **kwargs)
+
+        manager._perform_conversion = mock_perform_sometimes_fail
+
+        # First conversion fails
+        with pytest.raises(RuntimeError):
+            await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        metrics = manager.get_metrics()
+        assert metrics["consecutive_failures"] == 1
+
+        # Restore for successful conversion
+        manager._perform_conversion = original_perform
+
+        # Successful conversion should reset consecutive failures
+        await manager.convert_svg_to_png(svg_content, 50, 50)
+
+        metrics = manager.get_metrics()
+        assert metrics["consecutive_failures"] == 0
+        assert metrics["total_svg_conversions"] == 1
+        assert metrics["failed_svg_conversions"] == 1
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_uptime_tracking():
+    """Test that uptime is tracked correctly."""
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        # Get initial uptime
+        metrics1 = manager.get_metrics()
+        uptime1 = metrics1["uptime_seconds"]
+        assert uptime1 >= 0.0
+
+        # Wait a bit
+        await asyncio.sleep(1.5)
+
+        # Get uptime again
+        metrics2 = manager.get_metrics()
+        uptime2 = metrics2["uptime_seconds"]
+
+        # Uptime should have increased
+        assert uptime2 > uptime1
+        assert uptime2 >= 1.0
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_metrics_initial_state():
+    """Test that metrics have correct initial values."""
+    manager = ChromiumManager()
+
+    # Before starting
+    metrics = manager.get_metrics()
+    assert metrics["total_svg_conversions"] == 0
+    assert metrics["failed_svg_conversions"] == 0
+    assert metrics["error_rate_percent"] == 0.0
+    assert metrics["total_chromium_restarts"] == 0
+    assert metrics["avg_svg_conversion_time_ms"] == 0.0
+    assert metrics["last_health_check"] == ""
+    assert metrics["last_health_status"] is False
+    assert metrics["consecutive_failures"] == 0
+    assert metrics["uptime_seconds"] >= 0.0
+
+    await manager.start()
+    try:
+        # After starting, uptime should be tracked
+        metrics = manager.get_metrics()
+        assert metrics["uptime_seconds"] >= 0.0
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_multiple_restarts_tracking():
+    """Test that multiple restarts are correctly tracked in metrics."""
+    manager = ChromiumManager()
+    await manager.start()
+
+    try:
+        # Perform multiple restarts
+        await manager.restart()
+        await manager.restart()
+        await manager.restart()
+
+        # Check restart counter
+        metrics = manager.get_metrics()
+        assert metrics["total_chromium_restarts"] == 3
+
+    finally:
+        await manager.stop()
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_resource_usage_metrics():
+    """Test that CPU and memory usage metrics are collected and exposed."""
+    manager = ChromiumManager(config=ChromiumConfig(health_check_enabled=True, health_check_interval=10))
+    await manager.start()
+
+    try:
+        # Get initial metrics
+        metrics = manager.get_metrics()
+
+        # Resource metrics should be present
+        assert "current_cpu_percent" in metrics
+        assert "avg_cpu_percent" in metrics
+        assert "current_chromium_memory_mb" in metrics
+        assert "avg_chromium_memory_mb" in metrics
+
+        # Initial values should be 0.0 (no samples yet if browser process not found or health check hasn't run)
+        assert isinstance(metrics["current_cpu_percent"], float)
+        assert isinstance(metrics["avg_cpu_percent"], float)
+        assert isinstance(metrics["current_chromium_memory_mb"], float)
+        assert isinstance(metrics["avg_chromium_memory_mb"], float)
+
+        # All should be non-negative
+        assert metrics["current_cpu_percent"] >= 0.0
+        assert metrics["avg_cpu_percent"] >= 0.0
+        assert metrics["current_chromium_memory_mb"] >= 0.0
+        assert metrics["avg_chromium_memory_mb"] >= 0.0
+
+        # Wait for at least one health check to run (which collects resource metrics)
+        await asyncio.sleep(11)
+
+        # Get metrics again
+        metrics_after = manager.get_metrics()
+
+        # If browser process was found, metrics should potentially have values
+        # Note: On some systems pgrep may not find the process, so we check if values exist
+        # but don't assert they are > 0 since that depends on OS capabilities
+        assert "current_cpu_percent" in metrics_after
+        assert "avg_cpu_percent" in metrics_after
+        assert "current_chromium_memory_mb" in metrics_after
+        assert "avg_chromium_memory_mb" in metrics_after
+
+    finally:
+        await manager.stop()

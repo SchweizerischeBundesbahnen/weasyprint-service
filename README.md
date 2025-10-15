@@ -212,26 +212,6 @@ The following entry may be added to the `run` command:
 
 Replace `/path/to/host/fonts` with the folder containing custom fonts
 
-### Insert native sticky notes into final PDF document
-You can insert native PDF sticky note annotations at specific positions in the resulting document by using the following HTML structure (nested notes are supported for replies):
-
-```html
-  <span class="sticky-note">
-    <span class="sticky-note-time">2025-04-30T07:24:55.000+02:00</span>
-    <span class="sticky-note-username">Test User 1</span>
-    <span class="sticky-note-title">Test Title</span>
-    <span class="sticky-note-text">Test sticky note text</span>
-
-    <span class="sticky-note">
-      <span class="sticky-note-time">2020-05-12T08:17:02.000+02:00</span>
-      <span class="sticky-note-username">Test User 2</span>
-      <span class="sticky-note-title">Reply Title</span>
-      <span class="sticky-note-text">Reply text</span>
-    </span>
-
-  </span>
-```
-
 ## Development
 
 ### Building the Docker Image

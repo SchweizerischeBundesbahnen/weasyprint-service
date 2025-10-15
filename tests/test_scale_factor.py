@@ -1,5 +1,7 @@
 from fastapi.testclient import TestClient
 
+from app import weasyprint_controller as wc
+from app.svg_processor import SvgProcessor
 from app.weasyprint_controller import app
 
 
@@ -13,8 +15,6 @@ class DummySvgProcessor:
 
 
 def test_render_options_scale_factor_query_is_passed(monkeypatch):
-    from app import weasyprint_controller as wc
-
     # Ensure predictable environment
     monkeypatch.delenv("DEVICE_SCALE_FACTOR", raising=False)
 
@@ -32,8 +32,6 @@ def test_render_options_scale_factor_query_is_passed(monkeypatch):
 
 
 def test_render_options_scale_factor_defaults_to_none_when_missing(monkeypatch):
-    from app import weasyprint_controller as wc
-
     # Set env, but since controller passes None when missing, our dummy should receive None
     monkeypatch.setenv("DEVICE_SCALE_FACTOR", "1.7")
 
@@ -53,7 +51,6 @@ def test_render_options_scale_factor_defaults_to_none_when_missing(monkeypatch):
 def test_svg_processor_uses_env_scale_factor(monkeypatch):
     # Ensure env is set and no explicit override is provided
     monkeypatch.setenv("DEVICE_SCALE_FACTOR", "2.0")
-    from app.svg_processor import SvgProcessor
 
     sp = SvgProcessor(device_scale_factor=None)
     # Device scale factor should not affect layout unit conversion
@@ -64,7 +61,6 @@ def test_svg_processor_uses_env_scale_factor(monkeypatch):
 
 def test_svg_processor_explicit_override_takes_precedence(monkeypatch):
     monkeypatch.setenv("DEVICE_SCALE_FACTOR", "2.0")
-    from app.svg_processor import SvgProcessor
 
     sp = SvgProcessor(device_scale_factor=3.0)
     assert sp.get_px_conversion_ratio(None) == 1.0

@@ -270,15 +270,7 @@ async def convert_html(
         )
         logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
-        if len(notes) > 0 and output_pdf is not None:
-            try:
-                logger.debug("Processing %d notes for PDF annotation", len(notes))
-                output_pdf = notes_processor.process_pdf(output_pdf, notes)
-                logger.debug("Notes processed successfully")
-            except Exception as e:
-                logger.error("Failed to process PDF notes: %s", str(e), exc_info=True)
-                # Continue with PDF without notes rather than failing completely
-                logger.warning("Returning PDF without note annotations due to processing error")
+        output_pdf = notes_processor.process_pdf_with_notes(output_pdf, notes)
 
         return await __create_response(output, output_pdf)
 
@@ -365,6 +357,9 @@ async def convert_html_with_attachments(
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
 
+        notes_processor = NotesProcessor()
+        notes = notes_processor.replace_notes(parsed_html)
+
         # Use CDP-based async SVG processing
         svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
         parsed_html = await svg_processor.process_svg(parsed_html)
@@ -393,6 +388,8 @@ async def convert_html_with_attachments(
             attachments=attachments,
         )
         logger.info("PDF with attachments generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
+
+        output_pdf = notes_processor.process_pdf_with_notes(output_pdf, notes)
 
         return await __create_response(output, output_pdf)
 

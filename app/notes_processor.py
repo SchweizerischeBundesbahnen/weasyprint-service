@@ -98,6 +98,35 @@ class NotesProcessor:
 
         return Note(time=time, username=username, text=text, title=title, replies=replies)
 
+    def process_pdf_with_notes(self, pdf_content: bytes | None, notes: list[Note]) -> bytes | None:
+        """
+        Process PDF to add note annotations. Returns the PDF with notes or original PDF if processing fails.
+
+        This method handles all error cases internally and logs appropriate messages.
+        If there are no notes or pdf_content is None, returns the original pdf_content unchanged.
+
+        Args:
+            pdf_content: The PDF content as bytes, or None
+            notes: List of Note objects to add as annotations
+
+        Returns:
+            The processed PDF with note annotations, or the original PDF if processing fails or is not needed
+        """
+        # Return early if no processing needed
+        if pdf_content is None or len(notes) == 0:
+            return pdf_content
+
+        try:
+            logger.debug("Processing %d notes for PDF annotation", len(notes))
+            processed_pdf = self.process_pdf(pdf_content, notes)
+            logger.debug("Notes processed successfully")
+            return processed_pdf
+        except Exception as e:
+            logger.error("Failed to process PDF notes: %s", str(e), exc_info=True)
+            # Continue with PDF without notes rather than failing completely
+            logger.warning("Returning PDF without note annotations due to processing error")
+            return pdf_content
+
     def process_pdf(self, pdf_content: bytes, notes: list[Note]) -> bytes:
         """Process PDF to replace fake note links with actual PDF sticky note annotations with nested replies."""
         # Create a UUID to Note mapping for quick lookup (only top-level notes)

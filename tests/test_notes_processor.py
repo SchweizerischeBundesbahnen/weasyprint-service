@@ -247,3 +247,83 @@ def test_multiple_top_level_notes():
 
     # Verify both notes have unique UUIDs
     assert notes[0].uuid != notes[1].uuid
+
+
+def test_process_pdf_with_notes_none_pdf():
+    """Test process_pdf_with_notes returns None when PDF is None."""
+    processor = NotesProcessor()
+    notes = [Note(time="", username="User", text="Test", title="")]
+
+    result = processor.process_pdf_with_notes(None, notes)
+
+    assert result is None, "Should return None when pdf_content is None"
+
+
+def test_process_pdf_with_notes_empty_notes():
+    """Test process_pdf_with_notes returns original PDF when notes list is empty."""
+    processor = NotesProcessor()
+    pdf_content = b"fake pdf content"
+
+    result = processor.process_pdf_with_notes(pdf_content, [])
+
+    assert result == pdf_content, "Should return original PDF when notes list is empty"
+
+
+def test_process_pdf_with_notes_error_handling():
+    """Test process_pdf_with_notes handles errors gracefully and returns original PDF."""
+    processor = NotesProcessor()
+    invalid_pdf = b"not a valid pdf"
+    notes = [Note(time="", username="User", text="Test", title="", uuid="test-uuid")]
+
+    # Should handle error and return original PDF
+    result = processor.process_pdf_with_notes(invalid_pdf, notes)
+
+    assert result == invalid_pdf, "Should return original PDF when processing fails"
+
+
+def test_extract_note_from_annotation_edge_cases():
+    """Test _extract_note_from_annotation with various edge cases."""
+    from pypdf import PdfReader
+    from io import BytesIO
+
+    processor = NotesProcessor()
+
+    # Create a minimal PDF with no annotations
+    test_pdf_path = Path(__file__).parent / "test-data" / "notes_link_to_replace.pdf"
+    with open(test_pdf_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    reader = PdfReader(BytesIO(pdf_bytes))
+    page = reader.pages[0]
+
+    # Test with empty note map (no matching UUIDs)
+    note_map = {}
+    notes_to_create = processor._extract_note_annotations(page, note_map)
+
+    # Should find no notes to create since UUIDs don't match
+    assert len(notes_to_create) == 0, "Should find no notes when note_map is empty"
+
+
+def test_format_pdf_date_edge_cases():
+    """Test _format_pdf_date with additional edge cases."""
+    processor = NotesProcessor()
+
+    # Test with timezone but no offset info (edge case)
+    assert processor._format_pdf_date("2020-04-30T09:00:00Z") == "D:20200430090000+00'00"
+
+    # Test various invalid formats
+    assert processor._format_pdf_date("not-a-date") == ""
+    assert processor._format_pdf_date("2020-13-32T99:99:99") == ""
+
+
+def test_embed_png_as_xobject_missing_file():
+    """Test _embed_png_as_xobject with non-existent file."""
+    from pypdf import PdfWriter
+
+    processor = NotesProcessor()
+    writer = PdfWriter()
+
+    # Test with non-existent file
+    result = processor._embed_png_as_xobject(writer, "/non/existent/file.png")
+
+    assert result is None, "Should return None when PNG file doesn't exist"

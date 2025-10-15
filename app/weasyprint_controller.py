@@ -17,6 +17,7 @@ from app.attachment_manager import AttachmentManager
 from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
+from app.notes_processor import NotesProcessor
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import VersionSchema
 from app.svg_processor import SvgProcessor
@@ -245,6 +246,9 @@ async def convert_html(
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
 
+        notes_processor = NotesProcessor()
+        notes = notes_processor.replace_notes(parsed_html)
+
         # Use CDP-based async SVG processing
         svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
         parsed_html = await svg_processor.process_svg(parsed_html)
@@ -265,6 +269,8 @@ async def convert_html(
             custom_metadata=output.custom_metadata,
         )
         logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
+
+        output_pdf = notes_processor.process_pdf_with_notes(output_pdf, notes)
 
         return await __create_response(output, output_pdf)
 
@@ -351,6 +357,9 @@ async def convert_html_with_attachments(
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
 
+        notes_processor = NotesProcessor()
+        notes = notes_processor.replace_notes(parsed_html)
+
         # Use CDP-based async SVG processing
         svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
         parsed_html = await svg_processor.process_svg(parsed_html)
@@ -379,6 +388,8 @@ async def convert_html_with_attachments(
             attachments=attachments,
         )
         logger.info("PDF with attachments generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
+
+        output_pdf = notes_processor.process_pdf_with_notes(output_pdf, notes)
 
         return await __create_response(output, output_pdf)
 

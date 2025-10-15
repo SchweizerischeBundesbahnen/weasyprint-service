@@ -307,7 +307,7 @@ class ChromiumManager:
                         pids = [int(pid) for pid in result.stdout.strip().split("\n")]
                         if pids:
                             self._browser_process = psutil.Process(pids[0])
-                            self.log.info("Found Chromium process PID: %d", pids[0])
+                            self.log.debug("Found Chromium process PID: %d", pids[0])
             except Exception as e:  # noqa: BLE001
                 self.log.warning("Could not attach to Chromium process for resource monitoring: %s", e)
                 self._browser_process = None

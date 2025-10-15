@@ -54,6 +54,7 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 cover/
+tests/test-data/notes_link_to_replace_output.pdf
 
 # Translations
 *.mo

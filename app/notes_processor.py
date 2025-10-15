@@ -200,7 +200,10 @@ class NotesProcessor:
             if img.mode == "RGBA":
                 # Convert RGBA to RGB by compositing over white background
                 background = Image.new("RGB", img.size, (255, 255, 255))
-                background.paste(img, mask=img.split()[3] if len(img.split()) == RGBA_CHANNEL_COUNT else None)  # 3 is the alpha channel
+                # Split channels to get alpha channel for masking
+                channels = img.split()
+                alpha_mask = channels[3] if len(channels) == RGBA_CHANNEL_COUNT else None
+                background.paste(img, mask=alpha_mask)
                 img = background  # type: ignore[assignment]
             elif img.mode not in ("RGB", "L"):
                 img = img.convert("RGB")  # type: ignore[assignment]

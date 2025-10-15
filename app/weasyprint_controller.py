@@ -270,7 +270,7 @@ async def convert_html(
         )
         logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
-        if len(notes) > 0:
+        if len(notes) > 0 and output_pdf is not None:
             try:
                 logger.debug("Processing %d notes for PDF annotation", len(notes))
                 output_pdf = notes_processor.process_pdf(output_pdf, notes)

@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 import tempfile
+import time
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Annotated
@@ -276,6 +277,7 @@ async def convert_html(
     """
     Convert HTML content from the request body to a PDF document.
     """
+    start_time = time.time()
     logger.info("HTML to PDF conversion requested")
     raw: bytes = await request.body()
     logger.debug("Received HTML body of size: %d bytes", len(raw))
@@ -311,16 +313,23 @@ async def convert_html(
         )
         logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
+        # Record conversion success metrics
+        duration_ms = (time.time() - start_time) * 1000
+        chromium_manager._metrics.record_success(duration_ms)
+
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
         logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
         logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
         logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Unexpected error due converting to PDF", 500)
 
 
@@ -380,6 +389,7 @@ async def convert_html_with_attachments(
       - field 'html' contains the HTML content
       - remaining file parts are treated as attachments
     """
+    start_time = time.time()
     logger.info("HTML to PDF with attachments conversion requested")
     tmpdir = tempfile.mkdtemp(prefix="weasyprint-attach-")
     logger.debug("Created temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))
@@ -425,16 +435,23 @@ async def convert_html_with_attachments(
         )
         logger.info("PDF with attachments generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
 
+        # Record conversion success metrics
+        duration_ms = (time.time() - start_time) * 1000
+        chromium_manager._metrics.record_success(duration_ms)
+
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
         logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
         logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
         logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
+        chromium_manager._metrics.record_failure()
         return __process_error(e, "Unexpected error due converting to PDF", 500)
     finally:
         logger.debug("Cleaning up temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))

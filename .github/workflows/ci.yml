@@ -29,7 +29,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: 🧱 Install uv
-        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+        uses: astral-sh/setup-uv@3259c6206f993105e3a61b142c2d97bf4b9ef83d  # v7.1.0
+        with:
+          enable-cache: true
       - name: 🧱 Install dependencies
         run: uv sync --all-extras
       - name: 🧪 Run tests

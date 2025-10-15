@@ -268,7 +268,7 @@ grype weasyprint-service:0.0.0
 
 **Don't suggest these common patterns (already established in codebase):**
 - Using Ruff instead of Black/isort/flake8
-- Using Poetry for package management
+- Using uv for package management
 - Python 3.13+ syntax and features
 - FastAPI patterns already in use
 - Temporary file handling patterns
@@ -318,7 +318,7 @@ The repository uses extensive pre-commit hooks including:
 - OpenAPI schema auto-generation (`scripts/precommit_generate_openapi.sh`)
 - Security checks (gitleaks, sensitive data detection)
 - Docker security (hadolint for Dockerfile linting)
-- Poetry dependency management validation (lock file updates)
+- uv dependency management validation (lock file updates)
 - Commitizen (validates conventional commit format)
 - YAML/JSON/TOML validation and formatting
 

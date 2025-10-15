@@ -342,7 +342,7 @@ The repository uses extensive pre-commit hooks including:
 - Uses uv for Python dependency management
 - Dependencies defined in standard `[project.dependencies]` format in `pyproject.toml`
 - Fully compatible with Renovate for automated dependency updates
-- Lock file: `uv.lock` (replaces `poetry.lock`)
+- Lock file: `uv.lock`
 - Renovate handles automated dependency updates
 - Python 3.13+ required
 

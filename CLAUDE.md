@@ -33,7 +33,7 @@ Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
 ### Development Environment Setup
 ```bash
 # Install dependencies using uv
-uv sync --all-extras
+uv sync --extra dev --extra test
 ```
 
 ### Testing and Quality Assurance

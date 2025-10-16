@@ -49,19 +49,17 @@ RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
     echo "${BUILD_TIMESTAMP}" > "${WORKING_DIR}/.build_timestamp"
 
 COPY ./requirements.txt ${WORKING_DIR}/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
-COPY ./uv.lock ${WORKING_DIR}/uv.lock
-
-# Install dependencies
-RUN uv sync --frozen --no-dev --no-install-project && \
-    uv run playwright install chromium --with-deps
 
 COPY ./app/*.py ${WORKING_DIR}/app/
 COPY ./app/static/ ${WORKING_DIR}/app/static/
+COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
+COPY ./uv.lock ${WORKING_DIR}/uv.lock
 
-COPY entrypoint.sh ${WORKING_DIR}/entrypoint.sh
+RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && \
+    uv sync --frozen --no-dev --no-install-project && \
+    uv run playwright install chromium --with-deps
+
+COPY ./entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh
 
 EXPOSE ${PORT}

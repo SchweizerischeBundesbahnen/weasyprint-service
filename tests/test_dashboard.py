@@ -19,7 +19,8 @@ def test_dashboard_endpoint_returns_html():
         assert "WeasyPrint Service Monitor" in result.text
         assert "chart.js" in result.text  # CDN reference
         assert "queueChart" in result.text
-        assert "resourceChart" in result.text
+        assert "cpuChart" in result.text
+        assert "memoryChart" in result.text
 
 
 def test_dashboard_contains_required_elements():
@@ -38,15 +39,18 @@ def test_dashboard_contains_required_elements():
         assert "Avg Response Time" in html_content
         assert "Uptime" in html_content
 
-        # Check for charts (only 2 charts remain after removal)
+        # Check for charts (3 charts: Queue, CPU, Memory)
         assert "Queue & Active Conversions" in html_content
-        assert "Resource Usage" in html_content
+        assert "CPU Usage" in html_content
+        assert "Memory Usage" in html_content
 
-        # Check for system info section
-        assert "System Information" in html_content
-        assert "Service Version" in html_content
-        assert "WeasyPrint Version" in html_content
-        assert "Chromium Version" in html_content
+        # Check for version info in header
+        assert "Service:" in html_content
+        assert "WeasyPrint:" in html_content
+        assert "Chromium:" in html_content
+        assert "serviceVersion" in html_content
+        assert "weasyprintVersion" in html_content
+        assert "chromiumVersion" in html_content
 
 
 def test_dashboard_auto_refresh_configured():

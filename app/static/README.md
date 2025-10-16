@@ -23,13 +23,11 @@ The monitoring dashboard (`/dashboard`) provides real-time visualization of serv
 
 **Interactive Charts:**
 1. **Queue & Active Conversions** - Real-time visualization of request queue and concurrent processing
-2. **Resource Usage** - CPU and memory consumption tracking
+2. **CPU Usage (%)** - CPU consumption tracking with percentage scale
+3. **Memory Usage (MB)** - Memory tracking showing Chromium memory, total system memory, and available memory
 
-**System Information:**
-- Service and library versions (WeasyPrint, Chromium)
-- Health monitoring configuration
-- Queue statistics (max queue size, avg wait time)
-- Resource metrics (CPU, memory)
+**Version Information:**
+- Service, WeasyPrint, and Chromium versions displayed in the page header
 
 ### Technical Details
 

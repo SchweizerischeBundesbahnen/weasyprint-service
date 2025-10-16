@@ -21,10 +21,20 @@
         }
 
         .header {
-            text-align: center;
             margin-bottom: 30px;
             padding-bottom: 20px;
             border-bottom: 2px solid #444;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .header-main {
+            flex: 1;
         }
 
         .header h1 {
@@ -38,7 +48,26 @@
 
         .header .subtitle {
             color: #999;
-            font-size: 1.1em;
+            font-size: 1.5em;
+            font-weight: 500;
+        }
+
+        .header-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 0.95em;
+            color: #999;
+            text-align: right;
+        }
+
+        .header-info .info-item {
+            white-space: nowrap;
+        }
+
+        .header-info .info-item span {
+            color: #e0e0e0;
+            font-weight: 500;
         }
 
         .status-indicator {
@@ -126,9 +155,21 @@
 
         .chart-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 20px;
+        }
+
+        @media (max-width: 1400px) {
+            .chart-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .info-table {
@@ -193,10 +234,19 @@
 </head>
 <body>
     <div class="header">
-        <h1>WeasyPrint Service Monitor</h1>
-        <div class="subtitle">
-            <span class="status-indicator" id="statusIndicator"></span>
-            <span id="statusText">Loading...</span>
+        <div class="header-content">
+            <div class="header-main">
+                <h1>WeasyPrint Service Monitor</h1>
+                <div class="subtitle">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span id="statusText">Loading...</span>
+                </div>
+            </div>
+            <div class="header-info">
+                <div class="info-item">Service: <span id="serviceVersion">-</span></div>
+                <div class="info-item">WeasyPrint: <span id="weasyprintVersion">-</span></div>
+                <div class="info-item">Chromium: <span id="chromiumVersion">-</span></div>
+            </div>
         </div>
     </div>
 
@@ -208,7 +258,6 @@
             <div class="card">
                 <div class="card-label">Status</div>
                 <div class="card-value" id="status">-</div>
-                <div class="card-subtitle" id="chromiumVersion">-</div>
             </div>
 
             <div class="card">
@@ -261,53 +310,13 @@
             </div>
 
             <div class="chart-container">
-                <div class="chart-title">Resource Usage</div>
-                <canvas id="resourceChart"></canvas>
+                <div class="chart-title">CPU Usage (%)</div>
+                <canvas id="cpuChart"></canvas>
             </div>
-        </div>
 
-        <!-- System Info -->
-        <div class="info-table">
-            <h3>System Information</h3>
-            <div class="info-row">
-                <span class="info-label">Service Version</span>
-                <span class="info-value" id="serviceVersion">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">WeasyPrint Version</span>
-                <span class="info-value" id="weasyprintVersion">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Chromium Version</span>
-                <span class="info-value" id="chromiumVersionFull">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Health Monitoring</span>
-                <span class="info-value" id="healthMonitoring">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Last Health Check</span>
-                <span class="info-value" id="lastHealthCheck">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Max Queue Size</span>
-                <span class="info-value" id="maxQueueSize">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Avg Queue Wait Time</span>
-                <span class="info-value" id="avgQueueTime">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">CPU Usage</span>
-                <span class="info-value"><span id="currentCpu">-</span> (avg: <span id="avgCpu">-</span>)</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Chromium Memory</span>
-                <span class="info-value"><span id="currentMemory">-</span> MB (avg: <span id="avgMemory">-</span> MB)</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">System Memory</span>
-                <span class="info-value"><span id="availableMemory">-</span> / <span id="totalMemory">-</span> GB available</span>
+            <div class="chart-container">
+                <div class="chart-title">Memory Usage (MB)</div>
+                <canvas id="memoryChart"></canvas>
             </div>
         </div>
 
@@ -341,17 +350,20 @@
         };
 
         // Initialize charts
-        let queueChart, resourceChart;
+        let queueChart, cpuChart, memoryChart;
         const maxDataPoints = 20;
         const chartData = {
             labels: [],
             queue: [],
             active: [],
             cpu: [],
-            memory: []
+            chromiumMemory: [],
+            totalMemory: [],
+            availableMemory: []
         };
 
         function initCharts() {
+            // Queue Chart
             const queueCtx = document.getElementById('queueChart').getContext('2d');
             queueChart = new Chart(queueCtx, {
                 type: 'line',
@@ -377,27 +389,20 @@
                 options: chartConfig
             });
 
-            const resourceCtx = document.getElementById('resourceChart').getContext('2d');
-            resourceChart = new Chart(resourceCtx, {
+            // CPU Chart
+            const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+            cpuChart = new Chart(cpuCtx, {
                 type: 'line',
                 data: {
                     labels: chartData.labels,
                     datasets: [
                         {
-                            label: 'CPU %',
+                            label: 'CPU Usage',
                             data: chartData.cpu,
                             borderColor: '#f44336',
                             backgroundColor: 'rgba(244, 67, 54, 0.1)',
-                            yAxisID: 'y',
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Memory (MB)',
-                            data: chartData.memory,
-                            borderColor: '#4caf50',
-                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                            yAxisID: 'y1',
-                            tension: 0.4
+                            tension: 0.4,
+                            fill: true
                         }
                     ]
                 },
@@ -405,20 +410,15 @@
                     ...chartConfig,
                     scales: {
                         y: {
-                            type: 'linear',
-                            position: 'left',
                             beginAtZero: true,
-                            ticks: { color: '#999' },
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-                            title: { display: true, text: 'CPU %', color: '#999' }
-                        },
-                        y1: {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: true,
-                            ticks: { color: '#999' },
-                            grid: { drawOnChartArea: false },
-                            title: { display: true, text: 'Memory (MB)', color: '#999' }
+                            max: 100,
+                            ticks: {
+                                color: '#999',
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
                         },
                         x: {
                             ticks: { color: '#999' },
@@ -426,6 +426,44 @@
                         }
                     }
                 }
+            });
+
+            // Memory Chart
+            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+            memoryChart = new Chart(memoryCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'Chromium Memory',
+                            data: chartData.chromiumMemory,
+                            borderColor: '#2196f3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Total System Memory',
+                            data: chartData.totalMemory,
+                            borderColor: '#666',
+                            backgroundColor: 'rgba(102, 102, 102, 0.05)',
+                            tension: 0,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Available Memory',
+                            data: chartData.availableMemory,
+                            borderColor: '#4caf50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: chartConfig
             });
         }
 
@@ -436,7 +474,9 @@
             chartData.queue.push(metrics.queue_size);
             chartData.active.push(metrics.active_conversions);
             chartData.cpu.push(metrics.current_cpu_percent);
-            chartData.memory.push(metrics.current_chromium_memory_mb);
+            chartData.chromiumMemory.push(metrics.current_chromium_memory_mb);
+            chartData.totalMemory.push(metrics.total_memory_mb);
+            chartData.availableMemory.push(metrics.available_memory_mb);
 
             // Keep only last N data points
             if (chartData.labels.length > maxDataPoints) {
@@ -444,12 +484,15 @@
                 chartData.queue.shift();
                 chartData.active.shift();
                 chartData.cpu.shift();
-                chartData.memory.shift();
+                chartData.chromiumMemory.shift();
+                chartData.totalMemory.shift();
+                chartData.availableMemory.shift();
             }
 
             // Update all charts
             queueChart.update('none');
-            resourceChart.update('none');
+            cpuChart.update('none');
+            memoryChart.update('none');
         }
 
         function formatUptime(seconds) {
@@ -479,9 +522,13 @@
                 indicator.className = `status-indicator ${isHealthy ? 'healthy' : 'unhealthy'}`;
                 statusText.textContent = isHealthy ? 'Service Healthy' : 'Service Unhealthy';
 
+                // Update header info
+                document.getElementById('serviceVersion').textContent = data.version;
+                document.getElementById('weasyprintVersion').textContent = data.weasyprint_version;
+                document.getElementById('chromiumVersion').textContent = data.chromium_version || 'N/A';
+
                 // Update cards
                 document.getElementById('status').textContent = data.chromium_running ? 'Running' : 'Stopped';
-                document.getElementById('chromiumVersion').textContent = `Chromium ${data.chromium_version || 'N/A'}`;
 
                 const metrics = data.metrics;
                 const totalConversions = metrics.total_conversions + metrics.total_svg_conversions;
@@ -506,21 +553,6 @@
 
                 document.getElementById('uptime').textContent = formatUptime(metrics.uptime_seconds);
                 document.getElementById('restarts').textContent = `${metrics.total_chromium_restarts} restarts`;
-
-                // Update system info
-                document.getElementById('serviceVersion').textContent = data.version;
-                document.getElementById('weasyprintVersion').textContent = data.weasyprint_version;
-                document.getElementById('chromiumVersionFull').textContent = data.chromium_version || 'N/A';
-                document.getElementById('healthMonitoring').textContent = data.health_monitoring_enabled ? 'Enabled' : 'Disabled';
-                document.getElementById('lastHealthCheck').textContent = metrics.last_health_check || 'Never';
-                document.getElementById('maxQueueSize').textContent = metrics.max_queue_size;
-                document.getElementById('avgQueueTime').textContent = `${metrics.avg_queue_time_ms.toFixed(2)} ms`;
-                document.getElementById('currentCpu').textContent = `${metrics.current_cpu_percent.toFixed(1)}%`;
-                document.getElementById('avgCpu').textContent = `${metrics.avg_cpu_percent.toFixed(1)}%`;
-                document.getElementById('currentMemory').textContent = metrics.current_chromium_memory_mb.toFixed(1);
-                document.getElementById('avgMemory').textContent = metrics.avg_chromium_memory_mb.toFixed(1);
-                document.getElementById('availableMemory').textContent = (metrics.available_memory_mb / 1024).toFixed(1);
-                document.getElementById('totalMemory').textContent = (metrics.total_memory_mb / 1024).toFixed(1);
 
                 // Update charts
                 updateChartData(metrics);

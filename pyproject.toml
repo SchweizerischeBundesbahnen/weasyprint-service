@@ -19,7 +19,7 @@ dependencies = [
     "beautifulsoup4>=4.13.5,<5",
     "html5lib>=1.1,<2",
     "playwright>=1.49.0,<2",
-    "pillow>=11.1.0,<12",
+    "pillow>=12,<13",
     "psutil>=7.1.0,<8",
     "pypdf==6.1.1",
 ]

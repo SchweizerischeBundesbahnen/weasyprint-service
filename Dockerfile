@@ -1,4 +1,4 @@
-FROM python:3.14.0-slim@sha256:5cfac249393fa6c7ebacaf0027a1e127026745e603908b226baa784c52b9d99b
+FROM python:3.13.7-slim
 LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
 
 # hadolint ignore=DL3008

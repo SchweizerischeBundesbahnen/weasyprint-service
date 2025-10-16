@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize]
     # Only run on code, config, and infrastructure changes
-    paths: [app/**/*.py, tests/**/*.py, Dockerfile, docker-compose.yml, tox.ini, pyproject.toml, uv.lock, '!**/*.md']
+    paths: [app/**/*.py, tests/**/*.py, Dockerfile, docker-compose.yml, tox.ini, pyproject.toml, poetry.lock, '!**/*.md']
 jobs:
   claude-review:
     # Skip Claude review for Renovate and Dependabot PRs

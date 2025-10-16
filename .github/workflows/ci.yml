@@ -6,7 +6,11 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   REGISTRY_USERNAME: ${{ github.actor }}
@@ -22,12 +26,14 @@ jobs:
       - name: 📄 Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
-          fetch-depth: 0  # Full history required for SonarCloud analysis
           persist-credentials: false
-      - name: 🧱 Setup Python
+          fetch-depth: 0  # Full history required for SonarCloud analysis
+
+      - name: Set up Python from .tool-versions
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c  # v6.0.0
         with:
-          python-version: '3.14'
+          python-version-file: .tool-versions
+
       - name: 🧱 Install uv
         uses: astral-sh/setup-uv@3259c6206f993105e3a61b142c2d97bf4b9ef83d  # v7.1.0
         with:
@@ -125,6 +131,10 @@ jobs:
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392  # v3.6.0
       - name: 🧱 Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435  # v3.11.1
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
       - name: 📦 Build and push
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83  # v6.18.0
         with:
@@ -135,3 +145,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           build-args: APP_IMAGE_VERSION=${{ steps.meta.outputs.version }}
+          # Enable BuildKit cache mounts for faster builds
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

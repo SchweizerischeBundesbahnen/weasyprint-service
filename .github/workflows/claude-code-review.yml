@@ -4,7 +4,16 @@ on:
   pull_request:
     types: [opened, synchronize]
     # Only run on code, config, and infrastructure changes
-    paths: [app/**/*.py, tests/**/*.py, Dockerfile, docker-compose.yml, tox.ini, pyproject.toml, poetry.lock, '!**/*.md']
+    paths:
+      - "app/**/*.py"
+      - "tests/**/*.py"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "tox.ini"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "!**/*.md"
+
 jobs:
   claude-review:
     # Skip Claude review for Renovate and Dependabot PRs
@@ -18,12 +27,14 @@ jobs:
       issues: write
       actions: read
       id-token: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
         with:
           fetch-depth: 0  # Required: full history to compare PR against base branch
           persist-credentials: false  # Security: don't persist credentials
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@e8bad572273ce919ba15fec95aef0ce974464753  # v1.0.13
@@ -33,12 +44,14 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
             Review the PR diff. Report ONLY actual problems in changed lines.
+
             Focus on:
             - Bugs or logic errors
             - Security vulnerabilities (SQL injection, XSS, auth bypass, secrets exposure)
             - Breaking changes not mentioned in PR description
             - Missing tests for new functionality
             - Critical performance issues introduced by changes
+
             Format (be TERSE):
             ## Issues Found
 
@@ -47,8 +60,11 @@ jobs:
 
             ### 🟡 Important
             - `file:line` - Issue description - Suggestion: specific fix
+
             If NO issues found: "✅ No issues found."
+
             DO NOT review: unchanged code, style/formatting, optional improvements, or provide praise.
+
             Note: The PR branch is already checked out in the current working directory.
             Use `gh pr comment` to post your review as a top-level PR comment.
             Only post GitHub comments - don't submit review text as messages.

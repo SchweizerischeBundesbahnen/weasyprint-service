@@ -1,11 +1,6 @@
 ---
 default_install_hook_types: [pre-commit, commit-msg]
 repos:
-  - repo: https://github.com/lyz-code/yamlfix
-    rev: 1.18.0
-    hooks:
-      - id: yamlfix
-        args: [-c, .yamlfix.toml]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -14,6 +9,7 @@ repos:
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: trailing-whitespace
+        exclude_types: [markdown]  # Avoid conflicts with markdown formatting
       - id: check-xml
       - id: check-json
       - id: check-toml
@@ -48,6 +44,8 @@ repos:
         exclude: (^tests/)
         args: [--config-file, pyproject.toml]
         require_serial: true  # Serial processing is required for mypy (better performance and error reporting)
+  - repo: local
+    hooks:
       - id: generate-openapi
         name: Generate OpenAPI (update app/static/openapi.json)
         entry: scripts/precommit_generate_openapi.sh
@@ -66,10 +64,14 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.9.3
+  - repo: local
     hooks:
       - id: uv-lock
+        name: uv-lock
+        entry: uv lock --check
+        language: system
+        pass_filenames: false
+        files: ^(pyproject\.toml|uv\.lock)$
   - repo: https://github.com/zricethezav/gitleaks
     rev: v8.28.0
     hooks:
@@ -95,3 +97,7 @@ repos:
     rev: v1.7.8
     hooks:
       - id: actionlint
+
+# Configuration for different stages
+default_stages: [pre-commit]
+fail_fast: true

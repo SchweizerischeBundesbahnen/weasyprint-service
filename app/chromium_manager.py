@@ -735,9 +735,10 @@ class ChromiumManager:
                     raise
 
                 finally:
-                    # Decrement active conversions counter
+                    # Decrement active conversions counter and update metrics
                     async with self._queue_lock:
                         self._active_conversions -= 1
+                        self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
 
                     # Clean up: close page and context to prevent memory leaks (for normal exit path)
                     # Note: If CancelledError was caught above, these will be None and skip cleanup

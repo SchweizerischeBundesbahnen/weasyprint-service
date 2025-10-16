@@ -111,25 +111,29 @@ async def static_files(file_path: str) -> FileResponse | Response:
         to prevent path traversal attacks.
     """
     # Reject paths with directory traversal patterns
-    if ".." in file_path or file_path.startswith("/"):
+    if ".." in file_path or file_path.startswith(("/", "\\")):
         logger.warning("Rejected potentially malicious file path")
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
     static_dir = Path(__file__).parent / "static"
-    full_path = (static_dir / file_path).resolve()
+    static_dir_resolved = static_dir.resolve()
 
-    # Security check: ensure the resolved path is within static directory
+    # Construct and resolve the full path with validation
     try:
-        if not full_path.is_relative_to(static_dir.resolve()):
+        full_path = (static_dir / file_path).resolve()
+
+        # Security check: ensure the resolved path is within static directory
+        if not full_path.is_relative_to(static_dir_resolved):
             logger.warning("Attempted access to file outside static directory")
             return Response(status_code=status.HTTP_404_NOT_FOUND)
-    except ValueError:
-        # is_relative_to can raise ValueError on some platforms
-        logger.warning("Invalid static file path provided")
-        return Response(status_code=status.HTTP_404_NOT_FOUND)
 
-    if not full_path.exists() or not full_path.is_file():
-        logger.debug("Static file not found")
+        # Check if file exists and is a regular file (not directory or symlink)
+        if not full_path.exists() or not full_path.is_file():
+            logger.debug("Static file not found")
+            return Response(status_code=status.HTTP_404_NOT_FOUND)
+
+    except (ValueError, OSError):
+        logger.warning("Invalid or inaccessible file path")
         return Response(status_code=status.HTTP_404_NOT_FOUND)
 
     return FileResponse(full_path)

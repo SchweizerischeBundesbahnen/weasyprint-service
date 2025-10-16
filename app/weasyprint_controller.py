@@ -103,18 +103,33 @@ async def static_files(file_path: str) -> FileResponse | Response:
         file_path: Path to the static file
 
     Returns:
-        File response with the requested static file
-    """
-    static_dir = Path(__file__).parent / "static"
-    full_path = static_dir / file_path
+        FileResponse: The requested static file
+        Response: 404 Not Found if file doesn't exist or path is invalid
 
-    # Security check: ensure the path is within static directory
-    if not full_path.resolve().is_relative_to(static_dir.resolve()):
-        logger.warning("Attempted access to file outside static directory: %s", file_path)
+    Security:
+        Validates that the requested file path is within the static directory
+        to prevent path traversal attacks.
+    """
+    # Reject paths with directory traversal patterns
+    if ".." in file_path or file_path.startswith("/"):
+        logger.warning("Rejected potentially malicious file path: %s", file_path)
+        return Response("Not Found", status_code=404)
+
+    static_dir = Path(__file__).parent / "static"
+    full_path = (static_dir / file_path).resolve()
+
+    # Security check: ensure the resolved path is within static directory
+    try:
+        if not full_path.is_relative_to(static_dir.resolve()):
+            logger.warning("Attempted access to file outside static directory: %s", file_path)
+            return Response("Not Found", status_code=404)
+    except ValueError:
+        # is_relative_to can raise ValueError on some platforms
+        logger.warning("Invalid path provided: %s", file_path)
         return Response("Not Found", status_code=404)
 
     if not full_path.exists() or not full_path.is_file():
-        logger.warning("Static file not found: %s", file_path)
+        logger.debug("Static file not found: %s", file_path)
         return Response("Not Found", status_code=404)
 
     return FileResponse(full_path)

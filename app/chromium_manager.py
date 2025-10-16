@@ -667,6 +667,32 @@ class ChromiumManager:
             except Exception as e:  # noqa: BLE001
                 self.log.warning("Error closing context %s: %s", error_prefix, e)
 
+    async def _increment_queue_counter(self) -> None:
+        """Mark a request as waiting in queue."""
+        async with self._queue_lock:
+            self._waiting_in_queue += 1
+            self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
+
+    async def _decrement_queue_counter(self) -> None:
+        """Mark a request as no longer waiting in queue."""
+        async with self._queue_lock:
+            self._waiting_in_queue -= 1
+            self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
+
+    async def _transition_queue_to_active(self, queue_time_ms: float) -> None:
+        """Transition request from queue to active state."""
+        self._metrics.record_queue_entry(queue_time_ms)
+        async with self._queue_lock:
+            self._waiting_in_queue -= 1
+            self._active_conversions += 1
+            self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
+
+    async def _decrement_active_counter(self) -> None:
+        """Mark a request as no longer active."""
+        async with self._queue_lock:
+            self._active_conversions -= 1
+            self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
+
     @asynccontextmanager
     async def _get_page(self, device_scale_factor: float | None = None) -> AsyncGenerator[Page]:
         """
@@ -686,74 +712,46 @@ class ChromiumManager:
         if not self._browser:
             raise RuntimeError("Chromium browser is not started")
 
-        # Track queue entry time
         queue_entry_time = time.time()
-
-        # Mark as waiting in queue (before trying to acquire semaphore)
-        async with self._queue_lock:
-            self._waiting_in_queue += 1
-            self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
+        await self._increment_queue_counter()
 
         try:
-            # Acquire semaphore to limit concurrent conversions
             async with self._semaphore:
-                # Record time spent waiting in queue
-                queue_time_ms = (time.time() - queue_entry_time) * 1000
-                self._metrics.record_queue_entry(queue_time_ms)
-
-                # Now we have the semaphore - move from waiting to active
-                async with self._queue_lock:
-                    self._waiting_in_queue -= 1
-                    self._active_conversions += 1
-                    self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
-
-                context: BrowserContext | None = None
-                page: Page | None = None
-
-                # Use provided scale factor or fall back to instance default
-                scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
-
-                try:
-                    # Create new context with device scale factor
-                    context = await self._browser.new_context(
-                        device_scale_factor=scale_factor,
-                        viewport=ViewportSize(width=800, height=600),  # Default, will be overridden
-                    )
-
-                    page = await context.new_page()
+                await self._transition_queue_to_active((time.time() - queue_entry_time) * 1000)
+                async with self._create_and_yield_page(device_scale_factor) as page:
                     yield page
+        except (asyncio.CancelledError, Exception):
+            # If error/cancellation before acquiring semaphore, decrement waiting counter
+            # If error/cancellation after acquiring semaphore, decrement is handled by _create_and_yield_page
+            if self._waiting_in_queue > 0:
+                await self._decrement_queue_counter()
+            raise
 
-                except asyncio.CancelledError:
-                    # Handle cancellation (e.g., from timeout in wait_for)
-                    # Explicitly clean up resources before re-raising
-                    self.log.warning("Conversion cancelled (timeout or external cancellation), cleaning up page and context")
-                    await self._cleanup_page_resources(page, context, is_cancelled=True)
-                    # Mark as cleaned up to prevent duplicate close in finally
-                    page = None
-                    context = None
-                    # Re-raise CancelledError to propagate cancellation
-                    raise
+    @asynccontextmanager
+    async def _create_and_yield_page(self, device_scale_factor: float | None) -> AsyncGenerator[Page]:
+        """Create browser page and handle its lifecycle."""
+        scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
+        context: BrowserContext | None = None
+        page: Page | None = None
 
-                finally:
-                    # Decrement active conversions counter and update metrics
-                    async with self._queue_lock:
-                        self._active_conversions -= 1
-                        self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
-
-                    # Clean up: close page and context to prevent memory leaks (for normal exit path)
-                    # Note: If CancelledError was caught above, these will be None and skip cleanup
-                    await self._cleanup_page_resources(page, context, is_cancelled=False)
+        try:
+            context = await self._browser.new_context(  # type: ignore[union-attr]
+                device_scale_factor=scale_factor,
+                viewport=ViewportSize(width=800, height=600),
+            )
+            page = await context.new_page()
+            yield page
 
         except asyncio.CancelledError:
-            # If cancelled while waiting for semaphore, decrement waiting counter
-            async with self._queue_lock:
-                self._waiting_in_queue -= 1
+            self.log.warning("Conversion cancelled (timeout or external cancellation), cleaning up page and context")
+            await self._cleanup_page_resources(page, context, is_cancelled=True)
+            page = None
+            context = None
             raise
-        except Exception:
-            # If error while waiting for semaphore, decrement waiting counter
-            async with self._queue_lock:
-                self._waiting_in_queue -= 1
-            raise
+
+        finally:
+            await self._decrement_active_counter()
+            await self._cleanup_page_resources(page, context, is_cancelled=False)
 
     async def _health_monitor_loop(self) -> None:
         """

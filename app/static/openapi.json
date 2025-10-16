@@ -926,17 +926,38 @@
             "description": "WeasyPrint version"
           },
           "weasyprintService": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "WeasyPrint Service",
             "description": "Service version"
           },
           "timestamp": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Build Timestamp",
             "description": "Build timestamp"
           },
           "chromium": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Chromium",
             "description": "Chromium version"
           }

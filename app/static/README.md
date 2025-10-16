@@ -33,9 +33,10 @@ The monitoring dashboard (`/dashboard`) provides real-time visualization of serv
 
 - **Auto-refresh**: Updates every 5 seconds
 - **Data retention**: Last 20 data points on charts
-- **Technology**: Chart.js 4.4.0 for visualizations
+- **Technology**: Chart.js 4.4.0 (bundled locally) for visualizations
 - **Design**: Dark theme optimized for monitoring displays
 - **API endpoint**: Fetches data from `/health?detailed=true`
+- **Static assets**: Chart.js library served from `/static/chart.umd.min.js`
 
 ### Usage
 

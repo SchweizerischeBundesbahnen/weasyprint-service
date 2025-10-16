@@ -12,7 +12,7 @@ from urllib.parse import unquote
 
 import weasyprint  # type: ignore
 from fastapi import Depends, FastAPI, Query, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from app.attachment_manager import AttachmentManager
@@ -83,6 +83,41 @@ async def dashboard() -> HTMLResponse:
     dashboard_path = Path(__file__).parent / "static" / "dashboard.html"
     with dashboard_path.open("r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+
+@app.get(
+    "/static/{file_path:path}",
+    response_class=FileResponse,
+    summary="Static Files",
+    description="Serve static files (CSS, JS, etc.)",
+    operation_id="getStaticFile",
+    tags=["meta"],
+    include_in_schema=False,
+    response_model=None,
+)
+async def static_files(file_path: str) -> FileResponse | Response:
+    """
+    Serve static files from the static directory.
+
+    Args:
+        file_path: Path to the static file
+
+    Returns:
+        File response with the requested static file
+    """
+    static_dir = Path(__file__).parent / "static"
+    full_path = static_dir / file_path
+
+    # Security check: ensure the path is within static directory
+    if not full_path.resolve().is_relative_to(static_dir.resolve()):
+        logger.warning("Attempted access to file outside static directory: %s", file_path)
+        return Response("Not Found", status_code=404)
+
+    if not full_path.exists() or not full_path.is_file():
+        logger.warning("Static file not found: %s", file_path)
+        return Response("Not Found", status_code=404)
+
+    return FileResponse(full_path)
 
 
 @app.get(

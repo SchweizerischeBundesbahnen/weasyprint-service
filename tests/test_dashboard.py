@@ -17,7 +17,7 @@ def test_dashboard_endpoint_returns_html():
         assert result.status_code == 200
         assert result.headers["content-type"] == "text/html; charset=utf-8"
         assert "WeasyPrint Service Monitor" in result.text
-        assert "chart.js" in result.text  # CDN reference
+        assert "chart.umd.min.js" in result.text  # Local Chart.js file
         assert "queueChart" in result.text
         assert "cpuChart" in result.text
         assert "memoryChart" in result.text

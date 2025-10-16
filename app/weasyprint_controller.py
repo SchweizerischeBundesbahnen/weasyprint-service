@@ -112,15 +112,14 @@ async def static_files(file_path: str) -> FileResponse | Response:
     """
     # Reject paths with directory traversal patterns
     if ".." in file_path or file_path.startswith("/"):
-        logger.warning("Rejected potentially malicious file path: %s", file_path)
-        return Response("Not Found", status_code=404)
+        logger.warning("Rejected potentially malicious file path")
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
 
     static_dir = Path(__file__).parent / "static"
     full_path = (static_dir / file_path).resolve()
 
     # Security check: ensure the resolved path is within static directory
     try:
-        try:
         if not full_path.is_relative_to(static_dir.resolve()):
             logger.warning("Attempted access to file outside static directory")
             return Response(status_code=status.HTTP_404_NOT_FOUND)

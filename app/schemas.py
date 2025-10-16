@@ -40,6 +40,13 @@ class ChromiumMetricsSchema(BaseModel):
     current_chromium_memory_mb: float = Field(description="Current Chromium physical memory usage in MB")
     avg_chromium_memory_mb: float = Field(description="Average Chromium physical memory usage in MB")
 
+    # Queue metrics
+    queue_size: int = Field(description="Current number of requests waiting in queue")
+    max_queue_size: int = Field(description="Maximum queue size observed since startup")
+    active_conversions: int = Field(description="Current number of active conversions in progress")
+    avg_queue_time_ms: float = Field(description="Average time requests spend waiting in queue (milliseconds)")
+    max_concurrent_conversions: int = Field(description="Maximum allowed concurrent conversions (configured limit)")
+
 
 class HealthSchema(BaseModel):
     """Schema for detailed health status response"""

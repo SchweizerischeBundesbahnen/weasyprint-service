@@ -5,6 +5,28 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/dashboard": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Monitoring Dashboard",
+        "description": "Interactive real-time monitoring dashboard with charts and metrics visualization",
+        "operationId": "getDashboard",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -126,6 +148,31 @@
                           "description": "Average Chromium physical memory usage in MB",
                           "title": "Avg Chromium Memory Mb",
                           "type": "number"
+                        },
+                        "queue_size": {
+                          "description": "Current number of requests waiting in queue",
+                          "title": "Queue Size",
+                          "type": "integer"
+                        },
+                        "max_queue_size": {
+                          "description": "Maximum queue size observed since startup",
+                          "title": "Max Queue Size",
+                          "type": "integer"
+                        },
+                        "active_conversions": {
+                          "description": "Current number of active conversions in progress",
+                          "title": "Active Conversions",
+                          "type": "integer"
+                        },
+                        "avg_queue_time_ms": {
+                          "description": "Average time requests spend waiting in queue (milliseconds)",
+                          "title": "Avg Queue Time Ms",
+                          "type": "number"
+                        },
+                        "max_concurrent_conversions": {
+                          "description": "Maximum allowed concurrent conversions (configured limit)",
+                          "title": "Max Concurrent Conversions",
+                          "type": "integer"
                         }
                       },
                       "required": [
@@ -146,7 +193,12 @@
                         "total_memory_mb",
                         "available_memory_mb",
                         "current_chromium_memory_mb",
-                        "avg_chromium_memory_mb"
+                        "avg_chromium_memory_mb",
+                        "queue_size",
+                        "max_queue_size",
+                        "active_conversions",
+                        "avg_queue_time_ms",
+                        "max_concurrent_conversions"
                       ],
                       "title": "ChromiumMetricsSchema",
                       "type": "object"
@@ -314,6 +366,31 @@
                           "description": "Average Chromium physical memory usage in MB",
                           "title": "Avg Chromium Memory Mb",
                           "type": "number"
+                        },
+                        "queue_size": {
+                          "description": "Current number of requests waiting in queue",
+                          "title": "Queue Size",
+                          "type": "integer"
+                        },
+                        "max_queue_size": {
+                          "description": "Maximum queue size observed since startup",
+                          "title": "Max Queue Size",
+                          "type": "integer"
+                        },
+                        "active_conversions": {
+                          "description": "Current number of active conversions in progress",
+                          "title": "Active Conversions",
+                          "type": "integer"
+                        },
+                        "avg_queue_time_ms": {
+                          "description": "Average time requests spend waiting in queue (milliseconds)",
+                          "title": "Avg Queue Time Ms",
+                          "type": "number"
+                        },
+                        "max_concurrent_conversions": {
+                          "description": "Maximum allowed concurrent conversions (configured limit)",
+                          "title": "Max Concurrent Conversions",
+                          "type": "integer"
                         }
                       },
                       "required": [
@@ -334,7 +411,12 @@
                         "total_memory_mb",
                         "available_memory_mb",
                         "current_chromium_memory_mb",
-                        "avg_chromium_memory_mb"
+                        "avg_chromium_memory_mb",
+                        "queue_size",
+                        "max_queue_size",
+                        "active_conversions",
+                        "avg_queue_time_ms",
+                        "max_concurrent_conversions"
                       ],
                       "title": "ChromiumMetricsSchema",
                       "type": "object"

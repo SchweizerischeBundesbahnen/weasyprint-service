@@ -82,6 +82,11 @@ class ChromiumMetrics:
         total_cpu_sum: Total CPU sum (for averaging).
         total_memory_samples: Total memory samples collected (for averaging).
         total_memory_sum: Total memory sum in MB (for averaging).
+        queue_size: Current number of requests in queue (waiting for semaphore).
+        max_queue_size: Maximum queue size observed.
+        active_conversions: Current number of active conversions.
+        total_queue_time_ms: Total time requests spent waiting in queue (for averaging).
+        avg_queue_time_ms: Average time requests wait in queue.
     """
 
     # HTML to PDF conversion metrics
@@ -113,6 +118,13 @@ class ChromiumMetrics:
     total_cpu_sum: float = 0.0
     total_memory_samples: int = 0
     total_memory_sum: float = 0.0
+
+    # Queue metrics
+    queue_size: int = 0
+    max_queue_size: int = 0
+    active_conversions: int = 0
+    total_queue_time_ms: float = 0.0
+    avg_queue_time_ms: float = 0.0
 
     def record_success(self, duration_ms: float) -> None:
         """Record a successful HTML to PDF conversion."""
@@ -202,6 +214,30 @@ class ChromiumMetrics:
             # Process no longer exists or we don't have access
             pass
 
+    def record_queue_entry(self, queue_time_ms: float) -> None:
+        """
+        Record metrics when a request enters the queue.
+
+        Args:
+            queue_time_ms: Time spent waiting in queue in milliseconds.
+        """
+        self.total_queue_time_ms += queue_time_ms
+        total_processed = self.total_conversions + self.total_svg_conversions
+        if total_processed > 0:
+            self.avg_queue_time_ms = self.total_queue_time_ms / total_processed
+
+    def update_queue_metrics(self, queue_size: int, active_conversions: int) -> None:
+        """
+        Update current queue metrics.
+
+        Args:
+            queue_size: Current number of requests waiting in queue.
+            active_conversions: Current number of active conversions.
+        """
+        self.queue_size = queue_size
+        self.active_conversions = active_conversions
+        self.max_queue_size = max(self.max_queue_size, queue_size)
+
 
 class ChromiumManager:
     """
@@ -254,6 +290,11 @@ class ChromiumManager:
         self._metrics = ChromiumMetrics()
         self._health_monitor_task: asyncio.Task | None = None
         self._shutdown_event = asyncio.Event()
+
+        # Track waiting and active conversions
+        self._waiting_in_queue = 0  # Requests waiting to acquire semaphore
+        self._active_conversions = 0  # Requests that acquired semaphore
+        self._queue_lock = asyncio.Lock()  # Lock for both counters
 
     async def start(self) -> None:
         """Start the persistent Chromium browser process."""
@@ -645,39 +686,73 @@ class ChromiumManager:
         if not self._browser:
             raise RuntimeError("Chromium browser is not started")
 
-        # Acquire semaphore to limit concurrent conversions
-        async with self._semaphore:
-            context: BrowserContext | None = None
-            page: Page | None = None
+        # Track queue entry time
+        queue_entry_time = time.time()
 
-            # Use provided scale factor or fall back to instance default
-            scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
+        # Mark as waiting in queue (before trying to acquire semaphore)
+        async with self._queue_lock:
+            self._waiting_in_queue += 1
+            self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
 
-            try:
-                # Create new context with device scale factor
-                context = await self._browser.new_context(
-                    device_scale_factor=scale_factor,
-                    viewport=ViewportSize(width=800, height=600),  # Default, will be overridden
-                )
+        try:
+            # Acquire semaphore to limit concurrent conversions
+            async with self._semaphore:
+                # Record time spent waiting in queue
+                queue_time_ms = (time.time() - queue_entry_time) * 1000
+                self._metrics.record_queue_entry(queue_time_ms)
 
-                page = await context.new_page()
-                yield page
+                # Now we have the semaphore - move from waiting to active
+                async with self._queue_lock:
+                    self._waiting_in_queue -= 1
+                    self._active_conversions += 1
+                    self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
 
-            except asyncio.CancelledError:
-                # Handle cancellation (e.g., from timeout in wait_for)
-                # Explicitly clean up resources before re-raising
-                self.log.warning("Conversion cancelled (timeout or external cancellation), cleaning up page and context")
-                await self._cleanup_page_resources(page, context, is_cancelled=True)
-                # Mark as cleaned up to prevent duplicate close in finally
-                page = None
-                context = None
-                # Re-raise CancelledError to propagate cancellation
-                raise
+                context: BrowserContext | None = None
+                page: Page | None = None
 
-            finally:
-                # Clean up: close page and context to prevent memory leaks (for normal exit path)
-                # Note: If CancelledError was caught above, these will be None and skip cleanup
-                await self._cleanup_page_resources(page, context, is_cancelled=False)
+                # Use provided scale factor or fall back to instance default
+                scale_factor = device_scale_factor if device_scale_factor is not None else self.device_scale_factor
+
+                try:
+                    # Create new context with device scale factor
+                    context = await self._browser.new_context(
+                        device_scale_factor=scale_factor,
+                        viewport=ViewportSize(width=800, height=600),  # Default, will be overridden
+                    )
+
+                    page = await context.new_page()
+                    yield page
+
+                except asyncio.CancelledError:
+                    # Handle cancellation (e.g., from timeout in wait_for)
+                    # Explicitly clean up resources before re-raising
+                    self.log.warning("Conversion cancelled (timeout or external cancellation), cleaning up page and context")
+                    await self._cleanup_page_resources(page, context, is_cancelled=True)
+                    # Mark as cleaned up to prevent duplicate close in finally
+                    page = None
+                    context = None
+                    # Re-raise CancelledError to propagate cancellation
+                    raise
+
+                finally:
+                    # Decrement active conversions counter
+                    async with self._queue_lock:
+                        self._active_conversions -= 1
+
+                    # Clean up: close page and context to prevent memory leaks (for normal exit path)
+                    # Note: If CancelledError was caught above, these will be None and skip cleanup
+                    await self._cleanup_page_resources(page, context, is_cancelled=False)
+
+        except asyncio.CancelledError:
+            # If cancelled while waiting for semaphore, decrement waiting counter
+            async with self._queue_lock:
+                self._waiting_in_queue -= 1
+            raise
+        except Exception:
+            # If error while waiting for semaphore, decrement waiting counter
+            async with self._queue_lock:
+                self._waiting_in_queue -= 1
+            raise
 
     async def _health_monitor_loop(self) -> None:
         """
@@ -767,6 +842,11 @@ class ChromiumManager:
             - available_memory_mb: Available system memory in MB
             - current_chromium_memory_mb: Current Chromium physical memory usage in MB
             - avg_chromium_memory_mb: Average Chromium physical memory usage in MB
+            - queue_size: Current number of requests in queue
+            - max_queue_size: Maximum queue size observed
+            - active_conversions: Current number of active conversions
+            - avg_queue_time_ms: Average time requests wait in queue
+            - max_concurrent_conversions: Maximum allowed concurrent conversions
         """
         self._metrics.update_uptime()
 
@@ -800,6 +880,11 @@ class ChromiumManager:
             "available_memory_mb": round(available_memory_mb, 2),
             "current_chromium_memory_mb": round(self._metrics.current_chromium_memory_mb, 2),
             "avg_chromium_memory_mb": round(self._metrics.avg_chromium_memory_mb, 2),
+            "queue_size": self._metrics.queue_size,
+            "max_queue_size": self._metrics.max_queue_size,
+            "active_conversions": self._metrics.active_conversions,
+            "avg_queue_time_ms": round(self._metrics.avg_queue_time_ms, 2),
+            "max_concurrent_conversions": self.max_concurrent_conversions,
         }
 
     def _validate_int_config(

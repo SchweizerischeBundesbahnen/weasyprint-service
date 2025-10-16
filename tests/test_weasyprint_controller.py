@@ -125,6 +125,11 @@ def test_health_detailed_healthy():
             "available_memory_mb": 8192.0,
             "current_chromium_memory_mb": 128.5,
             "avg_chromium_memory_mb": 120.3,
+            "queue_size": 2,
+            "max_queue_size": 8,
+            "active_conversions": 5,
+            "avg_queue_time_ms": 15.75,
+            "max_concurrent_conversions": 10,
         }
     )
 
@@ -163,6 +168,11 @@ def test_health_detailed_healthy():
             assert metrics["available_memory_mb"] == 8192.0
             assert metrics["current_chromium_memory_mb"] == 128.5
             assert metrics["avg_chromium_memory_mb"] == 120.3
+            assert metrics["queue_size"] == 2
+            assert metrics["max_queue_size"] == 8
+            assert metrics["active_conversions"] == 5
+            assert metrics["avg_queue_time_ms"] == 15.75
+            assert metrics["max_concurrent_conversions"] == 10
 
 
 def test_health_detailed_unhealthy():
@@ -199,6 +209,11 @@ def test_health_detailed_unhealthy():
             "available_memory_mb": 2048.0,
             "current_chromium_memory_mb": 0.0,
             "avg_chromium_memory_mb": 0.0,
+            "queue_size": 0,
+            "max_queue_size": 0,
+            "active_conversions": 0,
+            "avg_queue_time_ms": 0.0,
+            "max_concurrent_conversions": 10,
         }
     )
 
@@ -308,6 +323,11 @@ def test_health_detailed_with_health_monitoring_disabled():
             "available_memory_mb": 10240.0,
             "current_chromium_memory_mb": 95.5,
             "avg_chromium_memory_mb": 90.2,
+            "queue_size": 0,
+            "max_queue_size": 3,
+            "active_conversions": 0,
+            "avg_queue_time_ms": 5.25,
+            "max_concurrent_conversions": 10,
         }
     )
 

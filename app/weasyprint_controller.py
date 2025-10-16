@@ -12,6 +12,7 @@ from urllib.parse import unquote
 
 import weasyprint  # type: ignore
 from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from app.attachment_manager import AttachmentManager
@@ -62,6 +63,26 @@ app = FastAPI(
     openapi_version="3.1.0",
     lifespan=lifespan,
 )
+
+
+@app.get(
+    "/dashboard",
+    response_class=HTMLResponse,
+    summary="Monitoring Dashboard",
+    description="Interactive real-time monitoring dashboard with charts and metrics visualization",
+    operation_id="getDashboard",
+    tags=["meta"],
+)
+async def dashboard() -> HTMLResponse:
+    """
+    Serve the monitoring dashboard HTML page.
+
+    Returns:
+        HTML page with real-time monitoring dashboard
+    """
+    dashboard_path = Path(__file__).parent / "static" / "dashboard.html"
+    with dashboard_path.open("r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
 
 @app.get(

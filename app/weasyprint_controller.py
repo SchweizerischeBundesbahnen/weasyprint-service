@@ -11,7 +11,7 @@ from typing import Annotated
 from urllib.parse import unquote
 
 import weasyprint  # type: ignore
-from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi import Depends, FastAPI, Query, Request, Response, status
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
@@ -120,17 +120,18 @@ async def static_files(file_path: str) -> FileResponse | Response:
 
     # Security check: ensure the resolved path is within static directory
     try:
+        try:
         if not full_path.is_relative_to(static_dir.resolve()):
-            logger.warning("Attempted access to file outside static directory: %s", file_path)
-            return Response("Not Found", status_code=404)
+            logger.warning("Attempted access to file outside static directory")
+            return Response(status_code=status.HTTP_404_NOT_FOUND)
     except ValueError:
         # is_relative_to can raise ValueError on some platforms
-        logger.warning("Invalid path provided: %s", file_path)
-        return Response("Not Found", status_code=404)
+        logger.warning("Invalid static file path provided")
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
 
     if not full_path.exists() or not full_path.is_file():
-        logger.debug("Static file not found: %s", file_path)
-        return Response("Not Found", status_code=404)
+        logger.debug("Static file not found")
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
 
     return FileResponse(full_path)
 

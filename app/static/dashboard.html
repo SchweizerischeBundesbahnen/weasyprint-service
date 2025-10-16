@@ -558,7 +558,15 @@
                 const errorRate = metrics.error_rate_percent;
                 const errorElement = document.getElementById('errorRate');
                 errorElement.textContent = `${errorRate.toFixed(2)}%`;
-                errorElement.className = errorRate > 5 ? 'card-value error' : errorRate > 1 ? 'card-value warning' : 'card-value success';
+
+                // Determine error rate class based on thresholds
+                let errorClass = 'card-value success';
+                if (errorRate > 5) {
+                    errorClass = 'card-value error';
+                } else if (errorRate > 1) {
+                    errorClass = 'card-value warning';
+                }
+                errorElement.className = errorClass;
                 document.getElementById('failedConversions').textContent = `${metrics.failed_conversions + metrics.failed_svg_conversions} failed`;
 
                 document.getElementById('queueSize').textContent = metrics.queue_size;

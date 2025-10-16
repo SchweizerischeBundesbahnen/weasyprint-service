@@ -48,6 +48,24 @@
       "semanticCommitType": "chore",
       "commitMessageTopic": "Python version",
       "automerge": false
+    },
+    {
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "python"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor"
+      ],
+      "semanticCommitType": "chore",
+      "commitMessageTopic": "Python Docker image version",
+      "automerge": false
     }
   ]
 }

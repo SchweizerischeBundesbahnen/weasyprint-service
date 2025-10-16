@@ -6,10 +6,7 @@
   "packageRules": [
     {
       "matchManagers": [
-        "poetry"
-      ],
-      "postUpdateOptions": [
-        "poetry-lock"
+        "pep621"
       ],
       "matchDatasources": [
         "pypi"
@@ -24,10 +21,7 @@
     },
     {
       "matchManagers": [
-        "poetry"
-      ],
-      "postUpdateOptions": [
-        "poetry-lock"
+        "pep621"
       ],
       "matchDatasources": [
         "pypi"

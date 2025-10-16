@@ -39,11 +39,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-try:
-    import httpx
-except ImportError:
-    print("Error: httpx is required. Install dependencies: poetry install --with=test", file=sys.stderr)
-    sys.exit(1)
+import httpx
 
 
 @dataclass

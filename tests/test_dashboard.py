@@ -31,13 +31,19 @@ def test_dashboard_contains_required_elements():
         result = test_client.get("/dashboard")
         html_content = result.text
 
-        # Check for key sections
-        assert "Queue Size" in html_content
-        assert "Active PDF Generations" in html_content
-        assert "Error Rates" in html_content
-        assert "Total PDF Generations" in html_content
-        assert "Avg Response Time" in html_content
+        # Check for all 12 metric cards
+        assert "Status" in html_content
         assert "Uptime" in html_content
+        assert "Concurrent Slots" in html_content
+        assert "Queue" in html_content
+        assert "PDF Generations" in html_content
+        assert "Avg Response Time" in html_content
+        assert "Failed PDF Generations" in html_content
+        assert "Error Rate" in html_content
+        assert "SVG Conversions" in html_content
+        assert "Avg SVG Conversion Time" in html_content
+        assert "Failed SVG Conversions" in html_content
+        assert "SVG Error Rate" in html_content
 
         # Check for charts (3 charts: Queue, CPU, Memory)
         assert "Queue & Active PDF Generations" in html_content

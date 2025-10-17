@@ -280,45 +280,58 @@
             </div>
 
             <div class="card">
-                <div class="card-label">Total PDF Generations</div>
-                <div class="card-value" id="totalPdfGenerations">0</div>
-                <div class="card-subtitle">
-                    <span class="success" id="totalPdfGens">Total: 0</span> |
-                    <span class="success" id="svgConversions">SVG: 0</span>
-                </div>
+                <div class="card-label">Uptime</div>
+                <div class="card-value" id="uptime">0s</div>
             </div>
 
             <div class="card">
-                <div class="card-label">Error Rates</div>
-                <div class="card-value" id="errorRate">0.00%</div>
-                <div class="card-subtitle">
-                    <span class="error" id="failedPdfGenerations">0 failed</span> |
-                    <span class="warning" id="svgErrorRate">SVG: 0.00%</span>
-                </div>
+                <div class="card-label">Concurrent Slots</div>
+                <div class="card-value"><span id="activePdfGenerations">0</span> / <span id="maxConcurrent">10</span></div>
             </div>
 
             <div class="card">
-                <div class="card-label">Queue Size</div>
+                <div class="card-label">Queue</div>
                 <div class="card-value" id="queueSize">0</div>
-                <div class="card-subtitle">
-                    <span id="activePdfGenerations">0 active</span> / <span id="maxConcurrent">10</span> slots
-                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">PDF Generations</div>
+                <div class="card-value" id="pdfGenerations">0</div>
             </div>
 
             <div class="card">
                 <div class="card-label">Avg Response Time</div>
-                <div class="card-value" id="avgTime">0 ms</div>
-                <div class="card-subtitle">
-                    HTML: <span id="avgHtmlTime">0</span>ms | SVG: <span id="avgSvgTime">0</span>ms
-                </div>
+                <div class="card-value" id="avgResponseTime">0 ms</div>
             </div>
 
             <div class="card">
-                <div class="card-label">Uptime</div>
-                <div class="card-value" id="uptime">0s</div>
-                <div class="card-subtitle">
-                    <span id="restarts">0 restarts</span>
-                </div>
+                <div class="card-label">Failed PDF Generations</div>
+                <div class="card-value" id="failedPdfGenerations">0</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Error Rate</div>
+                <div class="card-value" id="errorRate">0.00%</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">SVG Conversions</div>
+                <div class="card-value" id="svgConversions">0</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Avg SVG Conversion Time</div>
+                <div class="card-value" id="avgSvgTime">0 ms</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Failed SVG Conversions</div>
+                <div class="card-value" id="failedSvgConversions">0</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">SVG Error Rate</div>
+                <div class="card-value" id="svgErrorRate">0.00%</div>
             </div>
         </div>
 
@@ -551,14 +564,32 @@
                 document.getElementById('status').textContent = data.chromium_running ? 'Running' : 'Stopped';
 
                 const metrics = data.metrics;
-                document.getElementById('totalPdfGenerations').textContent = metrics.pdf_generations.toLocaleString();
-                document.getElementById('totalPdfGens').textContent = `Total: ${metrics.pdf_generations.toLocaleString()}`;
-                document.getElementById('svgConversions').textContent = `SVG: ${metrics.total_svg_conversions.toLocaleString()}`;
 
+                // Card 1: Status - already updated above
+
+                // Card 2: Uptime
+                document.getElementById('uptime').textContent = formatUptime(metrics.uptime_seconds);
+
+                // Card 3: Concurrent Slots
+                document.getElementById('activePdfGenerations').textContent = metrics.active_pdf_generations;
+                document.getElementById('maxConcurrent').textContent = metrics.max_concurrent_pdf_generations;
+
+                // Card 4: Queue
+                document.getElementById('queueSize').textContent = metrics.queue_size;
+
+                // Card 5: PDF Generations
+                document.getElementById('pdfGenerations').textContent = metrics.pdf_generations.toLocaleString();
+
+                // Card 6: Avg Response Time
+                document.getElementById('avgResponseTime').textContent = `${metrics.avg_pdf_generation_time_ms.toFixed(0)} ms`;
+
+                // Card 7: Failed PDF Generations
+                document.getElementById('failedPdfGenerations').textContent = metrics.failed_pdf_generations.toLocaleString();
+
+                // Card 8: Error Rate
                 const pdfErrorRate = metrics.error_pdf_generation_rate_percent;
-                const svgErrorRate = metrics.error_svg_conversion_rate_percent;
-                const errorElement = document.getElementById('errorRate');
-                errorElement.textContent = `${pdfErrorRate.toFixed(2)}%`;
+                const errorRateElement = document.getElementById('errorRate');
+                errorRateElement.textContent = `${pdfErrorRate.toFixed(2)}%`;
 
                 // Determine error rate class based on thresholds
                 let errorClass = 'card-value success';
@@ -567,20 +598,30 @@
                 } else if (pdfErrorRate > 1) {
                     errorClass = 'card-value warning';
                 }
-                errorElement.className = errorClass;
-                document.getElementById('failedPdfGenerations').textContent = `${metrics.failed_pdf_generations + metrics.failed_svg_conversions} failed`;
-                document.getElementById('svgErrorRate').textContent = `SVG: ${svgErrorRate.toFixed(2)}%`;
+                errorRateElement.className = errorClass;
 
-                document.getElementById('queueSize').textContent = metrics.queue_size;
-                document.getElementById('activePdfGenerations').textContent = metrics.active_pdf_generations;
-                document.getElementById('maxConcurrent').textContent = metrics.max_concurrent_pdf_generations;
+                // Card 9: SVG Conversions
+                document.getElementById('svgConversions').textContent = metrics.total_svg_conversions.toLocaleString();
 
-                document.getElementById('avgTime').textContent = `${metrics.avg_pdf_generation_time_ms.toFixed(0)} ms`;
-                document.getElementById('avgHtmlTime').textContent = metrics.avg_pdf_generation_time_ms.toFixed(0);
-                document.getElementById('avgSvgTime').textContent = metrics.avg_svg_conversion_time_ms.toFixed(0);
+                // Card 10: Avg SVG Conversion Time
+                document.getElementById('avgSvgTime').textContent = `${metrics.avg_svg_conversion_time_ms.toFixed(0)} ms`;
 
-                document.getElementById('uptime').textContent = formatUptime(metrics.uptime_seconds);
-                document.getElementById('restarts').textContent = `${metrics.total_chromium_restarts} restarts`;
+                // Card 11: Failed SVG Conversions
+                document.getElementById('failedSvgConversions').textContent = metrics.failed_svg_conversions.toLocaleString();
+
+                // Card 12: SVG Error Rate
+                const svgErrorRate = metrics.error_svg_conversion_rate_percent;
+                const svgErrorRateElement = document.getElementById('svgErrorRate');
+                svgErrorRateElement.textContent = `${svgErrorRate.toFixed(2)}%`;
+
+                // Determine SVG error rate class
+                let svgErrorClass = 'card-value success';
+                if (svgErrorRate > 5) {
+                    svgErrorClass = 'card-value error';
+                } else if (svgErrorRate > 1) {
+                    svgErrorClass = 'card-value warning';
+                }
+                svgErrorRateElement.className = svgErrorClass;
 
                 // Update charts
                 updateChartData(metrics);

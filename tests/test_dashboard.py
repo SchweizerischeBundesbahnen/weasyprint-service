@@ -37,13 +37,13 @@ def test_dashboard_contains_required_elements():
         assert "Concurrent Slots" in html_content
         assert "Queue" in html_content
         assert "PDF Generations" in html_content
-        assert "Avg Response Time" in html_content
-        assert "Failed PDF Generations" in html_content
-        assert "Error Rate" in html_content
+        assert "Avg Generation Time" in html_content
+        assert "Failed Generations" in html_content
+        assert "Generation Error Rate" in html_content
         assert "SVG Conversions" in html_content
-        assert "Avg SVG Conversion Time" in html_content
-        assert "Failed SVG Conversions" in html_content
-        assert "SVG Error Rate" in html_content
+        assert "Avg Conversion Time" in html_content
+        assert "Failed Conversions" in html_content
+        assert "Conversion Error Rate" in html_content
 
         # Check for charts (3 charts: Queue, CPU, Memory)
         assert "Queue & Active PDF Generations" in html_content

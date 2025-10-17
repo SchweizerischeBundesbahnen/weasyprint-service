@@ -573,7 +573,14 @@
                 document.getElementById('activeConversions').textContent = metrics.active_conversions;
                 document.getElementById('maxConcurrent').textContent = metrics.max_concurrent_conversions;
 
-                const avgTime = (metrics.avg_conversion_time_ms + metrics.avg_svg_conversion_time_ms) / 2;
+                const totalConversions = metrics.total_conversions + metrics.total_svg_conversions;
+                let avgTime = 0;
+                if (totalConversions > 0) {
+                    avgTime = (
+                        (metrics.avg_conversion_time_ms * metrics.total_conversions) +
+                        (metrics.avg_svg_conversion_time_ms * metrics.total_svg_conversions)
+                    ) / totalConversions;
+                }
                 document.getElementById('avgTime').textContent = `${avgTime.toFixed(0)} ms`;
                 document.getElementById('avgHtmlTime').textContent = metrics.avg_conversion_time_ms.toFixed(0);
                 document.getElementById('avgSvgTime').textContent = metrics.avg_svg_conversion_time_ms.toFixed(0);

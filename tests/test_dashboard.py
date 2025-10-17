@@ -33,14 +33,14 @@ def test_dashboard_contains_required_elements():
 
         # Check for key sections
         assert "Queue Size" in html_content
-        assert "Active Conversions" in html_content
-        assert "Error Rate" in html_content
-        assert "Total Conversions" in html_content
+        assert "Active PDF Generations" in html_content
+        assert "Error Rates" in html_content
+        assert "Total PDF Generations" in html_content
         assert "Avg Response Time" in html_content
         assert "Uptime" in html_content
 
         # Check for charts (3 charts: Queue, CPU, Memory)
-        assert "Queue & Active Conversions" in html_content
+        assert "Queue & Active PDF Generations" in html_content
         assert "CPU Usage" in html_content
         assert "Memory Usage" in html_content
 

@@ -1172,20 +1172,21 @@ async def test_chromium_manager_get_metrics():
         # Get initial metrics
         metrics = manager.get_metrics()
 
-        assert "total_conversions" in metrics
-        assert "failed_conversions" in metrics
-        assert "error_rate_percent" in metrics
+        assert "pdf_generations" in metrics
+        assert "failed_pdf_generations" in metrics
+        assert "error_pdf_generation_rate_percent" in metrics
+        assert "error_svg_conversion_rate_percent" in metrics
         assert "total_chromium_restarts" in metrics
-        assert "avg_conversion_time_ms" in metrics
+        assert "avg_pdf_generation_time_ms" in metrics
         assert "last_health_check" in metrics
         assert "last_health_status" in metrics
-        assert "consecutive_failures" in metrics
         assert "uptime_seconds" in metrics
 
         # Initial values
         assert metrics["total_svg_conversions"] == 0
         assert metrics["failed_svg_conversions"] == 0
-        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["error_pdf_generation_rate_percent"] == 0.0
+        assert metrics["error_svg_conversion_rate_percent"] == 0.0
         assert metrics["total_chromium_restarts"] == 0
         assert metrics["uptime_seconds"] >= 0.0
 
@@ -1209,9 +1210,8 @@ async def test_chromium_manager_metrics_after_conversion():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 1
         assert metrics["failed_svg_conversions"] == 0
-        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["error_svg_conversion_rate_percent"] == 0.0
         assert metrics["avg_svg_conversion_time_ms"] > 0.0
-        assert metrics["consecutive_failures"] == 0
 
     finally:
         await manager.stop()
@@ -1240,8 +1240,7 @@ async def test_chromium_manager_metrics_after_failure():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 0
         assert metrics["failed_svg_conversions"] == 1
-        assert metrics["error_rate_percent"] == 100.0
-        assert metrics["consecutive_failures"] == 1
+        assert metrics["error_svg_conversion_rate_percent"] == 100.0
 
     finally:
         await manager.stop()
@@ -1439,9 +1438,8 @@ async def test_chromium_manager_concurrent_conversions_metrics():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 10
         assert metrics["failed_svg_conversions"] == 0
-        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["error_svg_conversion_rate_percent"] == 0.0
         assert metrics["avg_svg_conversion_time_ms"] > 0.0
-        assert metrics["consecutive_failures"] == 0
 
     finally:
         await manager.stop()
@@ -1485,7 +1483,7 @@ async def test_chromium_manager_error_rate_calculation():
         # Successful conversion
         await manager.convert_svg_to_png(svg_content, 50, 50)
         metrics = manager.get_metrics()
-        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["error_svg_conversion_rate_percent"] == 0.0
 
         # Mock failure
         original_perform = manager._perform_conversion
@@ -1506,7 +1504,7 @@ async def test_chromium_manager_error_rate_calculation():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 1
         assert metrics["failed_svg_conversions"] == 1
-        assert metrics["error_rate_percent"] == 50.0
+        assert metrics["error_svg_conversion_rate_percent"] == 50.0
 
         # Another successful conversion
         await manager.convert_svg_to_png(svg_content, 50, 50)
@@ -1515,7 +1513,7 @@ async def test_chromium_manager_error_rate_calculation():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 2
         assert metrics["failed_svg_conversions"] == 1
-        assert 33.0 <= metrics["error_rate_percent"] <= 34.0
+        assert 33.0 <= metrics["error_svg_conversion_rate_percent"] <= 34.0
 
     finally:
         await manager.stop()
@@ -1547,17 +1545,13 @@ async def test_chromium_manager_consecutive_failures_reset():
         with pytest.raises(RuntimeError):
             await manager.convert_svg_to_png(svg_content, 50, 50)
 
-        metrics = manager.get_metrics()
-        assert metrics["consecutive_failures"] == 1
-
         # Restore for successful conversion
         manager._perform_conversion = original_perform
 
-        # Successful conversion should reset consecutive failures
+        # Successful conversion
         await manager.convert_svg_to_png(svg_content, 50, 50)
 
         metrics = manager.get_metrics()
-        assert metrics["consecutive_failures"] == 0
         assert metrics["total_svg_conversions"] == 1
         assert metrics["failed_svg_conversions"] == 1
 
@@ -1601,12 +1595,11 @@ async def test_chromium_manager_metrics_initial_state():
     metrics = manager.get_metrics()
     assert metrics["total_svg_conversions"] == 0
     assert metrics["failed_svg_conversions"] == 0
-    assert metrics["error_rate_percent"] == 0.0
+    assert metrics["error_svg_conversion_rate_percent"] == 0.0
     assert metrics["total_chromium_restarts"] == 0
     assert metrics["avg_svg_conversion_time_ms"] == 0.0
     assert metrics["last_health_check"] == ""
     assert metrics["last_health_status"] is False
-    assert metrics["consecutive_failures"] == 0
     assert metrics["uptime_seconds"] >= 0.0
 
     await manager.start()

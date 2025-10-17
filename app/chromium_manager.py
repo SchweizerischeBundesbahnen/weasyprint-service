@@ -177,6 +177,13 @@ class ChromiumMetrics:
             return 0.0
         return (self.failed_conversions / total_attempts) * 100.0
 
+    def get_svg_error_rate(self) -> float:
+        """Calculate SVG to PNG conversion error rate as percentage."""
+        total_svg_attempts = self.total_svg_conversions + self.failed_svg_conversions
+        if total_svg_attempts == 0:
+            return 0.0
+        return (self.failed_svg_conversions / total_svg_attempts) * 100.0
+
     def record_resource_usage(self, browser_process: psutil.Process | None) -> None:
         """
         Record CPU and memory usage for the browser process.
@@ -862,17 +869,17 @@ class ChromiumManager:
             last_health_check_str = dt.strftime("%H:%M:%S %d.%m.%Y")
 
         return {
-            "total_conversions": self._metrics.total_conversions,
-            "failed_conversions": self._metrics.failed_conversions,
+            "pdf_generations": self._metrics.total_conversions,
+            "failed_pdf_generations": self._metrics.failed_conversions,
             "total_svg_conversions": self._metrics.total_svg_conversions,
             "failed_svg_conversions": self._metrics.failed_svg_conversions,
-            "error_rate_percent": round(self._metrics.get_error_rate(), 2),
+            "error_pdf_generation_rate_percent": round(self._metrics.get_error_rate(), 2),
+            "error_svg_conversion_rate_percent": round(self._metrics.get_svg_error_rate(), 2),
             "total_chromium_restarts": self._metrics.total_chromium_restarts,
-            "avg_conversion_time_ms": round(self._metrics.avg_conversion_time_ms, 2),
+            "avg_pdf_generation_time_ms": round(self._metrics.avg_conversion_time_ms, 2),
             "avg_svg_conversion_time_ms": round(self._metrics.avg_svg_conversion_time_ms, 2),
             "last_health_check": last_health_check_str,
             "last_health_status": self._metrics.last_health_status,
-            "consecutive_failures": self._metrics.consecutive_failures,
             "uptime_seconds": round(self._metrics.uptime_seconds, 2),
             "current_cpu_percent": round(self._metrics.current_cpu_percent, 2),
             "avg_cpu_percent": round(self._metrics.avg_cpu_percent, 2),
@@ -881,10 +888,9 @@ class ChromiumManager:
             "current_chromium_memory_mb": round(self._metrics.current_chromium_memory_mb, 2),
             "avg_chromium_memory_mb": round(self._metrics.avg_chromium_memory_mb, 2),
             "queue_size": self._metrics.queue_size,
-            "max_queue_size": self._metrics.max_queue_size,
-            "active_conversions": self._metrics.active_conversions,
+            "active_pdf_generations": self._metrics.active_conversions,
             "avg_queue_time_ms": round(self._metrics.avg_queue_time_ms, 2),
-            "max_concurrent_conversions": self.max_concurrent_conversions,
+            "max_concurrent_pdf_generations": self.max_concurrent_conversions,
         }
 
     def _validate_int_config(

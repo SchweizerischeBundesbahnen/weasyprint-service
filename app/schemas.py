@@ -14,22 +14,24 @@ class VersionSchema(BaseModel):
 class ChromiumMetricsSchema(BaseModel):
     """Schema for Chromium performance and health metrics"""
 
-    # HTML to PDF conversion metrics
-    total_conversions: int = Field(description="Total successful HTML to PDF conversions")
-    failed_conversions: int = Field(description="Total failed HTML to PDF conversion attempts")
-    avg_conversion_time_ms: float = Field(description="Average HTML to PDF conversion time in milliseconds")
+    # HTML to PDF generation metrics
+    pdf_generations: int = Field(description="Total successful HTML to PDF generations")
+    failed_pdf_generations: int = Field(description="Total failed HTML to PDF generation attempts")
+    avg_pdf_generation_time_ms: float = Field(description="Average HTML to PDF generation time in milliseconds (includes time for any SVG processing within the HTML)")
 
-    # SVG to PNG conversion metrics
-    total_svg_conversions: int = Field(description="Total successful SVG to PNG conversions")
-    failed_svg_conversions: int = Field(description="Total failed SVG to PNG conversion attempts")
-    avg_svg_conversion_time_ms: float = Field(description="Average SVG to PNG conversion time in milliseconds")
+    # SVG to PNG conversion metrics (nested within PDF generations)
+    total_svg_conversions: int = Field(description="Total successful SVG to PNG conversions (these occur within HTML to PDF generations)")
+    failed_svg_conversions: int = Field(description="Total failed SVG to PNG conversion attempts (these occur within HTML to PDF generations)")
+    avg_svg_conversion_time_ms: float = Field(description="Average SVG to PNG conversion time in milliseconds (for individual SVG elements within HTML)")
 
-    # Error and health metrics
-    error_rate_percent: float = Field(description="Overall conversion error rate as percentage (includes both HTML->PDF and SVG->PNG)")
+    # Error rate metrics
+    error_pdf_generation_rate_percent: float = Field(description="HTML to PDF generation error rate as percentage (based only on PDF generation attempts, not nested SVG conversions)")
+    error_svg_conversion_rate_percent: float = Field(description="SVG to PNG conversion error rate as percentage (for SVG elements within HTML)")
+
+    # Health metrics
     total_chromium_restarts: int = Field(description="Total Chromium browser restarts since startup")
     last_health_check: str = Field(description="Formatted timestamp of last health check (HH:MM:SS DD.MM.YYYY)")
     last_health_status: bool = Field(description="Result of last health check (true=healthy)")
-    consecutive_failures: int = Field(description="Current consecutive conversion failures")
     uptime_seconds: float = Field(description="Browser uptime in seconds")
 
     # Resource usage metrics
@@ -42,10 +44,9 @@ class ChromiumMetricsSchema(BaseModel):
 
     # Queue metrics
     queue_size: int = Field(description="Current number of requests waiting in queue")
-    max_queue_size: int = Field(description="Maximum queue size observed since startup")
-    active_conversions: int = Field(description="Current number of active conversions in progress")
+    active_pdf_generations: int = Field(description="Current number of active PDF generations in progress")
     avg_queue_time_ms: float = Field(description="Average time requests spend waiting in queue (milliseconds)")
-    max_concurrent_conversions: int = Field(description="Maximum allowed concurrent conversions (configured limit)")
+    max_concurrent_pdf_generations: int = Field(description="Maximum allowed concurrent PDF generations (configured limit)")
 
 
 class HealthSchema(BaseModel):

@@ -280,19 +280,20 @@
             </div>
 
             <div class="card">
-                <div class="card-label">Total Conversions</div>
-                <div class="card-value" id="totalConversions">0</div>
+                <div class="card-label">Total PDF Generations</div>
+                <div class="card-value" id="totalPdfGenerations">0</div>
                 <div class="card-subtitle">
-                    <span class="success" id="htmlConversions">HTML: 0</span> |
+                    <span class="success" id="totalPdfGens">Total: 0</span> |
                     <span class="success" id="svgConversions">SVG: 0</span>
                 </div>
             </div>
 
             <div class="card">
-                <div class="card-label">Error Rate</div>
+                <div class="card-label">Error Rates</div>
                 <div class="card-value" id="errorRate">0.00%</div>
                 <div class="card-subtitle">
-                    <span class="error" id="failedConversions">0 failed</span>
+                    <span class="error" id="failedPdfGenerations">0 failed</span> |
+                    <span class="warning" id="svgErrorRate">SVG: 0.00%</span>
                 </div>
             </div>
 
@@ -300,7 +301,7 @@
                 <div class="card-label">Queue Size</div>
                 <div class="card-value" id="queueSize">0</div>
                 <div class="card-subtitle">
-                    <span id="activeConversions">0 active</span> / <span id="maxConcurrent">10</span> slots
+                    <span id="activePdfGenerations">0 active</span> / <span id="maxConcurrent">10</span> slots
                 </div>
             </div>
 
@@ -324,7 +325,7 @@
         <!-- Charts -->
         <div class="chart-grid">
             <div class="chart-container">
-                <div class="chart-title">Queue & Active Conversions</div>
+                <div class="chart-title">Queue & Active PDF Generations</div>
                 <canvas id="queueChart"></canvas>
             </div>
 
@@ -397,7 +398,7 @@
                             tension: 0.4
                         },
                         {
-                            label: 'Active Conversions',
+                            label: 'Active PDF Generations',
                             data: chartData.active,
                             borderColor: '#4caf50',
                             backgroundColor: 'rgba(76, 175, 80, 0.1)',
@@ -491,7 +492,7 @@
 
             chartData.labels.push(now);
             chartData.queue.push(metrics.queue_size);
-            chartData.active.push(metrics.active_conversions);
+            chartData.active.push(metrics.active_pdf_generations);
             chartData.cpu.push(metrics.current_cpu_percent);
             chartData.chromiumMemory.push(metrics.current_chromium_memory_mb);
             chartData.totalMemory.push(metrics.total_memory_mb);
@@ -550,30 +551,32 @@
                 document.getElementById('status').textContent = data.chromium_running ? 'Running' : 'Stopped';
 
                 const metrics = data.metrics;
-                document.getElementById('totalConversions').textContent = metrics.total_conversions.toLocaleString();
-                document.getElementById('htmlConversions').textContent = `Total: ${metrics.total_conversions.toLocaleString()}`;
+                document.getElementById('totalPdfGenerations').textContent = metrics.pdf_generations.toLocaleString();
+                document.getElementById('totalPdfGens').textContent = `Total: ${metrics.pdf_generations.toLocaleString()}`;
                 document.getElementById('svgConversions').textContent = `SVG: ${metrics.total_svg_conversions.toLocaleString()}`;
 
-                const errorRate = metrics.error_rate_percent;
+                const pdfErrorRate = metrics.error_pdf_generation_rate_percent;
+                const svgErrorRate = metrics.error_svg_conversion_rate_percent;
                 const errorElement = document.getElementById('errorRate');
-                errorElement.textContent = `${errorRate.toFixed(2)}%`;
+                errorElement.textContent = `${pdfErrorRate.toFixed(2)}%`;
 
                 // Determine error rate class based on thresholds
                 let errorClass = 'card-value success';
-                if (errorRate > 5) {
+                if (pdfErrorRate > 5) {
                     errorClass = 'card-value error';
-                } else if (errorRate > 1) {
+                } else if (pdfErrorRate > 1) {
                     errorClass = 'card-value warning';
                 }
                 errorElement.className = errorClass;
-                document.getElementById('failedConversions').textContent = `${metrics.failed_conversions + metrics.failed_svg_conversions} failed`;
+                document.getElementById('failedPdfGenerations').textContent = `${metrics.failed_pdf_generations + metrics.failed_svg_conversions} failed`;
+                document.getElementById('svgErrorRate').textContent = `SVG: ${svgErrorRate.toFixed(2)}%`;
 
                 document.getElementById('queueSize').textContent = metrics.queue_size;
-                document.getElementById('activeConversions').textContent = metrics.active_conversions;
-                document.getElementById('maxConcurrent').textContent = metrics.max_concurrent_conversions;
+                document.getElementById('activePdfGenerations').textContent = metrics.active_pdf_generations;
+                document.getElementById('maxConcurrent').textContent = metrics.max_concurrent_pdf_generations;
 
-                document.getElementById('avgTime').textContent = `${metrics.avg_conversion_time_ms.toFixed(0)} ms`;
-                document.getElementById('avgHtmlTime').textContent = metrics.avg_conversion_time_ms.toFixed(0);
+                document.getElementById('avgTime').textContent = `${metrics.avg_pdf_generation_time_ms.toFixed(0)} ms`;
+                document.getElementById('avgHtmlTime').textContent = metrics.avg_pdf_generation_time_ms.toFixed(0);
                 document.getElementById('avgSvgTime').textContent = metrics.avg_svg_conversion_time_ms.toFixed(0);
 
                 document.getElementById('uptime').textContent = formatUptime(metrics.uptime_seconds);

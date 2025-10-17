@@ -47,7 +47,7 @@ repos:
   - repo: local
     hooks:
       - id: generate-openapi
-        name: Generate OpenAPI (update app/static/openapi.json)
+        name: Generate OpenAPI (update docs/openapi.json)
         entry: scripts/precommit_generate_openapi.sh
         language: script
         pass_filenames: false

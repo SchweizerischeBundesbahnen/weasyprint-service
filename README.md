@@ -355,4 +355,4 @@ uv run pre-commit run --all
 
 ### REST API
 
-This service provides REST API. OpenAPI Specification can be obtained [here](app/static/openapi.json).
+This service provides REST API. OpenAPI Specification can be obtained [here](docs/openapi.json).

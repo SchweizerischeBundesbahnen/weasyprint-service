@@ -36,32 +36,6 @@ def test_static_files_serve_chart_js():
         assert len(result.content) > 0
 
 
-def test_static_files_serve_readme():
-    """Test /static/README.md returns markdown file."""
-    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
-
-    with TestClient(app) as test_client:
-        result = test_client.get("/static/README.md")
-
-        assert result.status_code == 200
-        # Check content type is text/markdown or text/plain
-        assert "text/" in result.headers["content-type"] or result.headers["content-type"] == "application/octet-stream"
-        assert len(result.content) > 0
-
-
-def test_static_files_serve_png_image():
-    """Test /static/note.png returns PNG image."""
-    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
-
-    with TestClient(app) as test_client:
-        result = test_client.get("/static/note.png")
-
-        assert result.status_code == 200
-        assert "image/png" in result.headers["content-type"]
-        # PNG files start with magic bytes 89 50 4E 47
-        assert result.content[:4] == b"\x89PNG"
-
-
 def test_static_files_not_found():
     """Test /static/nonexistent returns 404."""
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
@@ -70,7 +44,8 @@ def test_static_files_not_found():
         result = test_client.get("/static/nonexistent.txt")
 
         assert result.status_code == 404
-        assert result.content == b""  # Empty response body
+        assert result.headers["content-type"] == "application/json"
+        assert result.json() == {"detail": "Not Found"}
 
 
 def test_static_files_path_traversal_dotdot():
@@ -81,8 +56,8 @@ def test_static_files_path_traversal_dotdot():
         result = test_client.get("/static/../weasyprint_controller.py")
 
         assert result.status_code == 404
-        # FastAPI returns JSON error when path doesn't match route pattern
-        # Our endpoint catches it when path matches but contains ".."
+        assert result.headers["content-type"] == "application/json"
+        assert result.json() == {"detail": "Not Found"}
 
 
 def test_static_files_path_traversal_dotdot_in_path():
@@ -93,8 +68,9 @@ def test_static_files_path_traversal_dotdot_in_path():
         # FastAPI normalizes paths, but our is_relative_to() check catches traversal
         result = test_client.get("/static/subdir/../../../etc/passwd")
 
-        # Should return 404 (either from FastAPI normalization or our validation)
         assert result.status_code == 404
+        assert result.headers["content-type"] == "application/json"
+        assert result.json() == {"detail": "Not Found"}
 
 
 def test_static_files_path_traversal_absolute():
@@ -105,7 +81,8 @@ def test_static_files_path_traversal_absolute():
         result = test_client.get("/static//etc/passwd")
 
         assert result.status_code == 404
-        assert result.content == b""
+        assert result.headers["content-type"] == "application/json"
+        assert result.json() == {"detail": "Not Found"}
 
 
 def test_static_files_path_traversal_backslash():
@@ -116,7 +93,8 @@ def test_static_files_path_traversal_backslash():
         result = test_client.get("/static/\\..\\weasyprint_controller.py")
 
         assert result.status_code == 404
-        assert result.content == b""
+        assert result.headers["content-type"] == "application/json"
+        assert result.json() == {"detail": "Not Found"}
 
 
 def test_static_files_nested_path():
@@ -127,7 +105,8 @@ def test_static_files_nested_path():
         result = test_client.get("/static/subdir/file.txt")
 
         assert result.status_code == 404
-        assert result.content == b""
+        assert result.headers["content-type"] == "application/json"
+        assert result.json() == {"detail": "Not Found"}
 
 
 def test_static_files_empty_path():
@@ -138,7 +117,8 @@ def test_static_files_empty_path():
         result = test_client.get("/static/")
 
         assert result.status_code == 404
-        assert result.content == b""
+        assert result.headers["content-type"] == "application/json"
+        assert result.json() == {"detail": "Not Found"}
 
 
 def test_static_files_directory_access():
@@ -150,4 +130,5 @@ def test_static_files_directory_access():
         result = test_client.get("/static/.")
 
         assert result.status_code == 404
-        assert result.content == b""
+        assert result.headers["content-type"] == "application/json"
+        assert result.json() == {"detail": "Not Found"}

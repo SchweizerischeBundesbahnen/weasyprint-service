@@ -336,7 +336,7 @@ The repository uses extensive pre-commit hooks including:
 
 ### OpenAPI Schema Management
 - Auto-generated during pre-commit via `scripts/precommit_generate_openapi.sh`
-- Stored at `app/static/openapi.json`
+- Stored at `docs/openapi.json`
 - Served at `/static/openapi.json` and docs at `/api/docs`
 - Script starts local FastAPI instance, downloads schema, and formats with jq
 

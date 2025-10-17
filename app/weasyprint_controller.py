@@ -11,9 +11,10 @@ from typing import Annotated
 from urllib.parse import unquote
 
 import weasyprint  # type: ignore
-from fastapi import Depends, FastAPI, Query, Request, Response, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import Depends, FastAPI, Query, Request, Response
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
+from starlette.staticfiles import StaticFiles
 
 from app.attachment_manager import AttachmentManager
 from app.chromium_manager import ChromiumManager, get_chromium_manager
@@ -63,6 +64,7 @@ app = FastAPI(
     openapi_version="3.1.0",
     lifespan=lifespan,
 )
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
 @app.get(
@@ -80,63 +82,9 @@ async def dashboard() -> HTMLResponse:
     Returns:
         HTML page with real-time monitoring dashboard
     """
-    dashboard_path = Path(__file__).parent / "static" / "dashboard.html"
+    dashboard_path = Path(__file__).parent / "resources" / "dashboard.html"
     with dashboard_path.open("r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
-
-
-@app.get(
-    "/static/{file_path:path}",
-    response_class=FileResponse,
-    summary="Static Files",
-    description="Serve static files (CSS, JS, etc.)",
-    operation_id="getStaticFile",
-    tags=["meta"],
-    include_in_schema=False,
-    response_model=None,
-)
-async def static_files(file_path: str) -> FileResponse | Response:
-    """
-    Serve static files from the static directory.
-
-    Args:
-        file_path: Path to the static file
-
-    Returns:
-        FileResponse: The requested static file
-        Response: 404 Not Found if file doesn't exist or path is invalid
-
-    Security:
-        Validates that the requested file path is within the static directory
-        to prevent path traversal attacks.
-    """
-    # Reject paths with directory traversal patterns
-    if ".." in file_path or file_path.startswith(("/", "\\")):
-        logger.warning("Rejected potentially malicious file path")
-        return Response(status_code=status.HTTP_404_NOT_FOUND)
-
-    static_dir = Path(__file__).parent / "static"
-    static_dir_resolved = static_dir.resolve()
-
-    # Construct and resolve the full path with validation
-    try:
-        full_path = (static_dir / file_path).resolve()
-
-        # Security check: ensure the resolved path is within static directory
-        if not full_path.is_relative_to(static_dir_resolved):
-            logger.warning("Attempted access to file outside static directory")
-            return Response(status_code=status.HTTP_404_NOT_FOUND)
-
-        # Check if file exists and is a regular file (not directory or symlink)
-        if not full_path.exists() or not full_path.is_file():
-            logger.debug("Static file not found")
-            return Response(status_code=status.HTTP_404_NOT_FOUND)
-
-    except (ValueError, OSError):
-        logger.warning("Invalid or inaccessible file path")
-        return Response(status_code=status.HTTP_404_NOT_FOUND)
-
-    return FileResponse(full_path)
 
 
 @app.get(

@@ -327,7 +327,7 @@ class NotesProcessor:
 
     def _set_custom_icon(self, writer: PdfWriter, annot_dict: DictionaryObject, rect: tuple[float, float, float, float]) -> None:
         """Set custom icon appearance for annotation if available."""
-        custom_icon_path = Path(__file__).parent.resolve() / "static" / "note.png"
+        custom_icon_path = Path(__file__).parent.resolve() / "resources" / "note.png"
         if custom_icon_path.exists():
             xobject_ref = self._embed_png_as_xobject(writer, str(custom_icon_path))
             if xobject_ref is not None:

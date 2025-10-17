@@ -329,7 +329,7 @@
 
             <div class="card">
                 <div class="card-label">Avg Generation Time</div>
-                <div class="card-value" id="avgResponseTime">0 ms</div>
+                <div class="card-value" id="avgResponseTime">0 s</div>
             </div>
 
             <div class="card">
@@ -624,7 +624,7 @@
                 document.getElementById('pdfGenerations').textContent = metrics.pdf_generations.toLocaleString();
 
                 // Card 6: Avg Response Time
-                document.getElementById('avgResponseTime').textContent = `${metrics.avg_pdf_generation_time_ms.toFixed(0)} ms`;
+                document.getElementById('avgResponseTime').textContent = `${(metrics.avg_pdf_generation_time_ms / 1000).toFixed(2)} s`;
 
                 // Card 7: Failed PDF Generations
                 document.getElementById('failedPdfGenerations').textContent = metrics.failed_pdf_generations.toLocaleString();

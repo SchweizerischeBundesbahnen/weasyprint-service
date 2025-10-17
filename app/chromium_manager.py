@@ -222,12 +222,7 @@ class ChromiumMetrics:
             queue_time_ms: Time spent waiting in queue in milliseconds.
         """
         self.total_queue_time_ms += queue_time_ms
-        total_attempted = (
-            self.total_conversions
-            + self.total_svg_conversions
-            + self.failed_conversions
-            + self.failed_svg_conversions
-        )
+        total_attempted = self.total_conversions + self.failed_conversions
         if total_attempted > 0:
             self.avg_queue_time_ms = self.total_queue_time_ms / total_attempted
 
@@ -681,21 +676,21 @@ class ChromiumManager:
     async def _decrement_queue_counter(self) -> None:
         """Mark a request as no longer waiting in queue."""
         async with self._queue_lock:
-            self._waiting_in_queue -= 1
+            self._waiting_in_queue = max(0, self._waiting_in_queue - 1)
             self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
 
     async def _transition_queue_to_active(self, queue_time_ms: float) -> None:
         """Transition request from queue to active state."""
         self._metrics.record_queue_entry(queue_time_ms)
         async with self._queue_lock:
-            self._waiting_in_queue -= 1
+            self._waiting_in_queue = max(0, self._waiting_in_queue - 1)
             self._active_conversions += 1
             self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
 
     async def _decrement_active_counter(self) -> None:
         """Mark a request as no longer active."""
         async with self._queue_lock:
-            self._active_conversions -= 1
+            self._active_conversions = max(0, self._active_conversions - 1)
             self._metrics.update_queue_metrics(self._waiting_in_queue, self._active_conversions)
 
     @asynccontextmanager

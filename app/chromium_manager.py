@@ -222,9 +222,14 @@ class ChromiumMetrics:
             queue_time_ms: Time spent waiting in queue in milliseconds.
         """
         self.total_queue_time_ms += queue_time_ms
-        total_processed = self.total_conversions + self.total_svg_conversions
-        if total_processed > 0:
-            self.avg_queue_time_ms = self.total_queue_time_ms / total_processed
+        total_attempted = (
+            self.total_conversions
+            + self.total_svg_conversions
+            + self.failed_conversions
+            + self.failed_svg_conversions
+        )
+        if total_attempted > 0:
+            self.avg_queue_time_ms = self.total_queue_time_ms / total_attempted
 
     def update_queue_metrics(self, queue_size: int, active_conversions: int) -> None:
         """

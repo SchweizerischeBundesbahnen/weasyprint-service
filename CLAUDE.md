@@ -7,10 +7,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Before Committing - Run Full Test Suite
 ```bash
 # Run complete test suite (optimized sequence, no redundancy)
-# 1. Run tox - handles linting, formatting, type checking, and tests with coverage
+# 1. Install dependencies first (required before running tox)
+uv sync --extra dev --extra test
+
+# 2. Run tox - handles linting, formatting, type checking, and tests with coverage
 uv run tox
 
-# 2. Run pre-commit hooks - final validation including security checks and commit format
+# 3. Run pre-commit hooks - final validation including security checks and commit format
 uv run pre-commit run --all
 ```
 

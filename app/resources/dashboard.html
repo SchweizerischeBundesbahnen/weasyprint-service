@@ -573,7 +573,6 @@
                 document.getElementById('activeConversions').textContent = metrics.active_conversions;
                 document.getElementById('maxConcurrent').textContent = metrics.max_concurrent_conversions;
 
-                const totalConversions = metrics.total_conversions + metrics.total_svg_conversions;
                 let avgTime = 0;
                 if (totalConversions > 0) {
                     avgTime = (

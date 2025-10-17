@@ -77,14 +77,28 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 )
 async def dashboard() -> HTMLResponse:
     """
-    Serve the monitoring dashboard HTML page.
+    Serve the monitoring dashboard HTML page with theme configuration.
+
+    Theme can be configured via DASHBOARD_THEME environment variable.
+    Supported values: 'light' (default), 'dark'
 
     Returns:
         HTML page with real-time monitoring dashboard
     """
     dashboard_path = Path(__file__).parent / "resources" / "dashboard.html"
     with dashboard_path.open("r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html_content = f.read()
+
+    # Get theme from environment variable (default to 'light')
+    theme = os.environ.get("DASHBOARD_THEME", "light").lower()
+    if theme not in ("light", "dark"):
+        logger.warning("Invalid DASHBOARD_THEME value '%s', defaulting to 'light'", theme)
+        theme = "light"
+
+    # Replace placeholder with actual theme value
+    html_content = html_content.replace("{{DASHBOARD_THEME}}", theme)
+
+    return HTMLResponse(content=html_content)
 
 
 @app.get(

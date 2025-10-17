@@ -71,3 +71,59 @@ def test_dashboard_auto_refresh_configured():
         assert "setInterval" in html_content
         assert "updateMetrics" in html_content
         assert "5000" in html_content  # 5 second refresh interval
+
+
+def test_dashboard_theme_light_by_default():
+    """Test dashboard uses light theme by default when DASHBOARD_THEME is not set."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+    # Remove DASHBOARD_THEME if it exists
+    os.environ.pop("DASHBOARD_THEME", None)
+
+    with TestClient(app) as test_client:
+        result = test_client.get("/dashboard")
+        assert result.status_code == 200
+        assert 'data-theme="light"' in result.text
+
+
+def test_dashboard_theme_light_explicit():
+    """Test dashboard uses light theme when DASHBOARD_THEME=light."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+    os.environ["DASHBOARD_THEME"] = "light"
+
+    with TestClient(app) as test_client:
+        result = test_client.get("/dashboard")
+        assert result.status_code == 200
+        assert 'data-theme="light"' in result.text
+
+
+def test_dashboard_theme_dark():
+    """Test dashboard uses dark theme when DASHBOARD_THEME=dark."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+    os.environ["DASHBOARD_THEME"] = "dark"
+
+    with TestClient(app) as test_client:
+        result = test_client.get("/dashboard")
+        assert result.status_code == 200
+        assert 'data-theme="dark"' in result.text
+
+
+def test_dashboard_theme_invalid_defaults_to_light():
+    """Test invalid DASHBOARD_THEME value defaults to light theme."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+    os.environ["DASHBOARD_THEME"] = "invalid"
+
+    with TestClient(app) as test_client:
+        result = test_client.get("/dashboard")
+        assert result.status_code == 200
+        assert 'data-theme="light"' in result.text
+
+
+def test_dashboard_theme_case_insensitive():
+    """Test DASHBOARD_THEME is case-insensitive."""
+    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+    os.environ["DASHBOARD_THEME"] = "DARK"
+
+    with TestClient(app) as test_client:
+        result = test_client.get("/dashboard")
+        assert result.status_code == 200
+        assert 'data-theme="dark"' in result.text

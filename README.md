@@ -155,9 +155,27 @@ The service includes an interactive web-based monitoring dashboard accessible at
 - **Auto-refresh**: Updates every 5 seconds
 - **Data retention**: Last 20 data points on charts
 - **Technology**: Chart.js 4.4.0 (bundled locally) for visualizations
-- **Design**: Dark theme optimized for monitoring displays
+- **Design**: Light or dark theme support via environment variable
 - **API endpoint**: Fetches data from `/health?detailed=true`
 - **Version information**: Service, WeasyPrint, and Chromium versions displayed in the header
+
+**Theme Configuration:**
+
+The dashboard theme can be configured via the `DASHBOARD_THEME` environment variable:
+
+**Valid values:** `light`, `dark` (case-insensitive, default: `light`)
+
+To use dark theme:
+
+```bash
+docker run --detach \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env DASHBOARD_THEME=dark \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+**Note:** Invalid values will fall back to light theme with a warning logged.
 
 **Production Considerations:**
 - Consider restricting dashboard access via reverse proxy (nginx, Traefik)

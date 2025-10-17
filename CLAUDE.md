@@ -146,7 +146,7 @@ grype weasyprint-service:0.0.0
 - `/dashboard` - Interactive web-based monitoring dashboard with real-time metrics visualization
   - Real-time charts for queue size, active conversions, response times, and resource usage
   - Auto-refresh every 5 seconds
-  - Dark theme optimized for monitoring displays
+  - Configurable light/dark theme via DASHBOARD_THEME environment variable (default: light)
 - `/health` - Health check endpoint with optional detailed metrics
   - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
   - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, health monitoring info, and queue metrics
@@ -174,9 +174,12 @@ grype weasyprint-service:0.0.0
 - `CHROMIUM_MAX_CONVERSION_RETRIES`: Max retry attempts on conversion failure (1-10, default: 2)
 - `CHROMIUM_CONVERSION_TIMEOUT`: Timeout in seconds for each conversion (5-300, default: 30)
 
-**Health Monitoring (New):**
+**Health Monitoring:**
 - `CHROMIUM_HEALTH_CHECK_ENABLED`: Enable background health monitoring (true/false, default: true)
 - `CHROMIUM_HEALTH_CHECK_INTERVAL`: Interval in seconds for background health checks (10-300, default: 30)
+
+**Dashboard Configuration:**
+- `DASHBOARD_THEME`: Dashboard theme (light/dark, case-insensitive, default: light)
 
 ## Development Practices
 
@@ -428,7 +431,10 @@ open http://localhost:9080/dashboard
 # - Resource usage (CPU and Memory)
 # - Conversion rate graphs
 # - System information and health status
-# - Dark theme optimized for monitoring displays
+# - Configurable light/dark theme (DASHBOARD_THEME env var, default: light)
+
+# Configure dashboard theme
+DASHBOARD_THEME=dark uv run python -m app.weasyprint_service_application --port 9080
 ```
 
 **Monitoring API:**

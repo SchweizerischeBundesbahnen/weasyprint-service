@@ -1,11 +1,43 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="{{DASHBOARD_THEME}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WeasyPrint Service - Monitoring Dashboard</title>
     <script src="/static/chart.umd.min.js"></script>
     <style>
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --text-primary: #2c2c2c;
+            --text-secondary: #666666;
+            --text-tertiary: #999999;
+            --border-color: #e0e0e0;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-shadow: rgba(0, 0, 0, 0.1);
+            --card-hover-shadow: rgba(0, 0, 0, 0.15);
+            --gradient-start: #1e88e5;
+            --gradient-end: #1565c0;
+            --chart-grid: rgba(0, 0, 0, 0.1);
+            --chart-text: #666666;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #999999;
+            --text-tertiary: #666666;
+            --border-color: #444444;
+            --card-bg: rgba(45, 45, 45, 0.8);
+            --card-shadow: rgba(0, 0, 0, 0.3);
+            --card-hover-shadow: rgba(0, 0, 0, 0.4);
+            --gradient-start: #4fc3f7;
+            --gradient-end: #29b6f6;
+            --chart-grid: rgba(255, 255, 255, 0.1);
+            --chart-text: #999999;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -14,16 +46,17 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
-            color: #e0e0e0;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
             padding: 20px;
             min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
         }
 
         .header {
             margin-bottom: 30px;
             padding-bottom: 20px;
-            border-bottom: 2px solid #444;
+            border-bottom: 2px solid var(--border-color);
         }
 
         .header-content {
@@ -40,14 +73,14 @@
         .header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
-            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
 
         .header .subtitle {
-            color: #999;
+            color: var(--text-secondary);
             font-size: 1.5em;
             font-weight: 500;
         }
@@ -57,7 +90,7 @@
             flex-direction: column;
             gap: 8px;
             font-size: 0.95em;
-            color: #999;
+            color: var(--text-secondary);
             text-align: right;
         }
 
@@ -66,7 +99,7 @@
         }
 
         .header-info .info-item span {
-            color: #e0e0e0;
+            color: var(--text-primary);
             font-weight: 500;
         }
 
@@ -102,21 +135,21 @@
         }
 
         .card {
-            background: rgba(45, 45, 45, 0.8);
+            background: var(--card-bg);
             backdrop-filter: blur(10px);
             border-radius: 10px;
             padding: 15px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 6px var(--card-shadow);
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 6px 10px var(--card-hover-shadow);
         }
 
         .card-label {
-            color: #999;
+            color: var(--text-secondary);
             font-size: 0.75em;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -127,7 +160,7 @@
             font-size: 1.8em;
             font-weight: bold;
             margin-bottom: 3px;
-            background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -135,23 +168,23 @@
         }
 
         .card-subtitle {
-            color: #666;
+            color: var(--text-tertiary);
             font-size: 0.85em;
         }
 
         .chart-container {
-            background: rgba(45, 45, 45, 0.8);
+            background: var(--card-bg);
             backdrop-filter: blur(10px);
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 6px var(--card-shadow);
         }
 
         .chart-title {
             font-size: 1.2em;
             margin-bottom: 15px;
-            color: #e0e0e0;
+            color: var(--text-primary);
         }
 
         .chart-grid {
@@ -187,23 +220,23 @@
         }
 
         .info-table {
-            background: rgba(45, 45, 45, 0.8);
+            background: var(--card-bg);
             backdrop-filter: blur(10px);
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 4px 6px var(--card-shadow);
         }
 
         .info-table h3 {
             margin-bottom: 15px;
-            color: #4fc3f7;
+            color: var(--gradient-start);
         }
 
         .info-row {
             display: flex;
             justify-content: space-between;
             padding: 10px 0;
-            border-bottom: 1px solid #444;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .info-row:last-child {
@@ -211,17 +244,17 @@
         }
 
         .info-label {
-            color: #999;
+            color: var(--text-secondary);
         }
 
         .info-value {
-            color: #e0e0e0;
+            color: var(--text-primary);
             font-weight: 500;
         }
 
         .update-time {
             text-align: center;
-            color: #666;
+            color: var(--text-tertiary);
             font-size: 0.9em;
             margin-top: 20px;
         }
@@ -241,7 +274,7 @@
         .loading {
             text-align: center;
             padding: 40px;
-            color: #999;
+            color: var(--text-secondary);
             font-size: 1.2em;
         }
     </style>
@@ -354,28 +387,41 @@
     </div>
 
     <script>
+        // Get theme-aware colors for charts
+        function getChartColor() {
+            const theme = document.documentElement.getAttribute('data-theme') || 'light';
+            return theme === 'dark' ? '#999' : '#666';
+        }
+
+        function getChartGridColor() {
+            const theme = document.documentElement.getAttribute('data-theme') || 'light';
+            return theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        }
+
         // Chart configurations
-        const chartConfig = {
-            responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: 2,
-            plugins: {
-                legend: {
-                    labels: { color: '#e0e0e0' }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { color: '#999' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+        function getChartConfig() {
+            return {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 2,
+                plugins: {
+                    legend: {
+                        labels: { color: getChartColor() }
+                    }
                 },
-                x: {
-                    ticks: { color: '#999' },
-                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: getChartColor() },
+                        grid: { color: getChartGridColor() }
+                    },
+                    x: {
+                        ticks: { color: getChartColor() },
+                        grid: { color: getChartGridColor() }
+                    }
                 }
-            }
-        };
+            };
+        }
 
         // Initialize charts
         let queueChart, cpuChart, memoryChart;
@@ -391,6 +437,8 @@
         };
 
         function initCharts() {
+            const chartConfig = getChartConfig();
+
             // Queue Chart
             const queueCtx = document.getElementById('queueChart').getContext('2d');
             queueChart = new Chart(queueCtx, {
@@ -441,16 +489,16 @@
                             beginAtZero: true,
                             max: 100,
                             ticks: {
-                                color: '#999',
+                                color: getChartColor(),
                                 callback: function(value) {
                                     return value + '%';
                                 }
                             },
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            grid: { color: getChartGridColor() }
                         },
                         x: {
-                            ticks: { color: '#999' },
-                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            ticks: { color: getChartColor() },
+                            grid: { color: getChartGridColor() }
                         }
                     }
                 }

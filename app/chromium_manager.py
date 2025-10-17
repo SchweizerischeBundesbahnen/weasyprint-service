@@ -714,16 +714,19 @@ class ChromiumManager:
 
         queue_entry_time = time.time()
         await self._increment_queue_counter()
+        did_transition = False  # Track if this request transitioned from waiting to active
 
         try:
             async with self._semaphore:
                 await self._transition_queue_to_active((time.time() - queue_entry_time) * 1000)
+                did_transition = True  # Successfully transitioned to active
                 async with self._create_and_yield_page(device_scale_factor) as page:
                     yield page
         except (asyncio.CancelledError, Exception):
-            # If error/cancellation before acquiring semaphore, decrement waiting counter
-            # If error/cancellation after acquiring semaphore, decrement is handled by _create_and_yield_page
-            if self._waiting_in_queue > 0:
+            # Only decrement waiting counter if we never transitioned to active
+            # (i.e., exception happened before acquiring semaphore)
+            # If we did transition, decrement is handled by _create_and_yield_page's finally block
+            if not did_transition:
                 await self._decrement_queue_counter()
             raise
 

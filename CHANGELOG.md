@@ -1,5 +1,20 @@
 # Changelog
 
+## [66.0.7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.6...v66.0.7) (2025-10-17)
+
+
+### Features
+
+* ability to add native sticky note annotations into resulting PDF ([#238](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/238)) ([d950475](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d9504752419dd964eed2b7e41ec3cc94b97b56a0))
+* add proactive Chromium health monitoring and metrics tracking ([#241](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/241)) ([3866ad4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/3866ad4f69c6c1561e5197359b67ff948870f37a)), closes [#240](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/240)
+
+
+### Bug Fixes
+
+* **deps:** update dependency pillow to v12 ([#245](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/245)) ([78907d4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/78907d4e7b94b36b64f6f13cb837bc9cbd057436))
+* **deps:** update dependency ruff to v0.14.1 ([4292bbf](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4292bbf64d7ee31002932ff062254301f2d2ab1d))
+* **deps:** update dependency starlette to &gt;=0.48,&lt;0.49 ([38e45d1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/38e45d128d6bd174c6ea6971a83459598fddab3b))
+
 ## [66.0.6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.5...v66.0.6) (2025-10-14)
 
 

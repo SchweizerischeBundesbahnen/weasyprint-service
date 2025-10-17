@@ -6,6 +6,7 @@ from HTML and CSS.
 ## Features
 
 - Simple REST API to access [WeasyPrint](https://github.com/Kozea/WeasyPrint)
+- Real-time monitoring dashboard with metrics visualization
 - Compatible with amd64 and arm64 architectures
 - Easily deployable via Docker
 
@@ -130,6 +131,38 @@ docker run --detach \
 - Failed conversions are logged with WARNING level, recovery attempts with INFO level
 
 To diagnose Chromium startup issues, check the service logs for error messages during initialization. The container will exit if Chromium fails to start.
+
+### Monitoring Dashboard
+
+The service includes an interactive web-based monitoring dashboard accessible at `/dashboard`:
+
+**Dashboard Features:**
+
+**Key Performance Indicators:**
+- Service health status with real-time indicator
+- Total conversions (HTML→PDF and SVG→PNG)
+- Error rate percentage
+- Current queue size and active conversions
+- Average response time
+- System uptime and browser restarts
+
+**Interactive Charts:**
+1. **Queue & Active Conversions** - Real-time visualization of request queue and concurrent processing
+2. **CPU Usage (%)** - CPU consumption tracking with percentage scale
+3. **Memory Usage (MB)** - Memory tracking showing Chromium memory, total system memory, and available memory
+
+**Technical Details:**
+- **Auto-refresh**: Updates every 5 seconds
+- **Data retention**: Last 20 data points on charts
+- **Technology**: Chart.js 4.4.0 (bundled locally) for visualizations
+- **Design**: Dark theme optimized for monitoring displays
+- **API endpoint**: Fetches data from `/health?detailed=true`
+- **Version information**: Service, WeasyPrint, and Chromium versions displayed in the header
+
+**Production Considerations:**
+- Consider restricting dashboard access via reverse proxy (nginx, Traefik)
+- Use authentication middleware for sensitive environments
+- Monitor dashboard endpoint metrics separately
 
 ### Logging Configuration
 

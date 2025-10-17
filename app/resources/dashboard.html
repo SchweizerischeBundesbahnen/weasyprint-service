@@ -96,46 +96,47 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
             margin-bottom: 30px;
         }
 
         .card {
             background: rgba(45, 45, 45, 0.8);
             backdrop-filter: blur(10px);
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: 10px;
+            padding: 15px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
         }
 
         .card-label {
             color: #999;
-            font-size: 0.85em;
+            font-size: 0.75em;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
         }
 
         .card-value {
-            font-size: 2.5em;
+            font-size: 1.8em;
             font-weight: bold;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
             background: linear-gradient(135deg, #4fc3f7, #29b6f6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            line-height: 1.2;
         }
 
         .card-subtitle {
             color: #666;
-            font-size: 0.9em;
+            font-size: 0.85em;
         }
 
         .chart-container {

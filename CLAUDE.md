@@ -448,7 +448,7 @@ curl http://localhost:9080/health?detailed=true
     "total_svg_conversions": 458,
     "failed_svg_conversions": 1,
     "error_rate_percent": 0.13,
-    "total_restarts": 0,
+    "total_chromium_restarts": 0,
     "avg_conversion_time_ms": 145.23,
     "avg_svg_conversion_time_ms": 82.45,
     "last_health_check": "14:30:45 16.10.2025",

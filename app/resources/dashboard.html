@@ -389,12 +389,12 @@
     <script>
         // Get theme-aware colors for charts
         function getChartColor() {
-            const theme = document.documentElement.getAttribute('data-theme') || 'light';
+            const theme = document.documentElement.dataset.theme || 'light';
             return theme === 'dark' ? '#999' : '#666';
         }
 
         function getChartGridColor() {
-            const theme = document.documentElement.getAttribute('data-theme') || 'light';
+            const theme = document.documentElement.dataset.theme || 'light';
             return theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
         }
 

@@ -1683,3 +1683,107 @@ async def test_chromium_manager_resource_usage_metrics():
 
     finally:
         await manager.stop()
+
+
+# Tests for corrected error rate calculation (HTML to PDF only, not double-counting SVG conversions)
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_html_only_not_svg():
+    """Test that error rate calculation only considers HTML to PDF conversions, not nested SVG conversions.
+
+    This test verifies the fix for the bug where error rate incorrectly summed HTML and SVG conversions,
+    causing double-counting since SVG conversions happen INSIDE HTML conversions.
+    """
+    manager = ChromiumManager()
+
+    # Directly access the metrics object to simulate the scenario
+    metrics_obj = manager._metrics
+
+    # Simulate 10 successful HTML conversions (each may have had SVG conversions inside)
+    for _ in range(10):
+        metrics_obj.record_success(100.0)
+
+    # Simulate SVG conversions that happened WITHIN those HTML conversions
+    # These should NOT affect the HTML conversion error rate
+    for _ in range(20):
+        metrics_obj.record_svg_success(10.0)
+
+    # Simulate 2 failed HTML conversions
+    for _ in range(2):
+        metrics_obj.record_failure()
+
+    # Error rate should be based on HTML conversions only:
+    # 2 failures / (10 successes + 2 failures) = 2/12 = 16.67%
+    # NOT: (2 + 0) / (10 + 20 + 2 + 0) = 2/32 = 6.25% (old incorrect calculation)
+    error_rate = metrics_obj.get_error_rate()
+    assert abs(error_rate - 16.67) < 0.1, f"Expected ~16.67%, got {error_rate}%"
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_svg_failures_within_html():
+    """Test that SVG failures within HTML conversions are reflected in HTML failure count.
+
+    When an HTML conversion fails due to SVG processing error, it should count as 1 HTML failure,
+    not as both an HTML failure and an SVG failure in the error rate calculation.
+    """
+    manager = ChromiumManager()
+    metrics_obj = manager._metrics
+
+    # Simulate 5 successful HTML conversions
+    for _ in range(5):
+        metrics_obj.record_success(100.0)
+        metrics_obj.record_svg_success(10.0)  # Nested SVG also succeeded
+
+    # Simulate 1 failed HTML conversion (which had SVG failure inside it)
+    # In real scenario, when SVG fails, the HTML conversion also fails
+    metrics_obj.record_failure()  # This counts the full HTML failure
+    metrics_obj.record_svg_failure()  # SVG that caused the HTML failure
+
+    # Error rate should be: 1 failure / (5 successes + 1 failure) = 1/6 = 16.67%
+    # The SVG failure is already accounted for in the HTML failure
+    error_rate = metrics_obj.get_error_rate()
+    assert abs(error_rate - 16.67) < 0.1, f"Expected ~16.67%, got {error_rate}%"
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_with_no_conversions():
+    """Test that error rate is 0% when there are no conversion attempts."""
+    manager = ChromiumManager()
+    metrics_obj = manager._metrics
+
+    # No conversions at all
+    error_rate = metrics_obj.get_error_rate()
+    assert error_rate == 0.0
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_only_failures():
+    """Test error rate when all HTML conversions fail."""
+    manager = ChromiumManager()
+    metrics_obj = manager._metrics
+
+    # Simulate 5 failed HTML conversions
+    for _ in range(5):
+        metrics_obj.record_failure()
+
+    # Error rate should be 100%
+    error_rate = metrics_obj.get_error_rate()
+    assert error_rate == 100.0
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_only_successes():
+    """Test error rate when all HTML conversions succeed."""
+    manager = ChromiumManager()
+    metrics_obj = manager._metrics
+
+    # Simulate 10 successful HTML conversions with nested SVG conversions
+    for _ in range(10):
+        metrics_obj.record_success(100.0)
+        metrics_obj.record_svg_success(10.0)
+        metrics_obj.record_svg_success(15.0)
+
+    # Error rate should be 0% (SVG conversions don't affect HTML error rate)
+    error_rate = metrics_obj.get_error_rate()
+    assert error_rate == 0.0

@@ -171,13 +171,11 @@ class ChromiumMetrics:
         self.uptime_seconds = 0.0
 
     def get_error_rate(self) -> float:
-        """Calculate error rate as percentage (considers both HTML->PDF and SVG->PNG conversions)."""
-        total_successful = self.total_conversions + self.total_svg_conversions
-        total_failed = self.failed_conversions + self.failed_svg_conversions
-        total_attempts = total_successful + total_failed
+        """Calculate error rate as percentage for HTML to PDF conversions (SVG failures are included in HTML failures)."""
+        total_attempts = self.total_conversions + self.failed_conversions
         if total_attempts == 0:
             return 0.0
-        return (total_failed / total_attempts) * 100.0
+        return (self.failed_conversions / total_attempts) * 100.0
 
     def record_resource_usage(self, browser_process: psutil.Process | None) -> None:
         """

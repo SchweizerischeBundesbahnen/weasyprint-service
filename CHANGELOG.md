@@ -1,5 +1,17 @@
 # Changelog
 
+## [66.0.8](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.7...v66.0.8) (2025-10-18)
+
+
+### Features
+
+* queue monitoring and dashboard ([#251](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/251)) ([10a6fe1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/10a6fe1d54dee28464c201fb9d065dbc4b558afc)), closes [#253](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/253)
+
+
+### Performance Improvements
+
+* **ci:** optimize tox.ini by removing redundant uv sync commands ([#254](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/254)) ([92a3cb3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/92a3cb37fd2d1f46d59c984f97b5f31cadf5af97)), closes [#247](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/247)
+
 ## [66.0.7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.6...v66.0.7) (2025-10-17)
 
 

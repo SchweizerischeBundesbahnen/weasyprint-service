@@ -5,6 +5,28 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/dashboard": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Monitoring Dashboard",
+        "description": "Interactive real-time monitoring dashboard with charts and metrics visualization",
+        "operationId": "getDashboard",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -37,39 +59,44 @@
                     "ChromiumMetricsSchema": {
                       "description": "Schema for Chromium performance and health metrics",
                       "properties": {
-                        "total_conversions": {
-                          "description": "Total successful HTML to PDF conversions",
-                          "title": "Total Conversions",
+                        "pdf_generations": {
+                          "description": "Total successful HTML to PDF generations",
+                          "title": "PDF Generations",
                           "type": "integer"
                         },
-                        "failed_conversions": {
-                          "description": "Total failed HTML to PDF conversion attempts",
-                          "title": "Failed Conversions",
+                        "failed_pdf_generations": {
+                          "description": "Total failed HTML to PDF generation attempts",
+                          "title": "Failed PDF Generations",
                           "type": "integer"
                         },
-                        "avg_conversion_time_ms": {
-                          "description": "Average HTML to PDF conversion time in milliseconds",
-                          "title": "Avg Conversion Time Ms",
+                        "avg_pdf_generation_time_ms": {
+                          "description": "Average HTML to PDF generation time in milliseconds (includes time for any SVG processing within the HTML)",
+                          "title": "Avg PDF Generation Time (ms)",
                           "type": "number"
                         },
                         "total_svg_conversions": {
-                          "description": "Total successful SVG to PNG conversions",
-                          "title": "Total Svg Conversions",
+                          "description": "Total successful SVG to PNG conversions (these occur within HTML to PDF generations)",
+                          "title": "Total SVG Conversions",
                           "type": "integer"
                         },
                         "failed_svg_conversions": {
-                          "description": "Total failed SVG to PNG conversion attempts",
-                          "title": "Failed Svg Conversions",
+                          "description": "Total failed SVG to PNG conversion attempts (these occur within HTML to PDF generations)",
+                          "title": "Failed SVG Conversions",
                           "type": "integer"
                         },
                         "avg_svg_conversion_time_ms": {
-                          "description": "Average SVG to PNG conversion time in milliseconds",
-                          "title": "Avg Svg Conversion Time Ms",
+                          "description": "Average SVG to PNG conversion time in milliseconds (for individual SVG elements within HTML)",
+                          "title": "Avg SVG Conversion Time (ms)",
                           "type": "number"
                         },
-                        "error_rate_percent": {
-                          "description": "Overall conversion error rate as percentage (includes both HTML->PDF and SVG->PNG)",
-                          "title": "Error Rate Percent",
+                        "error_pdf_generation_rate_percent": {
+                          "description": "HTML to PDF generation error rate as percentage (based only on PDF generation attempts, not nested SVG conversions)",
+                          "title": "PDF Generation Error Rate (%)",
+                          "type": "number"
+                        },
+                        "error_svg_conversion_rate_percent": {
+                          "description": "SVG to PNG conversion error rate as percentage (for SVG elements within HTML)",
+                          "title": "SVG Conversion Error Rate (%)",
                           "type": "number"
                         },
                         "total_chromium_restarts": {
@@ -87,66 +114,85 @@
                           "title": "Last Health Status",
                           "type": "boolean"
                         },
-                        "consecutive_failures": {
-                          "description": "Current consecutive conversion failures",
-                          "title": "Consecutive Failures",
-                          "type": "integer"
-                        },
                         "uptime_seconds": {
                           "description": "Browser uptime in seconds",
-                          "title": "Uptime Seconds",
+                          "title": "Uptime (seconds)",
                           "type": "number"
                         },
                         "current_cpu_percent": {
                           "description": "Current CPU usage percentage",
-                          "title": "Current Cpu Percent",
+                          "title": "Current CPU (%)",
                           "type": "number"
                         },
                         "avg_cpu_percent": {
                           "description": "Average CPU usage percentage",
-                          "title": "Avg Cpu Percent",
+                          "title": "Avg CPU (%)",
                           "type": "number"
                         },
                         "total_memory_mb": {
                           "description": "Total system memory in MB",
-                          "title": "Total Memory Mb",
+                          "title": "Total Memory (MB)",
                           "type": "number"
                         },
                         "available_memory_mb": {
                           "description": "Available system memory in MB",
-                          "title": "Available Memory Mb",
+                          "title": "Available Memory (MB)",
                           "type": "number"
                         },
                         "current_chromium_memory_mb": {
                           "description": "Current Chromium physical memory usage in MB",
-                          "title": "Current Chromium Memory Mb",
+                          "title": "Current Chromium Memory (MB)",
                           "type": "number"
                         },
                         "avg_chromium_memory_mb": {
                           "description": "Average Chromium physical memory usage in MB",
-                          "title": "Avg Chromium Memory Mb",
+                          "title": "Avg Chromium Memory (MB)",
                           "type": "number"
+                        },
+                        "queue_size": {
+                          "description": "Current number of requests waiting in queue",
+                          "title": "Queue Size",
+                          "type": "integer"
+                        },
+                        "active_pdf_generations": {
+                          "description": "Current number of active PDF generations in progress",
+                          "title": "Active PDF Generations",
+                          "type": "integer"
+                        },
+                        "avg_queue_time_ms": {
+                          "description": "Average time requests spend waiting in queue (milliseconds)",
+                          "title": "Avg Queue Time (ms)",
+                          "type": "number"
+                        },
+                        "max_concurrent_pdf_generations": {
+                          "description": "Maximum allowed concurrent PDF generations (configured limit)",
+                          "title": "Max Concurrent PDF Generations",
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "total_conversions",
-                        "failed_conversions",
-                        "avg_conversion_time_ms",
+                        "pdf_generations",
+                        "failed_pdf_generations",
+                        "avg_pdf_generation_time_ms",
                         "total_svg_conversions",
                         "failed_svg_conversions",
                         "avg_svg_conversion_time_ms",
-                        "error_rate_percent",
+                        "error_pdf_generation_rate_percent",
+                        "error_svg_conversion_rate_percent",
                         "total_chromium_restarts",
                         "last_health_check",
                         "last_health_status",
-                        "consecutive_failures",
                         "uptime_seconds",
                         "current_cpu_percent",
                         "avg_cpu_percent",
                         "total_memory_mb",
                         "available_memory_mb",
                         "current_chromium_memory_mb",
-                        "avg_chromium_memory_mb"
+                        "avg_chromium_memory_mb",
+                        "queue_size",
+                        "active_pdf_generations",
+                        "avg_queue_time_ms",
+                        "max_concurrent_pdf_generations"
                       ],
                       "title": "ChromiumMetricsSchema",
                       "type": "object"
@@ -166,7 +212,7 @@
                     },
                     "weasyprint_version": {
                       "description": "WeasyPrint library version",
-                      "title": "Weasyprint Version",
+                      "title": "WeasyPrint Version",
                       "type": "string"
                     },
                     "chromium_running": {
@@ -193,7 +239,8 @@
                     },
                     "metrics": {
                       "$ref": "#/$defs/ChromiumMetricsSchema",
-                      "description": "Performance and health metrics"
+                      "description": "Performance and health metrics",
+                      "title": "Metrics"
                     }
                   },
                   "required": [
@@ -225,39 +272,44 @@
                     "ChromiumMetricsSchema": {
                       "description": "Schema for Chromium performance and health metrics",
                       "properties": {
-                        "total_conversions": {
-                          "description": "Total successful HTML to PDF conversions",
-                          "title": "Total Conversions",
+                        "pdf_generations": {
+                          "description": "Total successful HTML to PDF generations",
+                          "title": "PDF Generations",
                           "type": "integer"
                         },
-                        "failed_conversions": {
-                          "description": "Total failed HTML to PDF conversion attempts",
-                          "title": "Failed Conversions",
+                        "failed_pdf_generations": {
+                          "description": "Total failed HTML to PDF generation attempts",
+                          "title": "Failed PDF Generations",
                           "type": "integer"
                         },
-                        "avg_conversion_time_ms": {
-                          "description": "Average HTML to PDF conversion time in milliseconds",
-                          "title": "Avg Conversion Time Ms",
+                        "avg_pdf_generation_time_ms": {
+                          "description": "Average HTML to PDF generation time in milliseconds (includes time for any SVG processing within the HTML)",
+                          "title": "Avg PDF Generation Time (ms)",
                           "type": "number"
                         },
                         "total_svg_conversions": {
-                          "description": "Total successful SVG to PNG conversions",
-                          "title": "Total Svg Conversions",
+                          "description": "Total successful SVG to PNG conversions (these occur within HTML to PDF generations)",
+                          "title": "Total SVG Conversions",
                           "type": "integer"
                         },
                         "failed_svg_conversions": {
-                          "description": "Total failed SVG to PNG conversion attempts",
-                          "title": "Failed Svg Conversions",
+                          "description": "Total failed SVG to PNG conversion attempts (these occur within HTML to PDF generations)",
+                          "title": "Failed SVG Conversions",
                           "type": "integer"
                         },
                         "avg_svg_conversion_time_ms": {
-                          "description": "Average SVG to PNG conversion time in milliseconds",
-                          "title": "Avg Svg Conversion Time Ms",
+                          "description": "Average SVG to PNG conversion time in milliseconds (for individual SVG elements within HTML)",
+                          "title": "Avg SVG Conversion Time (ms)",
                           "type": "number"
                         },
-                        "error_rate_percent": {
-                          "description": "Overall conversion error rate as percentage (includes both HTML->PDF and SVG->PNG)",
-                          "title": "Error Rate Percent",
+                        "error_pdf_generation_rate_percent": {
+                          "description": "HTML to PDF generation error rate as percentage (based only on PDF generation attempts, not nested SVG conversions)",
+                          "title": "PDF Generation Error Rate (%)",
+                          "type": "number"
+                        },
+                        "error_svg_conversion_rate_percent": {
+                          "description": "SVG to PNG conversion error rate as percentage (for SVG elements within HTML)",
+                          "title": "SVG Conversion Error Rate (%)",
                           "type": "number"
                         },
                         "total_chromium_restarts": {
@@ -275,66 +327,85 @@
                           "title": "Last Health Status",
                           "type": "boolean"
                         },
-                        "consecutive_failures": {
-                          "description": "Current consecutive conversion failures",
-                          "title": "Consecutive Failures",
-                          "type": "integer"
-                        },
                         "uptime_seconds": {
                           "description": "Browser uptime in seconds",
-                          "title": "Uptime Seconds",
+                          "title": "Uptime (seconds)",
                           "type": "number"
                         },
                         "current_cpu_percent": {
                           "description": "Current CPU usage percentage",
-                          "title": "Current Cpu Percent",
+                          "title": "Current CPU (%)",
                           "type": "number"
                         },
                         "avg_cpu_percent": {
                           "description": "Average CPU usage percentage",
-                          "title": "Avg Cpu Percent",
+                          "title": "Avg CPU (%)",
                           "type": "number"
                         },
                         "total_memory_mb": {
                           "description": "Total system memory in MB",
-                          "title": "Total Memory Mb",
+                          "title": "Total Memory (MB)",
                           "type": "number"
                         },
                         "available_memory_mb": {
                           "description": "Available system memory in MB",
-                          "title": "Available Memory Mb",
+                          "title": "Available Memory (MB)",
                           "type": "number"
                         },
                         "current_chromium_memory_mb": {
                           "description": "Current Chromium physical memory usage in MB",
-                          "title": "Current Chromium Memory Mb",
+                          "title": "Current Chromium Memory (MB)",
                           "type": "number"
                         },
                         "avg_chromium_memory_mb": {
                           "description": "Average Chromium physical memory usage in MB",
-                          "title": "Avg Chromium Memory Mb",
+                          "title": "Avg Chromium Memory (MB)",
                           "type": "number"
+                        },
+                        "queue_size": {
+                          "description": "Current number of requests waiting in queue",
+                          "title": "Queue Size",
+                          "type": "integer"
+                        },
+                        "active_pdf_generations": {
+                          "description": "Current number of active PDF generations in progress",
+                          "title": "Active PDF Generations",
+                          "type": "integer"
+                        },
+                        "avg_queue_time_ms": {
+                          "description": "Average time requests spend waiting in queue (milliseconds)",
+                          "title": "Avg Queue Time (ms)",
+                          "type": "number"
+                        },
+                        "max_concurrent_pdf_generations": {
+                          "description": "Maximum allowed concurrent PDF generations (configured limit)",
+                          "title": "Max Concurrent PDF Generations",
+                          "type": "integer"
                         }
                       },
                       "required": [
-                        "total_conversions",
-                        "failed_conversions",
-                        "avg_conversion_time_ms",
+                        "pdf_generations",
+                        "failed_pdf_generations",
+                        "avg_pdf_generation_time_ms",
                         "total_svg_conversions",
                         "failed_svg_conversions",
                         "avg_svg_conversion_time_ms",
-                        "error_rate_percent",
+                        "error_pdf_generation_rate_percent",
+                        "error_svg_conversion_rate_percent",
                         "total_chromium_restarts",
                         "last_health_check",
                         "last_health_status",
-                        "consecutive_failures",
                         "uptime_seconds",
                         "current_cpu_percent",
                         "avg_cpu_percent",
                         "total_memory_mb",
                         "available_memory_mb",
                         "current_chromium_memory_mb",
-                        "avg_chromium_memory_mb"
+                        "avg_chromium_memory_mb",
+                        "queue_size",
+                        "active_pdf_generations",
+                        "avg_queue_time_ms",
+                        "max_concurrent_pdf_generations"
                       ],
                       "title": "ChromiumMetricsSchema",
                       "type": "object"
@@ -354,7 +425,7 @@
                     },
                     "weasyprint_version": {
                       "description": "WeasyPrint library version",
-                      "title": "Weasyprint Version",
+                      "title": "WeasyPrint Version",
                       "type": "string"
                     },
                     "chromium_running": {
@@ -381,7 +452,8 @@
                     },
                     "metrics": {
                       "$ref": "#/$defs/ChromiumMetricsSchema",
-                      "description": "Performance and health metrics"
+                      "description": "Performance and health metrics",
+                      "title": "Metrics"
                     }
                   },
                   "required": [
@@ -844,17 +916,38 @@
             "description": "WeasyPrint version"
           },
           "weasyprintService": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "WeasyPrint Service",
             "description": "Service version"
           },
           "timestamp": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Build Timestamp",
             "description": "Build timestamp"
           },
           "chromium": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Chromium",
             "description": "Chromium version"
           }

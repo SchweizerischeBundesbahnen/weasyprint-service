@@ -1172,20 +1172,21 @@ async def test_chromium_manager_get_metrics():
         # Get initial metrics
         metrics = manager.get_metrics()
 
-        assert "total_conversions" in metrics
-        assert "failed_conversions" in metrics
-        assert "error_rate_percent" in metrics
+        assert "pdf_generations" in metrics
+        assert "failed_pdf_generations" in metrics
+        assert "error_pdf_generation_rate_percent" in metrics
+        assert "error_svg_conversion_rate_percent" in metrics
         assert "total_chromium_restarts" in metrics
-        assert "avg_conversion_time_ms" in metrics
+        assert "avg_pdf_generation_time_ms" in metrics
         assert "last_health_check" in metrics
         assert "last_health_status" in metrics
-        assert "consecutive_failures" in metrics
         assert "uptime_seconds" in metrics
 
         # Initial values
         assert metrics["total_svg_conversions"] == 0
         assert metrics["failed_svg_conversions"] == 0
-        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["error_pdf_generation_rate_percent"] == 0.0
+        assert metrics["error_svg_conversion_rate_percent"] == 0.0
         assert metrics["total_chromium_restarts"] == 0
         assert metrics["uptime_seconds"] >= 0.0
 
@@ -1209,9 +1210,8 @@ async def test_chromium_manager_metrics_after_conversion():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 1
         assert metrics["failed_svg_conversions"] == 0
-        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["error_svg_conversion_rate_percent"] == 0.0
         assert metrics["avg_svg_conversion_time_ms"] > 0.0
-        assert metrics["consecutive_failures"] == 0
 
     finally:
         await manager.stop()
@@ -1240,8 +1240,7 @@ async def test_chromium_manager_metrics_after_failure():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 0
         assert metrics["failed_svg_conversions"] == 1
-        assert metrics["error_rate_percent"] == 100.0
-        assert metrics["consecutive_failures"] == 1
+        assert metrics["error_svg_conversion_rate_percent"] == 100.0
 
     finally:
         await manager.stop()
@@ -1439,9 +1438,8 @@ async def test_chromium_manager_concurrent_conversions_metrics():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 10
         assert metrics["failed_svg_conversions"] == 0
-        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["error_svg_conversion_rate_percent"] == 0.0
         assert metrics["avg_svg_conversion_time_ms"] > 0.0
-        assert metrics["consecutive_failures"] == 0
 
     finally:
         await manager.stop()
@@ -1485,7 +1483,7 @@ async def test_chromium_manager_error_rate_calculation():
         # Successful conversion
         await manager.convert_svg_to_png(svg_content, 50, 50)
         metrics = manager.get_metrics()
-        assert metrics["error_rate_percent"] == 0.0
+        assert metrics["error_svg_conversion_rate_percent"] == 0.0
 
         # Mock failure
         original_perform = manager._perform_conversion
@@ -1506,7 +1504,7 @@ async def test_chromium_manager_error_rate_calculation():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 1
         assert metrics["failed_svg_conversions"] == 1
-        assert metrics["error_rate_percent"] == 50.0
+        assert metrics["error_svg_conversion_rate_percent"] == 50.0
 
         # Another successful conversion
         await manager.convert_svg_to_png(svg_content, 50, 50)
@@ -1515,7 +1513,7 @@ async def test_chromium_manager_error_rate_calculation():
         metrics = manager.get_metrics()
         assert metrics["total_svg_conversions"] == 2
         assert metrics["failed_svg_conversions"] == 1
-        assert 33.0 <= metrics["error_rate_percent"] <= 34.0
+        assert 33.0 <= metrics["error_svg_conversion_rate_percent"] <= 34.0
 
     finally:
         await manager.stop()
@@ -1547,17 +1545,13 @@ async def test_chromium_manager_consecutive_failures_reset():
         with pytest.raises(RuntimeError):
             await manager.convert_svg_to_png(svg_content, 50, 50)
 
-        metrics = manager.get_metrics()
-        assert metrics["consecutive_failures"] == 1
-
         # Restore for successful conversion
         manager._perform_conversion = original_perform
 
-        # Successful conversion should reset consecutive failures
+        # Successful conversion
         await manager.convert_svg_to_png(svg_content, 50, 50)
 
         metrics = manager.get_metrics()
-        assert metrics["consecutive_failures"] == 0
         assert metrics["total_svg_conversions"] == 1
         assert metrics["failed_svg_conversions"] == 1
 
@@ -1601,12 +1595,11 @@ async def test_chromium_manager_metrics_initial_state():
     metrics = manager.get_metrics()
     assert metrics["total_svg_conversions"] == 0
     assert metrics["failed_svg_conversions"] == 0
-    assert metrics["error_rate_percent"] == 0.0
+    assert metrics["error_svg_conversion_rate_percent"] == 0.0
     assert metrics["total_chromium_restarts"] == 0
     assert metrics["avg_svg_conversion_time_ms"] == 0.0
     assert metrics["last_health_check"] == ""
     assert metrics["last_health_status"] is False
-    assert metrics["consecutive_failures"] == 0
     assert metrics["uptime_seconds"] >= 0.0
 
     await manager.start()
@@ -1683,3 +1676,107 @@ async def test_chromium_manager_resource_usage_metrics():
 
     finally:
         await manager.stop()
+
+
+# Tests for corrected error rate calculation (HTML to PDF only, not double-counting SVG conversions)
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_html_only_not_svg():
+    """Test that error rate calculation only considers HTML to PDF conversions, not nested SVG conversions.
+
+    This test verifies the fix for the bug where error rate incorrectly summed HTML and SVG conversions,
+    causing double-counting since SVG conversions happen INSIDE HTML conversions.
+    """
+    manager = ChromiumManager()
+
+    # Directly access the metrics object to simulate the scenario
+    metrics_obj = manager._metrics
+
+    # Simulate 10 successful HTML conversions (each may have had SVG conversions inside)
+    for _ in range(10):
+        metrics_obj.record_success(100.0)
+
+    # Simulate SVG conversions that happened WITHIN those HTML conversions
+    # These should NOT affect the HTML conversion error rate
+    for _ in range(20):
+        metrics_obj.record_svg_success(10.0)
+
+    # Simulate 2 failed HTML conversions
+    for _ in range(2):
+        metrics_obj.record_failure()
+
+    # Error rate should be based on HTML conversions only:
+    # 2 failures / (10 successes + 2 failures) = 2/12 = 16.67%
+    # NOT: (2 + 0) / (10 + 20 + 2 + 0) = 2/32 = 6.25% (old incorrect calculation)
+    error_rate = metrics_obj.get_error_rate()
+    assert abs(error_rate - 16.67) < 0.1, f"Expected ~16.67%, got {error_rate}%"
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_svg_failures_within_html():
+    """Test that SVG failures within HTML conversions are reflected in HTML failure count.
+
+    When an HTML conversion fails due to SVG processing error, it should count as 1 HTML failure,
+    not as both an HTML failure and an SVG failure in the error rate calculation.
+    """
+    manager = ChromiumManager()
+    metrics_obj = manager._metrics
+
+    # Simulate 5 successful HTML conversions
+    for _ in range(5):
+        metrics_obj.record_success(100.0)
+        metrics_obj.record_svg_success(10.0)  # Nested SVG also succeeded
+
+    # Simulate 1 failed HTML conversion (which had SVG failure inside it)
+    # In real scenario, when SVG fails, the HTML conversion also fails
+    metrics_obj.record_failure()  # This counts the full HTML failure
+    metrics_obj.record_svg_failure()  # SVG that caused the HTML failure
+
+    # Error rate should be: 1 failure / (5 successes + 1 failure) = 1/6 = 16.67%
+    # The SVG failure is already accounted for in the HTML failure
+    error_rate = metrics_obj.get_error_rate()
+    assert abs(error_rate - 16.67) < 0.1, f"Expected ~16.67%, got {error_rate}%"
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_with_no_conversions():
+    """Test that error rate is 0% when there are no conversion attempts."""
+    manager = ChromiumManager()
+    metrics_obj = manager._metrics
+
+    # No conversions at all
+    error_rate = metrics_obj.get_error_rate()
+    assert error_rate == 0.0
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_only_failures():
+    """Test error rate when all HTML conversions fail."""
+    manager = ChromiumManager()
+    metrics_obj = manager._metrics
+
+    # Simulate 5 failed HTML conversions
+    for _ in range(5):
+        metrics_obj.record_failure()
+
+    # Error rate should be 100%
+    error_rate = metrics_obj.get_error_rate()
+    assert error_rate == 100.0
+
+
+@pytest.mark.asyncio
+async def test_chromium_manager_error_rate_only_successes():
+    """Test error rate when all HTML conversions succeed."""
+    manager = ChromiumManager()
+    metrics_obj = manager._metrics
+
+    # Simulate 10 successful HTML conversions with nested SVG conversions
+    for _ in range(10):
+        metrics_obj.record_success(100.0)
+        metrics_obj.record_svg_success(10.0)
+        metrics_obj.record_svg_success(15.0)
+
+    # Error rate should be 0% (SVG conversions don't affect HTML error rate)
+    error_rate = metrics_obj.get_error_rate()
+    assert error_rate == 0.0

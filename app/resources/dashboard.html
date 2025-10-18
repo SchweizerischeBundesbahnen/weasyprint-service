@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{{DASHBOARD_THEME}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeasyPrint Service - Monitoring Dashboard</title>
+    <script src="/static/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #f5f5f5;
+            --bg-secondary: #ffffff;
+            --text-primary: #2c2c2c;
+            --text-secondary: #666666;
+            --text-tertiary: #999999;
+            --border-color: #e0e0e0;
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-shadow: rgba(0, 0, 0, 0.1);
+            --card-hover-shadow: rgba(0, 0, 0, 0.15);
+            --gradient-start: #1e88e5;
+            --gradient-end: #1565c0;
+            --chart-grid: rgba(0, 0, 0, 0.1);
+            --chart-text: #666666;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2d2d2d;
+            --text-primary: #e0e0e0;
+            --text-secondary: #999999;
+            --text-tertiary: #666666;
+            --border-color: #444444;
+            --card-bg: rgba(45, 45, 45, 0.8);
+            --card-shadow: rgba(0, 0, 0, 0.3);
+            --card-hover-shadow: rgba(0, 0, 0, 0.4);
+            --gradient-start: #4fc3f7;
+            --gradient-end: #29b6f6;
+            --chart-grid: rgba(255, 255, 255, 0.1);
+            --chart-text: #999999;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            padding: 20px;
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .header-main {
+            flex: 1;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.5em;
+            font-weight: 500;
+        }
+
+        .header-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 0.95em;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .header-info .info-item {
+            white-space: nowrap;
+        }
+
+        .header-info .info-item span {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.healthy {
+            background: #4caf50;
+            box-shadow: 0 0 10px #4caf50;
+        }
+
+        .status-indicator.unhealthy {
+            background: #f44336;
+            box-shadow: 0 0 10px #f44336;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 6px var(--card-shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 10px var(--card-hover-shadow);
+        }
+
+        .card-label {
+            color: var(--text-secondary);
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .card-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 3px;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+        }
+
+        .card-subtitle {
+            color: var(--text-tertiary);
+            font-size: 0.85em;
+        }
+
+        .chart-container {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px var(--card-shadow);
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .chart-grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header-info {
+                text-align: left;
+            }
+
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .header .subtitle {
+                font-size: 1.2em;
+            }
+        }
+
+        .info-table {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px var(--card-shadow);
+        }
+
+        .info-table h3 {
+            margin-bottom: 15px;
+            color: var(--gradient-start);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+        }
+
+        .info-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .update-time {
+            text-align: center;
+            color: var(--text-tertiary);
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+
+        .warning {
+            color: #ff9800;
+        }
+
+        .error {
+            color: #f44336;
+        }
+
+        .success {
+            color: #4caf50;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-main">
+                <h1>WeasyPrint Service Monitor</h1>
+                <div class="subtitle">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span id="statusText">Loading...</span>
+                </div>
+            </div>
+            <div class="header-info">
+                <div class="info-item">Service: <span id="serviceVersion">-</span></div>
+                <div class="info-item">WeasyPrint: <span id="weasyprintVersion">-</span></div>
+                <div class="info-item">Chromium: <span id="chromiumVersion">-</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">Loading metrics...</div>
+
+    <div id="dashboard" style="display: none;">
+        <!-- Key Metrics Cards -->
+        <div class="grid">
+            <div class="card">
+                <div class="card-label">Status</div>
+                <div class="card-value" id="status">-</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Uptime</div>
+                <div class="card-value" id="uptime">0s</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Concurrent Slots</div>
+                <div class="card-value"><span id="activePdfGenerations">0</span> / <span id="maxConcurrent">10</span></div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Queue</div>
+                <div class="card-value" id="queueSize">0</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">PDF Generations</div>
+                <div class="card-value" id="pdfGenerations">0</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Avg Generation Time</div>
+                <div class="card-value" id="avgResponseTime">0 s</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Failed Generations</div>
+                <div class="card-value" id="failedPdfGenerations">0</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Generation Error Rate</div>
+                <div class="card-value" id="errorRate">0.00%</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">SVG Conversions</div>
+                <div class="card-value" id="svgConversions">0</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Avg Conversion Time</div>
+                <div class="card-value" id="avgSvgTime">0 ms</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Failed Conversions</div>
+                <div class="card-value" id="failedSvgConversions">0</div>
+            </div>
+
+            <div class="card">
+                <div class="card-label">Conversion Error Rate</div>
+                <div class="card-value" id="svgErrorRate">0.00%</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="chart-grid">
+            <div class="chart-container">
+                <div class="chart-title">Queue & Active PDF Generations</div>
+                <canvas id="queueChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">CPU Usage (%)</div>
+                <canvas id="cpuChart"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">Memory Usage (MB)</div>
+                <canvas id="memoryChart"></canvas>
+            </div>
+        </div>
+
+        <div class="update-time">
+            Last updated: <span id="updateTime">-</span> | Auto-refresh every 5 seconds
+        </div>
+    </div>
+
+    <script>
+        // Get theme-aware colors for charts
+        function getChartColor() {
+            const theme = document.documentElement.dataset.theme || 'light';
+            return theme === 'dark' ? '#999' : '#666';
+        }
+
+        function getChartGridColor() {
+            const theme = document.documentElement.dataset.theme || 'light';
+            return theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+        }
+
+        // Chart configurations
+        function getChartConfig() {
+            return {
+                responsive: true,
+                maintainAspectRatio: true,
+                aspectRatio: 2,
+                plugins: {
+                    legend: {
+                        labels: { color: getChartColor() }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: getChartColor() },
+                        grid: { color: getChartGridColor() }
+                    },
+                    x: {
+                        ticks: { color: getChartColor() },
+                        grid: { color: getChartGridColor() }
+                    }
+                }
+            };
+        }
+
+        // Initialize charts
+        let queueChart, cpuChart, memoryChart;
+        const maxDataPoints = 20;
+        const chartData = {
+            labels: [],
+            queue: [],
+            active: [],
+            cpu: [],
+            chromiumMemory: [],
+            totalMemory: [],
+            availableMemory: []
+        };
+
+        function initCharts() {
+            const chartConfig = getChartConfig();
+
+            // Queue Chart
+            const queueCtx = document.getElementById('queueChart').getContext('2d');
+            queueChart = new Chart(queueCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'Queue Size',
+                            data: chartData.queue,
+                            borderColor: '#ff9800',
+                            backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Active PDF Generations',
+                            data: chartData.active,
+                            borderColor: '#4caf50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: chartConfig
+            });
+
+            // CPU Chart
+            const cpuCtx = document.getElementById('cpuChart').getContext('2d');
+            cpuChart = new Chart(cpuCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'CPU Usage',
+                            data: chartData.cpu,
+                            borderColor: '#f44336',
+                            backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    ...chartConfig,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                color: getChartColor(),
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            },
+                            grid: { color: getChartGridColor() }
+                        },
+                        x: {
+                            ticks: { color: getChartColor() },
+                            grid: { color: getChartGridColor() }
+                        }
+                    }
+                }
+            });
+
+            // Memory Chart
+            const memoryCtx = document.getElementById('memoryChart').getContext('2d');
+            memoryChart = new Chart(memoryCtx, {
+                type: 'line',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [
+                        {
+                            label: 'Chromium Memory',
+                            data: chartData.chromiumMemory,
+                            borderColor: '#2196f3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: 'Total System Memory',
+                            data: chartData.totalMemory,
+                            borderColor: '#666',
+                            backgroundColor: 'rgba(102, 102, 102, 0.05)',
+                            tension: 0,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Available Memory',
+                            data: chartData.availableMemory,
+                            borderColor: '#4caf50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: chartConfig
+            });
+        }
+
+        function updateChartData(metrics) {
+            const now = new Date().toLocaleTimeString();
+
+            chartData.labels.push(now);
+            chartData.queue.push(metrics.queue_size);
+            chartData.active.push(metrics.active_pdf_generations);
+            chartData.cpu.push(metrics.current_cpu_percent);
+            chartData.chromiumMemory.push(metrics.current_chromium_memory_mb);
+            chartData.totalMemory.push(metrics.total_memory_mb);
+            chartData.availableMemory.push(metrics.available_memory_mb);
+
+            // Keep only last N data points
+            if (chartData.labels.length > maxDataPoints) {
+                chartData.labels.shift();
+                chartData.queue.shift();
+                chartData.active.shift();
+                chartData.cpu.shift();
+                chartData.chromiumMemory.shift();
+                chartData.totalMemory.shift();
+                chartData.availableMemory.shift();
+            }
+
+            // Update all charts
+            queueChart.update('none');
+            cpuChart.update('none');
+            memoryChart.update('none');
+        }
+
+        function formatUptime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
+        }
+
+        async function updateMetrics() {
+            try {
+                const response = await fetch('/health?detailed=true');
+                const data = await response.json();
+
+                // Update status
+                const indicator = document.getElementById('statusIndicator');
+                const statusText = document.getElementById('statusText');
+                const isHealthy = data.status === 'healthy';
+
+                indicator.className = `status-indicator ${isHealthy ? 'healthy' : 'unhealthy'}`;
+                statusText.textContent = isHealthy ? 'Service Healthy' : 'Service Unhealthy';
+
+                // Update header info
+                document.getElementById('serviceVersion').textContent = data.version;
+                document.getElementById('weasyprintVersion').textContent = data.weasyprint_version;
+                document.getElementById('chromiumVersion').textContent = data.chromium_version || 'N/A';
+
+                // Update cards
+                document.getElementById('status').textContent = data.chromium_running ? 'Running' : 'Stopped';
+
+                const metrics = data.metrics;
+
+                // Card 1: Status - already updated above
+
+                // Card 2: Uptime
+                document.getElementById('uptime').textContent = formatUptime(metrics.uptime_seconds);
+
+                // Card 3: Concurrent Slots
+                document.getElementById('activePdfGenerations').textContent = metrics.active_pdf_generations;
+                document.getElementById('maxConcurrent').textContent = metrics.max_concurrent_pdf_generations;
+
+                // Card 4: Queue
+                document.getElementById('queueSize').textContent = metrics.queue_size;
+
+                // Card 5: PDF Generations
+                document.getElementById('pdfGenerations').textContent = metrics.pdf_generations.toLocaleString();
+
+                // Card 6: Avg Response Time
+                document.getElementById('avgResponseTime').textContent = `${(metrics.avg_pdf_generation_time_ms / 1000).toFixed(2)} s`;
+
+                // Card 7: Failed PDF Generations
+                document.getElementById('failedPdfGenerations').textContent = metrics.failed_pdf_generations.toLocaleString();
+
+                // Card 8: Error Rate
+                const pdfErrorRate = metrics.error_pdf_generation_rate_percent;
+                const errorRateElement = document.getElementById('errorRate');
+                errorRateElement.textContent = `${pdfErrorRate.toFixed(2)}%`;
+
+                // Determine error rate class based on thresholds
+                let errorClass = 'card-value success';
+                if (pdfErrorRate > 5) {
+                    errorClass = 'card-value error';
+                } else if (pdfErrorRate > 1) {
+                    errorClass = 'card-value warning';
+                }
+                errorRateElement.className = errorClass;
+
+                // Card 9: SVG Conversions
+                document.getElementById('svgConversions').textContent = metrics.total_svg_conversions.toLocaleString();
+
+                // Card 10: Avg SVG Conversion Time
+                document.getElementById('avgSvgTime').textContent = `${metrics.avg_svg_conversion_time_ms.toFixed(0)} ms`;
+
+                // Card 11: Failed SVG Conversions
+                document.getElementById('failedSvgConversions').textContent = metrics.failed_svg_conversions.toLocaleString();
+
+                // Card 12: SVG Error Rate
+                const svgErrorRate = metrics.error_svg_conversion_rate_percent;
+                const svgErrorRateElement = document.getElementById('svgErrorRate');
+                svgErrorRateElement.textContent = `${svgErrorRate.toFixed(2)}%`;
+
+                // Determine SVG error rate class
+                let svgErrorClass = 'card-value success';
+                if (svgErrorRate > 5) {
+                    svgErrorClass = 'card-value error';
+                } else if (svgErrorRate > 1) {
+                    svgErrorClass = 'card-value warning';
+                }
+                svgErrorRateElement.className = svgErrorClass;
+
+                // Update charts
+                updateChartData(metrics);
+
+                // Update timestamp
+                document.getElementById('updateTime').textContent = new Date().toLocaleString();
+
+                // Show dashboard if hidden
+                if (document.getElementById('dashboard').style.display === 'none') {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+                document.getElementById('statusText').textContent = 'Connection Error';
+                document.getElementById('statusIndicator').className = 'status-indicator unhealthy';
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            initCharts();
+            updateMetrics();
+            setInterval(updateMetrics, 5000); // Update every 5 seconds
+        });
+    </script>
+</body>
+</html>

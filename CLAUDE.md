@@ -143,9 +143,13 @@ grype weasyprint-service:0.0.0
 - **Schemas** (`app/schemas.py`): Pydantic models for API request/response validation
 
 ### API Endpoints Architecture
+- `/dashboard` - Interactive web-based monitoring dashboard with real-time metrics visualization
+  - Real-time charts for queue size, active conversions, response times, and resource usage
+  - Auto-refresh every 5 seconds
+  - Configurable light/dark theme via DASHBOARD_THEME environment variable (default: light)
 - `/health` - Health check endpoint with optional detailed metrics
   - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
-  - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, and health monitoring info
+  - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, health monitoring info, and queue metrics
 - `/version` - Service version information (Python, WeasyPrint, Chromium, service versions)
 - `/convert/html` - Basic HTML to PDF conversion (accepts HTML string, returns PDF binary)
 - `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data, for embedded resources)
@@ -170,9 +174,12 @@ grype weasyprint-service:0.0.0
 - `CHROMIUM_MAX_CONVERSION_RETRIES`: Max retry attempts on conversion failure (1-10, default: 2)
 - `CHROMIUM_CONVERSION_TIMEOUT`: Timeout in seconds for each conversion (5-300, default: 30)
 
-**Health Monitoring (New):**
+**Health Monitoring:**
 - `CHROMIUM_HEALTH_CHECK_ENABLED`: Enable background health monitoring (true/false, default: true)
 - `CHROMIUM_HEALTH_CHECK_INTERVAL`: Interval in seconds for background health checks (10-300, default: 30)
+
+**Dashboard Configuration:**
+- `DASHBOARD_THEME`: Dashboard theme (light/dark, case-insensitive, default: light)
 
 ## Development Practices
 
@@ -335,7 +342,7 @@ The repository uses extensive pre-commit hooks including:
 
 ### OpenAPI Schema Management
 - Auto-generated during pre-commit via `scripts/precommit_generate_openapi.sh`
-- Stored at `app/static/openapi.json`
+- Stored at `docs/openapi.json`
 - Served at `/static/openapi.json` and docs at `/api/docs`
 - Script starts local FastAPI instance, downloads schema, and formats with jq
 
@@ -385,12 +392,14 @@ The ChromiumManager includes proactive health monitoring to ensure reliability:
 - **Automatic Recovery**: Restarts browser after 3 consecutive health check failures
 - **Metrics Collection**: Tracks all conversions, failures, response times, and system uptime
 - **Retry Logic**: Automatic retry with browser restart on conversion errors (configurable via `CHROMIUM_MAX_CONVERSION_RETRIES`)
+- **Queue Monitoring**: Real-time tracking of request queue and active conversions
 - **Detailed Health Endpoint**: Access `/health?detailed=true` for JSON metrics including:
-  - Total conversions and failures
+  - Total conversions and failures (HTML→PDF and SVG→PNG)
   - Error rate percentage
   - Average conversion time
   - Browser restarts count
   - Uptime and last health check status
+  - Queue metrics: queue size, active conversions, max queue size, average queue wait time
 
 **Configuration:**
 ```bash
@@ -410,13 +419,31 @@ CHROMIUM_MAX_CONVERSION_RETRIES=3
 CHROMIUM_CONVERSION_TIMEOUT=30
 ```
 
-**Monitoring Example:**
+**Monitoring Dashboard:**
+```bash
+# Access interactive web dashboard
+open http://localhost:9080/dashboard
+
+# Dashboard features:
+# - Real-time charts with 5-second auto-refresh
+# - Queue size and active conversions visualization
+# - Response time metrics (HTML→PDF and SVG→PNG)
+# - Resource usage (CPU and Memory)
+# - Conversion rate graphs
+# - System information and health status
+# - Configurable light/dark theme (DASHBOARD_THEME env var, default: light)
+
+# Configure dashboard theme
+DASHBOARD_THEME=dark uv run python -m app.weasyprint_service_application --port 9080
+```
+
+**Monitoring API:**
 ```bash
 # Simple health check
 curl http://localhost:9080/health
 # Response: OK (200) or Service Unavailable (503)
 
-# Detailed health with metrics
+# Detailed health with metrics (used by dashboard)
 curl http://localhost:9080/health?detailed=true
 # Response (JSON):
 {
@@ -427,13 +454,27 @@ curl http://localhost:9080/health?detailed=true
   "metrics": {
     "total_conversions": 1523,
     "failed_conversions": 2,
+    "total_svg_conversions": 458,
+    "failed_svg_conversions": 1,
     "error_rate_percent": 0.13,
-    "total_restarts": 0,
+    "total_chromium_restarts": 0,
     "avg_conversion_time_ms": 145.23,
-    "last_health_check": 1760450132.61,
+    "avg_svg_conversion_time_ms": 82.45,
+    "last_health_check": "14:30:45 16.10.2025",
     "last_health_status": true,
     "consecutive_failures": 0,
-    "uptime_seconds": 3600.45
+    "uptime_seconds": 3600.45,
+    "current_cpu_percent": 12.5,
+    "avg_cpu_percent": 8.3,
+    "total_memory_mb": 16384.0,
+    "available_memory_mb": 8192.0,
+    "current_chromium_memory_mb": 256.8,
+    "avg_chromium_memory_mb": 234.5,
+    "queue_size": 3,
+    "max_queue_size": 15,
+    "active_conversions": 7,
+    "avg_queue_time_ms": 12.34,
+    "max_concurrent_conversions": 10
   }
 }
 ```

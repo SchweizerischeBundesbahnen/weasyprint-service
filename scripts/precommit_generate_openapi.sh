@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Start the app locally and save app/static/openapi.json
+# Start the app locally and save openapi.json
 # - Starts FastAPI on configurable port via python from local virtualenv only
 # - Waits until OpenAPI endpoint is up
-# - Downloads and pretty-prints directly to app/static/openapi.json
+# - Downloads and pretty-prints directly to docs/openapi.json
 
 ROOT_DIR="$(cd "$(dirname "$0")"/.. && pwd)"
-OUTPUT="${ROOT_DIR}/app/static/openapi.json"
+OUTPUT="${ROOT_DIR}/docs/openapi.json"
 PORT="${OPENAPI_PORT:-9980}"
 URL="http://localhost:${PORT}/static/openapi.json"
 

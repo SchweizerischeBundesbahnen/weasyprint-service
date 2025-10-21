@@ -82,10 +82,17 @@ uv run python scripts/load_test.py --url http://localhost:9080 --requests 200 --
 
 # Stress test with high concurrency
 uv run python scripts/load_test.py --scenario svg --requests 2000 --concurrency 100 --timeout 60
+
+# Verbose mode - show detailed per-request information
+uv run python scripts/load_test.py --requests 50 --concurrency 5 --verbose
 ```
 
 **Load Test Features:**
 - Real-time progress display with success/failure counts
+- Verbose mode (`--verbose` or `-v`): visual per-request tracking with "Request sent..." and completion status
+  - Shows: `[N/total] → Request sent...` when request is initiated
+  - Shows: `[N/total] ✓ Completed in XXXms` on success
+  - Shows: `[N/total] ✗ Completed in XXXms (error)` on failure
 - Comprehensive metrics: min/max/avg/p50/p95/p99 response times
 - Requests per second calculation
 - Status code and error distribution

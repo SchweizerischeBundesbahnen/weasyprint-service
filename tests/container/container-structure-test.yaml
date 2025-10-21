@@ -48,3 +48,12 @@ fileExistenceTests:
     permissions: drwxrwxrwx
     uid: 0
     gid: 0
+  - name: Dashboard HTML resource
+    path: /opt/weasyprint/app/resources/dashboard.html
+    shouldExist: true
+  - name: Dashboard note.png resource
+    path: /opt/weasyprint/app/resources/note.png
+    shouldExist: true
+  - name: Chart.js library for dashboard
+    path: /opt/weasyprint/app/static/chart.umd.min.js
+    shouldExist: true

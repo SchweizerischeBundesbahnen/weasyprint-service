@@ -9,17 +9,21 @@ Features:
 - Configurable number of requests and concurrency
 - Multiple test scenarios (simple HTML, complex HTML, SVG conversion)
 - Real-time progress and statistics display
+- Verbose mode with visual per-request tracking (shows "Request sent..." and completion status)
 - Results export to console, JSON, or CSV
 
 Usage examples:
     # Simple test with 100 requests, 10 concurrent workers (default: 10 pages, 3 SVGs per page)
     python scripts/load_test.py --requests 100 --concurrency 10
 
+    # Verbose mode - visual tracking of each request (sent → completed)
+    python scripts/load_test.py --requests 50 --concurrency 5 --verbose
+
     # Complex HTML test with custom URL and JSON output
     python scripts/load_test.py --url http://localhost:9080 --scenario complex --requests 500 --concurrency 20 --output results.json
 
-    # SVG conversion stress test with 20 pages and 5 SVGs per page
-    python scripts/load_test.py --scenario svg --requests 1000 --concurrency 50 --pages 20 --svgs-per-page 5
+    # SVG conversion stress test with 20 pages and 5 SVGs per page (verbose)
+    python scripts/load_test.py --scenario svg --requests 1000 --concurrency 50 --pages 20 --svgs-per-page 5 --verbose
 
     # Large document test (50 pages, 10 SVGs per page)
     python scripts/load_test.py --scenario complex --pages 50 --svgs-per-page 10 --requests 100 --concurrency 5
@@ -92,7 +96,7 @@ class LoadTestResults:
 class LoadTester:
     """Async load tester for WeasyPrint service."""
 
-    def __init__(self, base_url: str, scenario: str, concurrency: int, timeout: float, pages: int, svgs_per_page: int):
+    def __init__(self, base_url: str, scenario: str, concurrency: int, timeout: float, pages: int, svgs_per_page: int, verbose: bool = False):
         """
         Initialize load tester.
 
@@ -103,6 +107,7 @@ class LoadTester:
             timeout: Request timeout in seconds
             pages: Number of pages to generate in PDF (default: 10)
             svgs_per_page: Number of SVG elements per page (default: 3)
+            verbose: Enable verbose per-request output (default: False)
         """
         self.base_url = base_url.rstrip("/")
         self.scenario = scenario
@@ -110,6 +115,7 @@ class LoadTester:
         self.timeout = timeout
         self.pages = pages
         self.svgs_per_page = svgs_per_page
+        self.verbose = verbose
         self.results: list[RequestStats] = []
         self.lock = asyncio.Lock()
         self.progress_counter = 0
@@ -327,19 +333,24 @@ class LoadTester:
         """
         return "/convert/html", html
 
-    async def _send_request(self, client: httpx.AsyncClient, request_id: int) -> RequestStats:
+    async def _send_request(self, client: httpx.AsyncClient, request_id: int, total_requests: int) -> RequestStats:
         """
         Send a single request and collect statistics.
 
         Args:
             client: HTTP client
             request_id: Request identifier
+            total_requests: Total number of requests (for display)
 
         Returns:
             Request statistics
         """
         endpoint, html_content = self._get_test_payload()
         url = f"{self.base_url}{endpoint}"
+
+        # Print "request sent" message in verbose mode
+        if self.verbose:
+            print(f"[{request_id + 1:4d}/{total_requests}] → Request sent...")
 
         start_time = time.time()
         try:
@@ -376,15 +387,26 @@ class LoadTester:
                     queue.task_done()
                     break
 
-                stats = await self._send_request(client, request_id)
+                stats = await self._send_request(client, request_id, total_requests)
 
                 async with self.lock:
                     self.results.append(stats)
                     self.progress_counter += 1
-                    # Print progress every 10 requests or on completion
-                    if self.progress_counter % 10 == 0 or self.progress_counter == total_requests:
+
+                    if self.verbose:
+                        # Simple visual output: request completed
+                        status_icon = "✓" if stats.success else "✗"
+                        error_str = f" ({stats.error})" if stats.error else ""
+
+                        print(f"[{self.progress_counter:4d}/{total_requests}] {status_icon} Completed in {stats.duration_ms:7.2f}ms{error_str}")
+                    # Compact progress bar (every 10 requests or on completion)
+                    elif self.progress_counter % 10 == 0 or self.progress_counter == total_requests:
                         progress_pct = (self.progress_counter / total_requests) * 100
-                        print(f"\rProgress: {self.progress_counter}/{total_requests} ({progress_pct:.1f}%) - Success: {sum(1 for r in self.results if r.success)}, Failed: {sum(1 for r in self.results if not r.success)}", end="", flush=True)
+                        print(
+                            f"\rProgress: {self.progress_counter}/{total_requests} ({progress_pct:.1f}%) - Success: {sum(1 for r in self.results if r.success)}, Failed: {sum(1 for r in self.results if not r.success)}",
+                            end="",
+                            flush=True,
+                        )
 
                 queue.task_done()
             except Exception as e:
@@ -404,7 +426,11 @@ class LoadTester:
         print(f"Starting load test: {num_requests} requests with {self.concurrency} concurrent workers")
         print(f"Target: {self.base_url}")
         print(f"Scenario: {self.scenario}")
+        print(f"Verbose mode: {'enabled' if self.verbose else 'disabled'}")
         print("-" * 80)
+        if self.verbose:
+            print("Sending requests and tracking completion...")
+            print()
 
         # Create queue and fill with request IDs
         queue: asyncio.Queue = asyncio.Queue()
@@ -428,7 +454,8 @@ class LoadTester:
             await asyncio.gather(*workers)
 
         total_duration = time.time() - start_time
-        print()  # New line after progress
+        if not self.verbose:
+            print()  # New line after progress
         print("-" * 80)
 
         return self._calculate_results(total_duration)
@@ -606,6 +633,8 @@ def main() -> None:
 
     parser.add_argument("--format", "-f", choices=["json", "csv"], default="json", help="Output format: json or csv (default: json)")
 
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output (print details for each request)")
+
     args = parser.parse_args()
 
     # Validate arguments
@@ -629,6 +658,7 @@ def main() -> None:
             timeout=args.timeout,
             pages=args.pages,
             svgs_per_page=args.svgs_per_page,
+            verbose=args.verbose,
         )
 
         results = asyncio.run(tester.run(args.requests))

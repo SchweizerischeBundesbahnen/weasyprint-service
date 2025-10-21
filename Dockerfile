@@ -52,6 +52,7 @@ COPY ./requirements.txt ${WORKING_DIR}/requirements.txt
 
 COPY ./app/*.py ${WORKING_DIR}/app/
 COPY ./app/static/ ${WORKING_DIR}/app/static/
+COPY ./app/resources/ ${WORKING_DIR}/app/resources/
 COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
 COPY ./uv.lock ${WORKING_DIR}/uv.lock
 

@@ -13,6 +13,8 @@ from urllib.parse import unquote
 import weasyprint  # type: ignore
 from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.responses import HTMLResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from starlette.staticfiles import StaticFiles
 
@@ -21,6 +23,7 @@ from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.notes_processor import NotesProcessor
+from app.prometheus_metrics import update_metrics_from_chromium_manager
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
@@ -64,6 +67,20 @@ app = FastAPI(
     openapi_version="3.1.0",
     lifespan=lifespan,
 )
+
+# Initialize Prometheus Instrumentator for automatic HTTP metrics
+# Note: We instrument but don't expose() - we'll create our own /metrics endpoint
+Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_respect_env_var=True,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/metrics"],
+    env_var_name="ENABLE_METRICS",
+    inprogress_name="http_requests_inprogress",
+    inprogress_labels=True,
+).instrument(app)
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 
@@ -196,6 +213,34 @@ async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chrom
     }
     logger.debug("Version info: %s", version_info)
     return version_info
+
+
+@app.get(
+    "/metrics",
+    summary="Prometheus metrics",
+    description="Returns Prometheus-compatible metrics for monitoring and observability",
+    operation_id="getMetrics",
+    tags=["meta"],
+    response_class=Response,
+)
+async def metrics(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> Response:
+    """
+    Expose Prometheus metrics endpoint.
+
+    This endpoint returns metrics in Prometheus text format, including:
+    - Automatic FastAPI request metrics (duration, in-progress, total) from prometheus-fastapi-instrumentator
+    - Custom ChromiumManager metrics (conversions, failures, resource usage)
+    - System metrics (CPU, memory)
+
+    The metrics are automatically scraped by Prometheus for monitoring and alerting.
+    """
+    # Update custom metrics from ChromiumManager before serving
+    update_metrics_from_chromium_manager(chromium_manager)
+
+    # Generate Prometheus metrics output
+    metrics_output = generate_latest()
+
+    return Response(content=metrics_output, media_type=CONTENT_TYPE_LATEST)
 
 
 class RenderOptions(BaseModel):

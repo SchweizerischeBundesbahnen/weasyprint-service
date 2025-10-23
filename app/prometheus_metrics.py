@@ -3,6 +3,9 @@ Prometheus metrics collectors for weasyprint-service.
 
 This module defines custom Prometheus metrics that expose ChromiumManager
 and application-level metrics for monitoring and observability.
+
+Note: Counters are incremented when events occur (not synced from external state).
+      Gauges are updated periodically to reflect current state.
 """
 
 import logging
@@ -17,7 +20,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Chromium conversion metrics
+# Chromium conversion counters - these are incremented when events occur
+# DO NOT set these directly - use the increment functions below
 chromium_pdf_generations_total = Counter(
     "chromium_pdf_generations_total",
     "Total number of successful HTML to PDF conversions",
@@ -38,7 +42,7 @@ chromium_svg_conversion_failures_total = Counter(
     "Total number of failed SVG to PNG conversions",
 )
 
-# Conversion duration histograms
+# Conversion duration histograms - observations are added when conversions complete
 chromium_pdf_generation_duration_seconds = Histogram(
     "chromium_pdf_generation_duration_seconds",
     "HTML to PDF conversion duration in seconds",
@@ -123,12 +127,42 @@ chromium_info = Info(
 )
 
 
-def update_metrics_from_chromium_manager(chromium_manager: "ChromiumManager") -> None:
-    """
-    Update all Prometheus metrics from ChromiumManager metrics.
+# Helper functions to increment counters (called when events occur)
+def increment_pdf_generation_success(duration_seconds: float) -> None:
+    """Increment successful PDF generation counter and record duration."""
+    chromium_pdf_generations_total.inc()
+    chromium_pdf_generation_duration_seconds.observe(duration_seconds)
 
-    This function should be called periodically or before serving metrics
-    to ensure Prometheus gauges reflect the current state.
+
+def increment_pdf_generation_failure() -> None:
+    """Increment failed PDF generation counter."""
+    chromium_pdf_generation_failures_total.inc()
+
+
+def increment_svg_conversion_success(duration_seconds: float) -> None:
+    """Increment successful SVG conversion counter and record duration."""
+    chromium_svg_conversions_total.inc()
+    chromium_svg_conversion_duration_seconds.observe(duration_seconds)
+
+
+def increment_svg_conversion_failure() -> None:
+    """Increment failed SVG conversion counter."""
+    chromium_svg_conversion_failures_total.inc()
+
+
+def increment_chromium_restart() -> None:
+    """Increment Chromium restart counter."""
+    chromium_restarts_total.inc()
+
+
+def update_gauges_from_chromium_manager(chromium_manager: "ChromiumManager") -> None:
+    """
+    Update Prometheus gauges from ChromiumManager current state.
+
+    This function should be called before serving metrics to ensure
+    gauges reflect the current state. It ONLY updates gauges, not counters.
+
+    Note: Counters are incremented when events occur via the increment_* functions.
 
     Args:
         chromium_manager: ChromiumManager instance to collect metrics from
@@ -136,15 +170,7 @@ def update_metrics_from_chromium_manager(chromium_manager: "ChromiumManager") ->
     try:
         metrics = chromium_manager.get_metrics()
 
-        # Update counters (set to current value - Prometheus counters should only increase)
-        # Note: We update the internal _value directly since these are cumulative
-        chromium_pdf_generations_total._value.set(float(metrics["pdf_generations"]))
-        chromium_pdf_generation_failures_total._value.set(float(metrics["failed_pdf_generations"]))
-        chromium_svg_conversions_total._value.set(float(metrics["total_svg_conversions"]))
-        chromium_svg_conversion_failures_total._value.set(float(metrics["failed_svg_conversions"]))
-        chromium_restarts_total._value.set(float(metrics["total_chromium_restarts"]))
-
-        # Update gauges - convert to float to satisfy mypy type checking
+        # Update gauges only - convert to float to satisfy mypy type checking
         chromium_pdf_generation_error_rate_percent.set(float(metrics["error_pdf_generation_rate_percent"]))
         chromium_svg_conversion_error_rate_percent.set(float(metrics["error_svg_conversion_rate_percent"]))
         chromium_uptime_seconds.set(float(metrics["uptime_seconds"]))
@@ -154,16 +180,14 @@ def update_metrics_from_chromium_manager(chromium_manager: "ChromiumManager") ->
         system_memory_available_bytes.set(float(metrics["available_memory_mb"]) * 1024 * 1024)  # Convert MB to bytes
         chromium_queue_size.set(float(metrics["queue_size"]))
         chromium_active_pdf_generations.set(float(metrics["active_pdf_generations"]))
-
-        # Note: Histogram observations (duration and queue time) are recorded during actual conversions
-        # in the ChromiumManager, not here. This function only updates counters and gauges.
+        chromium_consecutive_failures.set(float(metrics.get("consecutive_failures", 0)))
 
         # Update browser info
         chromium_version = chromium_manager.get_version()
         if chromium_version:
             chromium_info.info({"version": chromium_version})
 
-        logger.debug("Prometheus metrics updated from ChromiumManager")
+        logger.debug("Prometheus gauges updated from ChromiumManager")
 
     except Exception as e:
-        logger.error("Failed to update Prometheus metrics: %s", e, exc_info=True)
+        logger.error("Failed to update Prometheus gauges: %s", e, exc_info=True)

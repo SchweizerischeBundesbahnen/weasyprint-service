@@ -7,6 +7,7 @@ from HTML and CSS.
 
 - Simple REST API to access [WeasyPrint](https://github.com/Kozea/WeasyPrint)
 - Real-time monitoring dashboard with metrics visualization
+- Prometheus metrics endpoint for Grafana integration and observability
 - Compatible with amd64 and arm64 architectures
 - Easily deployable via Docker
 
@@ -181,6 +182,105 @@ docker run --detach \
 - Consider restricting dashboard access via reverse proxy (nginx, Traefik)
 - Use authentication middleware for sensitive environments
 - Monitor dashboard endpoint metrics separately
+
+### Prometheus & Grafana Integration
+
+The service exposes Prometheus-compatible metrics for comprehensive monitoring and observability through Grafana dashboards.
+
+**Metrics Endpoint:** `/metrics`
+
+**Available Metrics:**
+
+**Conversion Metrics:**
+- `chromium_pdf_generations_total` - Total successful HTML→PDF conversions
+- `chromium_pdf_generation_failures_total` - Total failed PDF conversions
+- `chromium_svg_conversions_total` - Total successful SVG→PNG conversions
+- `chromium_svg_conversion_failures_total` - Total failed SVG conversions
+- `chromium_pdf_generation_error_rate_percent` - PDF generation error rate
+- `chromium_svg_conversion_error_rate_percent` - SVG conversion error rate
+
+**Performance Metrics:**
+- `chromium_pdf_generation_duration_seconds` - PDF generation time histogram
+- `chromium_svg_conversion_duration_seconds` - SVG conversion time histogram
+- `chromium_queue_time_seconds` - Request queue wait time histogram
+- `http_request_duration_seconds` - HTTP request duration histogram
+
+**Resource Metrics:**
+- `chromium_cpu_percent` - Current Chromium CPU usage
+- `chromium_memory_bytes` - Current Chromium memory usage
+- `system_memory_total_bytes` - Total system memory
+- `system_memory_available_bytes` - Available system memory
+- `chromium_queue_size` - Current requests in queue
+- `chromium_active_pdf_generations` - Active conversion processes
+
+**Health Metrics:**
+- `chromium_uptime_seconds` - Browser uptime
+- `chromium_restarts_total` - Browser restart count
+- `chromium_consecutive_failures` - Health check failure streak
+
+**Prometheus Configuration Example:**
+
+```yaml
+scrape_configs:
+  - job_name: 'weasyprint-service'
+    static_configs:
+      - targets: ['weasyprint-service:9080']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+```
+
+**Grafana Dashboard Queries:**
+
+```promql
+# PDF generation rate (requests per second)
+rate(chromium_pdf_generations_total[5m])
+
+# Error rate percentage
+(rate(chromium_pdf_generation_failures_total[5m]) + rate(chromium_svg_conversion_failures_total[5m]))
+/ (rate(chromium_pdf_generations_total[5m]) + rate(chromium_svg_conversions_total[5m])) * 100
+
+# 95th percentile conversion duration
+histogram_quantile(0.95, rate(chromium_pdf_generation_duration_seconds_bucket[5m]))
+
+# Memory usage (MB)
+chromium_memory_bytes / 1024 / 1024
+```
+
+**Docker Compose Example with Prometheus & Grafana:**
+
+```yaml
+version: '3.8'
+services:
+  weasyprint-service:
+    image: ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+    init: true
+    ports:
+      - "9080:9080"
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+volumes:
+  prometheus-data:
+  grafana-data:
+```
+
+For complete metric descriptions and alerting examples, see [CLAUDE.md](CLAUDE.md#prometheus-integration).
 
 ### Logging Configuration
 

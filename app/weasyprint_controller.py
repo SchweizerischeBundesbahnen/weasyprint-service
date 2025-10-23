@@ -23,7 +23,11 @@ from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.notes_processor import NotesProcessor
-from app.prometheus_metrics import update_metrics_from_chromium_manager
+from app.prometheus_metrics import (
+    increment_pdf_generation_failure,
+    increment_pdf_generation_success,
+    update_gauges_from_chromium_manager,
+)
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
@@ -233,9 +237,12 @@ async def metrics(chromium_manager: Annotated[ChromiumManager, Depends(get_chrom
     - System metrics (CPU, memory)
 
     The metrics are automatically scraped by Prometheus for monitoring and alerting.
+
+    Note: Counters are incremented when events occur. This endpoint only updates gauges
+    to reflect current state (CPU, memory, queue size, etc.).
     """
-    # Update custom metrics from ChromiumManager before serving
-    update_metrics_from_chromium_manager(chromium_manager)
+    # Update gauges from ChromiumManager before serving (counters are updated when events occur)
+    update_gauges_from_chromium_manager(chromium_manager)
 
     # Generate Prometheus metrics output
     metrics_output = generate_latest()
@@ -404,20 +411,25 @@ async def convert_html(
         # Record conversion success metrics
         duration_ms = (time.time() - start_time) * 1000
         chromium_manager._metrics.record_success(duration_ms)
+        # Also increment Prometheus counter
+        increment_pdf_generation_success(duration_ms / 1000.0)  # Convert ms to seconds
 
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
         logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
         chromium_manager._metrics.record_failure()
+        increment_pdf_generation_failure()
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
         logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
         chromium_manager._metrics.record_failure()
+        increment_pdf_generation_failure()
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
         logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
         chromium_manager._metrics.record_failure()
+        increment_pdf_generation_failure()
         return __process_error(e, "Unexpected error due converting to PDF", 500)
 
 
@@ -531,20 +543,25 @@ async def convert_html_with_attachments(
         # Record conversion success metrics
         duration_ms = (time.time() - start_time) * 1000
         chromium_manager._metrics.record_success(duration_ms)
+        # Also increment Prometheus counter
+        increment_pdf_generation_success(duration_ms / 1000.0)  # Convert ms to seconds
 
         return await __create_response(output, output_pdf)
 
     except AssertionError as e:
         logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
         chromium_manager._metrics.record_failure()
+        increment_pdf_generation_failure()
         return __process_error(e, "Assertion error, check the request body html", 400)
     except (UnicodeDecodeError, LookupError) as e:
         logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
         chromium_manager._metrics.record_failure()
+        increment_pdf_generation_failure()
         return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
         logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
         chromium_manager._metrics.record_failure()
+        increment_pdf_generation_failure()
         return __process_error(e, "Unexpected error due converting to PDF", 500)
     finally:
         logger.debug("Cleaning up temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))

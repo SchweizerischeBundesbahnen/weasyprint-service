@@ -22,6 +22,9 @@ from typing import TYPE_CHECKING
 import psutil
 from playwright.async_api import ViewportSize, async_playwright
 
+# Import Prometheus metric helpers
+from app.prometheus_metrics import increment_chromium_restart, increment_svg_conversion_failure, increment_svg_conversion_success
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
@@ -155,6 +158,7 @@ class ChromiumMetrics:
     def record_restart(self) -> None:
         """Record a browser restart."""
         self.total_chromium_restarts += 1
+        increment_chromium_restart()  # Also increment Prometheus counter
 
     def record_health_check(self, is_healthy: bool) -> None:
         """Record a health check result."""
@@ -561,6 +565,8 @@ class ChromiumManager:
                 # Record SVG success metrics
                 duration_ms = (time.time() - start_time) * 1000
                 self._metrics.record_svg_success(duration_ms)
+                # Also increment Prometheus counter
+                increment_svg_conversion_success(duration_ms / 1000.0)  # Convert ms to seconds
                 return result
             except TimeoutError:
                 last_error = TimeoutError(f"Conversion timed out after {self.conversion_timeout} seconds")
@@ -578,6 +584,7 @@ class ChromiumManager:
 
         # If we get here, all retries failed
         self._metrics.record_svg_failure()
+        increment_svg_conversion_failure()  # Also increment Prometheus counter
         self.log.error("SVG conversion failed after %d attempts: %s", self.max_conversion_retries, str(last_error))
         raise RuntimeError(f"SVG to PNG conversion failed after {self.max_conversion_retries} attempts") from last_error
 

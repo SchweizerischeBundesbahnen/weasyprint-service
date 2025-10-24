@@ -51,11 +51,11 @@ def test_metrics_endpoint_contains_custom_chromium_metrics():
 
         # Check for custom ChromiumManager metrics
         # Note: These will be 0 or default values since we're not running actual conversions
-        assert "chromium_pdf_generations_total" in content
-        assert "chromium_pdf_generation_failures_total" in content
-        assert "chromium_svg_conversions_total" in content
-        assert "chromium_svg_conversion_failures_total" in content
-        assert "chromium_uptime_seconds" in content
+        assert "pdf_generations_total" in content
+        assert "pdf_generation_failures_total" in content
+        assert "svg_conversions_total" in content
+        assert "svg_conversion_failures_total" in content
+        assert "uptime_seconds" in content
         assert "chromium_memory_bytes" in content
         assert "system_memory_total_bytes" in content
 

@@ -192,30 +192,30 @@ The service exposes Prometheus-compatible metrics for comprehensive monitoring a
 **Available Metrics:**
 
 **Conversion Metrics:**
-- `chromium_pdf_generations_total` - Total successful HTML→PDF conversions
-- `chromium_pdf_generation_failures_total` - Total failed PDF conversions
-- `chromium_svg_conversions_total` - Total successful SVG→PNG conversions
-- `chromium_svg_conversion_failures_total` - Total failed SVG conversions
-- `chromium_pdf_generation_error_rate_percent` - PDF generation error rate
-- `chromium_svg_conversion_error_rate_percent` - SVG conversion error rate
+- `pdf_generations_total` - Total successful PDF generations
+- `pdf_generation_failures_total` - Total failed PDF conversions
+- `pdf_generation_error_rate_percent` - PDF generation error rate
+- `svg_conversions_total` - Total successful SVG conversions
+- `svg_conversion_failures_total` - Total failed SVG conversions
+- `svg_conversion_error_rate_percent` - SVG conversion error rate
 
 **Performance Metrics:**
-- `chromium_pdf_generation_duration_seconds` - PDF generation time histogram
-- `chromium_svg_conversion_duration_seconds` - SVG conversion time histogram
-- `chromium_queue_time_seconds` - Request queue wait time histogram
+- `pdf_generation_duration_seconds` - PDF generation time histogram
+- `svg_conversion_duration_seconds` - SVG conversion time histogram
+- `queue_time_seconds` - Request queue wait time histogram
 - `http_request_duration_seconds` - HTTP request duration histogram
 
 **Resource Metrics:**
-- `chromium_cpu_percent` - Current Chromium CPU usage
-- `chromium_memory_bytes` - Current Chromium memory usage
+- `cpu_percent` - Current CPU usage
 - `system_memory_total_bytes` - Total system memory
 - `system_memory_available_bytes` - Available system memory
-- `chromium_queue_size` - Current requests in queue
-- `chromium_active_pdf_generations` - Active conversion processes
+- `chromium_memory_bytes` - Current Chromium memory usage
+- `queue_size` - Current requests in queue
+- `active_pdf_generations` - Active PDF generations processes
 
 **Health Metrics:**
-- `chromium_uptime_seconds` - Browser uptime
-- `chromium_restarts_total` - Browser restart count
+- `uptime_seconds` - Service uptime
+- `chromium_restarts_total` - Chromium restart count
 - `chromium_consecutive_failures` - Health check failure streak
 
 **Prometheus Configuration Example:**

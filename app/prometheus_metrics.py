@@ -22,47 +22,47 @@ logger = logging.getLogger(__name__)
 
 # Chromium conversion counters - these are incremented when events occur
 # DO NOT set these directly - use the increment functions below
-chromium_pdf_generations_total = Counter(
-    "chromium_pdf_generations_total",
+pdf_generations_total = Counter(
+    "pdf_generations_total",
     "Total number of successful HTML to PDF conversions",
 )
 
-chromium_pdf_generation_failures_total = Counter(
-    "chromium_pdf_generation_failures_total",
+pdf_generation_failures_total = Counter(
+    "pdf_generation_failures_total",
     "Total number of failed HTML to PDF conversions",
 )
 
-chromium_svg_conversions_total = Counter(
-    "chromium_svg_conversions_total",
+svg_conversions_total = Counter(
+    "svg_conversions_total",
     "Total number of successful SVG to PNG conversions",
 )
 
-chromium_svg_conversion_failures_total = Counter(
-    "chromium_svg_conversion_failures_total",
+svg_conversion_failures_total = Counter(
+    "svg_conversion_failures_total",
     "Total number of failed SVG to PNG conversions",
 )
 
 # Conversion duration histograms - observations are added when conversions complete
-chromium_pdf_generation_duration_seconds = Histogram(
-    "chromium_pdf_generation_duration_seconds",
+pdf_generation_duration_seconds = Histogram(
+    "pdf_generation_duration_seconds",
     "HTML to PDF conversion duration in seconds",
     buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0],
 )
 
-chromium_svg_conversion_duration_seconds = Histogram(
-    "chromium_svg_conversion_duration_seconds",
+svg_conversion_duration_seconds = Histogram(
+    "svg_conversion_duration_seconds",
     "SVG to PNG conversion duration in seconds",
     buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0],
 )
 
 # Error rate gauges
-chromium_pdf_generation_error_rate_percent = Gauge(
-    "chromium_pdf_generation_error_rate_percent",
+pdf_generation_error_rate_percent = Gauge(
+    "pdf_generation_error_rate_percent",
     "PDF generation error rate as percentage",
 )
 
-chromium_svg_conversion_error_rate_percent = Gauge(
-    "chromium_svg_conversion_error_rate_percent",
+svg_conversion_error_rate_percent = Gauge(
+    "svg_conversion_error_rate_percent",
     "SVG conversion error rate as percentage",
 )
 
@@ -72,9 +72,9 @@ chromium_restarts_total = Counter(
     "Total number of Chromium browser restarts",
 )
 
-chromium_uptime_seconds = Gauge(
-    "chromium_uptime_seconds",
-    "Chromium browser uptime in seconds",
+uptime_seconds = Gauge(
+    "uptime_seconds",
+    "Service uptime in seconds",
 )
 
 chromium_consecutive_failures = Gauge(
@@ -83,9 +83,9 @@ chromium_consecutive_failures = Gauge(
 )
 
 # Resource usage metrics
-chromium_cpu_percent = Gauge(
-    "chromium_cpu_percent",
-    "Current Chromium CPU usage percentage",
+cpu_percent = Gauge(
+    "cpu_percent",
+    "Current CPU usage percentage",
 )
 
 chromium_memory_bytes = Gauge(
@@ -104,18 +104,18 @@ system_memory_available_bytes = Gauge(
 )
 
 # Queue and concurrency metrics
-chromium_queue_size = Gauge(
-    "chromium_queue_size",
+queue_size = Gauge(
+    "queue_size",
     "Current number of requests in the conversion queue",
 )
 
-chromium_active_pdf_generations = Gauge(
-    "chromium_active_pdf_generations",
+active_pdf_generations = Gauge(
+    "active_pdf_generations",
     "Current number of active PDF generation processes",
 )
 
-chromium_queue_time_seconds = Histogram(
-    "chromium_queue_time_seconds",
+queue_time_seconds = Histogram(
+    "queue_time_seconds",
     "Time requests spend waiting in the queue",
     buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0],
 )
@@ -130,24 +130,24 @@ chromium_info = Info(
 # Helper functions to increment counters (called when events occur)
 def increment_pdf_generation_success(duration_seconds: float) -> None:
     """Increment successful PDF generation counter and record duration."""
-    chromium_pdf_generations_total.inc()
-    chromium_pdf_generation_duration_seconds.observe(duration_seconds)
+    pdf_generations_total.inc()
+    pdf_generation_duration_seconds.observe(duration_seconds)
 
 
 def increment_pdf_generation_failure() -> None:
     """Increment failed PDF generation counter."""
-    chromium_pdf_generation_failures_total.inc()
+    pdf_generation_failures_total.inc()
 
 
 def increment_svg_conversion_success(duration_seconds: float) -> None:
     """Increment successful SVG conversion counter and record duration."""
-    chromium_svg_conversions_total.inc()
-    chromium_svg_conversion_duration_seconds.observe(duration_seconds)
+    svg_conversions_total.inc()
+    svg_conversion_duration_seconds.observe(duration_seconds)
 
 
 def increment_svg_conversion_failure() -> None:
     """Increment failed SVG conversion counter."""
-    chromium_svg_conversion_failures_total.inc()
+    svg_conversion_failures_total.inc()
 
 
 def increment_chromium_restart() -> None:
@@ -171,15 +171,15 @@ def update_gauges_from_chromium_manager(chromium_manager: "ChromiumManager") -> 
         metrics = chromium_manager.get_metrics()
 
         # Update gauges only - convert to float to satisfy mypy type checking
-        chromium_pdf_generation_error_rate_percent.set(float(metrics["error_pdf_generation_rate_percent"]))
-        chromium_svg_conversion_error_rate_percent.set(float(metrics["error_svg_conversion_rate_percent"]))
-        chromium_uptime_seconds.set(float(metrics["uptime_seconds"]))
-        chromium_cpu_percent.set(float(metrics["current_cpu_percent"]))
+        pdf_generation_error_rate_percent.set(float(metrics["error_pdf_generation_rate_percent"]))
+        svg_conversion_error_rate_percent.set(float(metrics["error_svg_conversion_rate_percent"]))
+        uptime_seconds.set(float(metrics["uptime_seconds"]))
+        cpu_percent.set(float(metrics["current_cpu_percent"]))
         chromium_memory_bytes.set(float(metrics["current_chromium_memory_mb"]) * 1024 * 1024)  # Convert MB to bytes
         system_memory_total_bytes.set(float(metrics["total_memory_mb"]) * 1024 * 1024)  # Convert MB to bytes
         system_memory_available_bytes.set(float(metrics["available_memory_mb"]) * 1024 * 1024)  # Convert MB to bytes
-        chromium_queue_size.set(float(metrics["queue_size"]))
-        chromium_active_pdf_generations.set(float(metrics["active_pdf_generations"]))
+        queue_size.set(float(metrics["queue_size"]))
+        active_pdf_generations.set(float(metrics["active_pdf_generations"]))
         chromium_consecutive_failures.set(float(metrics.get("consecutive_failures", 0)))
 
         # Update browser info

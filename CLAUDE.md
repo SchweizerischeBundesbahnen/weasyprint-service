@@ -504,26 +504,26 @@ The service exposes metrics in Prometheus format via the `/metrics` endpoint for
 - `http_requests_inprogress` - Current in-flight HTTP requests
 
 **Custom ChromiumManager Metrics:**
-- `chromium_pdf_generations_total` - Total successful HTML→PDF conversions
-- `chromium_pdf_generation_failures_total` - Failed HTML→PDF conversions
-- `chromium_svg_conversions_total` - Total successful SVG→PNG conversions
-- `chromium_svg_conversion_failures_total` - Failed SVG→PNG conversions
-- `chromium_pdf_generation_duration_seconds` - PDF generation duration histogram (buckets: 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
-- `chromium_svg_conversion_duration_seconds` - SVG conversion duration histogram (buckets: 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
-- `chromium_pdf_generation_error_rate_percent` - PDF generation error rate percentage
-- `chromium_svg_conversion_error_rate_percent` - SVG conversion error rate percentage
+- `pdf_generations_total` - Total successful HTML→PDF conversions
+- `pdf_generation_failures_total` - Failed HTML→PDF conversions
+- `svg_conversions_total` - Total successful SVG→PNG conversions
+- `svg_conversion_failures_total` - Failed SVG→PNG conversions
+- `pdf_generation_duration_seconds` - PDF generation duration histogram (buckets: 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+- `svg_conversion_duration_seconds` - SVG conversion duration histogram (buckets: 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
+- `pdf_generation_error_rate_percent` - PDF generation error rate percentage
+- `svg_conversion_error_rate_percent` - SVG conversion error rate percentage
 - `chromium_restarts_total` - Browser restart count
-- `chromium_uptime_seconds` - Browser uptime
+- `uptime_seconds` - Browser uptime
 - `chromium_consecutive_failures` - Current consecutive health check failures
 
 **System & Resource Metrics:**
-- `chromium_cpu_percent` - Current Chromium CPU usage percentage
+- `cpu_percent` - Current Chromium CPU usage percentage
 - `chromium_memory_bytes` - Current Chromium memory usage in bytes
 - `system_memory_total_bytes` - Total system memory in bytes
 - `system_memory_available_bytes` - Available system memory in bytes
-- `chromium_queue_size` - Current number of requests in conversion queue
-- `chromium_active_pdf_generations` - Current number of active PDF generation processes
-- `chromium_queue_time_seconds` - Request queue wait time histogram (buckets: 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0)
+- `queue_size` - Current number of requests in conversion queue
+- `active_pdf_generations` - Current number of active PDF generation processes
+- `queue_time_seconds` - Request queue wait time histogram (buckets: 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0)
 
 **Browser Info:**
 - `chromium_info` - Chromium browser version information
@@ -535,18 +535,18 @@ The service exposes metrics in Prometheus format via the `/metrics` endpoint for
 curl http://localhost:9080/metrics
 
 # Example output (excerpt):
-# HELP chromium_pdf_generations_total Total number of successful HTML to PDF conversions
-# TYPE chromium_pdf_generations_total counter
-chromium_pdf_generations_total 1523.0
-# HELP chromium_pdf_generation_failures_total Total number of failed HTML to PDF conversions
-# TYPE chromium_pdf_generation_failures_total counter
-chromium_pdf_generation_failures_total 2.0
-# HELP chromium_svg_conversions_total Total number of successful SVG to PNG conversions
-# TYPE chromium_svg_conversions_total counter
-chromium_svg_conversions_total 458.0
-# HELP chromium_uptime_seconds Chromium browser uptime in seconds
-# TYPE chromium_uptime_seconds gauge
-chromium_uptime_seconds 3600.45
+# HELP pdf_generations_total Total number of successful HTML to PDF conversions
+# TYPE pdf_generations_total counter
+pdf_generations_total 1523.0
+# HELP pdf_generation_failures_total Total number of failed HTML to PDF conversions
+# TYPE pdf_generation_failures_total counter
+pdf_generation_failures_total 2.0
+# HELP svg_conversions_total Total number of successful SVG to PNG conversions
+# TYPE svg_conversions_total counter
+svg_conversions_total 458.0
+# HELP uptime_seconds Chromium browser uptime in seconds
+# TYPE uptime_seconds gauge
+uptime_seconds 3600.45
 ```
 
 **Prometheus Scrape Configuration:**
@@ -565,32 +565,32 @@ scrape_configs:
 
 ```promql
 # PDF generation rate (requests per second)
-rate(chromium_pdf_generations_total[5m])
+rate(pdf_generations_total[5m])
 
 # SVG conversion rate (requests per second)
-rate(chromium_svg_conversions_total[5m])
+rate(svg_conversions_total[5m])
 
 # Overall error rate percentage
 (
-  rate(chromium_pdf_generation_failures_total[5m]) +
-  rate(chromium_svg_conversion_failures_total[5m])
+  rate(pdf_generation_failures_total[5m]) +
+  rate(svg_conversion_failures_total[5m])
 ) / (
-  rate(chromium_pdf_generations_total[5m]) +
-  rate(chromium_svg_conversions_total[5m])
+  rate(pdf_generations_total[5m]) +
+  rate(svg_conversions_total[5m])
 ) * 100
 
 # 95th percentile PDF generation duration
-histogram_quantile(0.95, rate(chromium_pdf_generation_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, rate(pdf_generation_duration_seconds_bucket[5m]))
 
 # 95th percentile SVG conversion duration
-histogram_quantile(0.95, rate(chromium_svg_conversion_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, rate(svg_conversion_duration_seconds_bucket[5m]))
 
 # Memory usage trend
 chromium_memory_bytes / 1024 / 1024
 
 # Active conversions and queue size
-chromium_active_pdf_generations
-chromium_queue_size
+active_pdf_generations
+queue_size
 ```
 
 **Alerting Rules Example:**
@@ -601,7 +601,7 @@ groups:
     interval: 30s
     rules:
       - alert: HighPDFGenerationErrorRate
-        expr: chromium_pdf_generation_error_rate_percent > 5
+        expr: pdf_generation_error_rate_percent > 5
         for: 5m
         labels:
           severity: warning
@@ -628,7 +628,7 @@ groups:
           description: "Chromium memory usage is {{ $value | humanize }}B"
 
       - alert: LargeConversionQueue
-        expr: chromium_queue_size > 50
+        expr: queue_size > 50
         for: 5m
         labels:
           severity: warning

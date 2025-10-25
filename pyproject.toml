@@ -33,7 +33,7 @@ dev = [
     "types-psutil==7.0.0.20251001",
 ]
 test = [
-    "tox==4.31.0",
+    "tox==4.32.0",
     "docker==7.1.0",
     "pytest==8.4.2",
     "pytest-asyncio>=1.0.0,<2",

@@ -380,7 +380,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(pdf_generation_duration_seconds_sum[5m]) / rate(pdf_generation_duration_seconds_count[5m])",
+          "expr": "avg_pdf_generation_time_seconds",
           "refId": "A",
           "legendFormat": ""
         }
@@ -592,7 +592,7 @@
               }
             ]
           },
-          "unit": "ms"
+          "unit": "s"
         },
         "overrides": []
       },
@@ -624,7 +624,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(svg_conversion_duration_seconds_sum[5m]) / rate(svg_conversion_duration_seconds_count[5m]) * 1000",
+          "expr": "avg_svg_conversion_time_seconds",
           "refId": "A",
           "legendFormat": ""
         }

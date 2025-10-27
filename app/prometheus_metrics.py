@@ -66,6 +66,16 @@ svg_conversion_error_rate_percent = Gauge(
     "SVG conversion error rate as percentage",
 )
 
+avg_pdf_generation_time_seconds = Gauge(
+    "avg_pdf_generation_time_seconds",
+    "Average HTML to PDF conversion time in seconds",
+)
+
+avg_svg_conversion_time_seconds = Gauge(
+    "avg_svg_conversion_time_seconds",
+    "Average SVG to PNG conversion time in seconds",
+)
+
 # Browser lifecycle metrics
 chromium_restarts_total = Counter(
     "chromium_restarts_total",
@@ -181,6 +191,8 @@ def update_gauges_from_chromium_manager(chromium_manager: "ChromiumManager") -> 
         queue_size.set(float(metrics["queue_size"]))
         active_pdf_generations.set(float(metrics["active_pdf_generations"]))
         chromium_consecutive_failures.set(float(metrics.get("consecutive_failures", 0)))
+        avg_pdf_generation_time_seconds.set(float(metrics["avg_pdf_generation_time_ms"]) / 1000.0)
+        avg_svg_conversion_time_seconds.set(float(metrics["avg_svg_conversion_time_ms"]) / 1000.0)
 
         # Update browser info
         chromium_version = chromium_manager.get_version()

@@ -11,6 +11,7 @@ from typing import Annotated
 from urllib.parse import unquote
 
 import weasyprint  # type: ignore
+from bs4 import BeautifulSoup
 from fastapi import Depends, FastAPI, Query, Request, Response
 from fastapi.responses import HTMLResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -373,64 +374,14 @@ async def convert_html(
     logger.debug("Received HTML body of size: %d bytes", len(raw))
     encoding: str = await __get_encoding(request, render.encoding)
     logger.debug("Using encoding: %s", encoding)
+
     try:
-        base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
-        if base_url:
-            logger.debug("Using base URL: %s", sanitize_url_for_logging(base_url))
-
         html = raw.decode(encoding)
-        html_parser = HtmlParser()
-        parsed_html = html_parser.parse(html)
-
-        notes_processor = NotesProcessor()
-        notes = notes_processor.replace_notes(parsed_html)
-
-        # Use CDP-based async SVG processing
-        svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
-        parsed_html = await svg_processor.process_svg(parsed_html)
-
-        processed_html = html_parser.serialize(parsed_html)
-
-        logger.debug("Creating WeasyPrint HTML object with media_type=%s", render.media_type)
-        weasyprint_html = weasyprint.HTML(
-            string=processed_html,
-            base_url=base_url,
-            media_type=render.media_type,
-            encoding=render.encoding,
-        )
-        logger.debug("Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s", output.pdf_variant, render.presentational_hints, output.custom_metadata)
-        output_pdf = weasyprint_html.write_pdf(
-            pdf_variant=output.pdf_variant,
-            presentational_hints=render.presentational_hints,
-            custom_metadata=output.custom_metadata,
-        )
-        logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
-
-        output_pdf = notes_processor.process_pdf_with_notes(output_pdf, notes)
-
-        # Record conversion success metrics
-        duration_ms = (time.time() - start_time) * 1000
-        chromium_manager._metrics.record_success(duration_ms)
-        # Also increment Prometheus counter
-        increment_pdf_generation_success(duration_ms / 1000.0)  # Convert ms to seconds
-
+        output_pdf = await __process_html_to_pdf(html, render, output, chromium_manager)
+        __record_conversion_metrics(chromium_manager, start_time, success=True)
         return await __create_response(output, output_pdf)
-
-    except AssertionError as e:
-        logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
-        chromium_manager._metrics.record_failure()
-        increment_pdf_generation_failure()
-        return __process_error(e, "Assertion error, check the request body html", 400)
-    except (UnicodeDecodeError, LookupError) as e:
-        logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
-        chromium_manager._metrics.record_failure()
-        increment_pdf_generation_failure()
-        return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
-        logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
-        chromium_manager._metrics.record_failure()
-        increment_pdf_generation_failure()
-        return __process_error(e, "Unexpected error due converting to PDF", 500)
+        return __handle_conversion_error(e, chromium_manager)
 
 
 async def __get_encoding(request: Request, encoding: str | None) -> str:
@@ -440,6 +391,156 @@ async def __get_encoding(request: Request, encoding: str | None) -> str:
         if "charset=" in ct:
             charset = ct.split("charset=", 1)[1].split(";", 1)[0].strip()
     return charset or encoding or "utf-8"
+
+
+async def __process_html_to_pdf(
+    html: str,
+    render: RenderOptions,
+    output: OutputOptions,
+    chromium_manager: ChromiumManager,
+    attachments: list | None = None,
+) -> bytes:
+    """
+    Common logic for HTML to PDF conversion with SVG processing.
+
+    This function handles the complete pipeline from raw HTML string to final PDF:
+    - Parses HTML
+    - Processes notes
+    - Converts SVG to PNG
+    - Generates PDF with WeasyPrint
+    - Applies note processing to PDF
+
+    Args:
+        html: HTML content to convert
+        render: Rendering options
+        output: Output options
+        chromium_manager: Chromium manager instance
+        attachments: Optional list of PDF attachments
+
+    Returns:
+        Generated PDF as bytes
+    """
+    html_parser = HtmlParser()
+    parsed_html = html_parser.parse(html)
+
+    return await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments)
+
+
+async def __generate_pdf_from_parsed_html(
+    parsed_html: BeautifulSoup,
+    html_parser: HtmlParser,
+    render: RenderOptions,
+    output: OutputOptions,
+    chromium_manager: ChromiumManager,
+    attachments: list | None = None,
+) -> bytes:
+    """
+    Generate PDF from already-parsed HTML element tree.
+
+    This helper function contains the common PDF generation logic that can be used
+    by both convert_html and convert_html_with_attachments endpoints.
+
+    Args:
+        parsed_html: Pre-parsed HTML element tree
+        html_parser: HtmlParser instance for serialization
+        render: Rendering options
+        output: Output options
+        chromium_manager: Chromium manager instance
+        attachments: Optional list of PDF attachments
+
+    Returns:
+        Generated PDF as bytes
+    """
+    notes_processor = NotesProcessor()
+    notes = notes_processor.replace_notes(parsed_html)
+
+    # Use CDP-based async SVG processing
+    svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
+    parsed_html = await svg_processor.process_svg(parsed_html)
+
+    processed_html = html_parser.serialize(parsed_html)
+
+    base_url = unquote(render.base_url, render.encoding) if render.base_url else None
+    if base_url:
+        logger.debug("Using base URL: %s", sanitize_url_for_logging(base_url))
+
+    logger.debug("Creating WeasyPrint HTML object with media_type=%s", render.media_type)
+    weasyprint_html = weasyprint.HTML(
+        string=processed_html,
+        base_url=base_url,
+        media_type=render.media_type,
+        encoding=render.encoding,
+    )
+
+    logger.debug(
+        "Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s%s",
+        output.pdf_variant,
+        render.presentational_hints,
+        output.custom_metadata,
+        f", attachments={len(attachments)}" if attachments else "",
+    )
+
+    output_pdf = weasyprint_html.write_pdf(
+        pdf_variant=output.pdf_variant,
+        presentational_hints=render.presentational_hints,
+        custom_metadata=output.custom_metadata,
+        attachments=attachments,
+    )
+
+    logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
+
+    output_pdf_with_notes = notes_processor.process_pdf_with_notes(output_pdf, notes)
+
+    # process_pdf_with_notes preserves the input type, so if input is bytes, output is bytes
+    if output_pdf_with_notes is None:
+        msg = "PDF generation should never return None"
+        raise RuntimeError(msg)
+
+    return output_pdf_with_notes
+
+
+def __record_conversion_metrics(chromium_manager: ChromiumManager, start_time: float, success: bool) -> None:
+    """
+    Record conversion metrics for both internal tracking and Prometheus.
+
+    Args:
+        chromium_manager: Chromium manager instance
+        start_time: Conversion start time from time.time()
+        success: Whether conversion succeeded
+    """
+    duration_ms = (time.time() - start_time) * 1000
+
+    if success:
+        chromium_manager._metrics.record_success(duration_ms)
+        increment_pdf_generation_success(duration_ms / 1000.0)  # Convert ms to seconds
+    else:
+        chromium_manager._metrics.record_failure()
+        increment_pdf_generation_failure()
+
+
+def __handle_conversion_error(e: Exception, chromium_manager: ChromiumManager) -> Response:
+    """
+    Handle conversion errors with appropriate logging and metrics.
+
+    Args:
+        e: Exception that occurred
+        chromium_manager: Chromium manager instance
+
+    Returns:
+        Error response with appropriate status code
+    """
+    chromium_manager._metrics.record_failure()
+    increment_pdf_generation_failure()
+
+    if isinstance(e, AssertionError):
+        logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
+        return __process_error(e, "Assertion error, check the request body html", 400)
+    if isinstance(e, (UnicodeDecodeError, LookupError)):
+        logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
+        return __process_error(e, "Cannot decode request html body", 400)
+
+    logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
+    return __process_error(e, "Unexpected error due converting to PDF", 500)
 
 
 @app.post(
@@ -495,7 +596,6 @@ async def convert_html_with_attachments(
     logger.debug("Created temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))
     try:
         encoding: str = await __get_encoding(request, render.encoding)
-        base_url = unquote(render.base_url, encoding=encoding) if render.base_url else None
 
         form_parser = FormParser()
         form = await form_parser.parse(request)
@@ -503,66 +603,22 @@ async def convert_html_with_attachments(
         files = form_parser.collect_files_from_form(form)
         logger.debug("Parsed form with %d file attachments", len(files))
 
+        # Process attachments and update HTML with attachment references
+        attachment_manager = AttachmentManager()
         html_parser = HtmlParser()
         parsed_html = html_parser.parse(html)
-
-        notes_processor = NotesProcessor()
-        notes = notes_processor.replace_notes(parsed_html)
-
-        # Use CDP-based async SVG processing
-        svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
-        parsed_html = await svg_processor.process_svg(parsed_html)
-
-        attachment_manager = AttachmentManager()
         parsed_html, attachments = await attachment_manager.process_html_and_uploads(
             parsed_html=parsed_html,
             files=files,
             tmpdir=Path(tmpdir),
         )
 
-        processed_html = html_parser.serialize(parsed_html)
-
-        logger.debug("Creating WeasyPrint HTML object with media_type=%s", render.media_type)
-        weasyprint_html = weasyprint.HTML(
-            string=processed_html,
-            base_url=base_url,
-            media_type=render.media_type,
-            encoding=render.encoding,
-        )
-        logger.debug("Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s, attachments=%d", output.pdf_variant, render.presentational_hints, output.custom_metadata, len(attachments))
-        output_pdf = weasyprint_html.write_pdf(
-            pdf_variant=output.pdf_variant,
-            presentational_hints=render.presentational_hints,
-            custom_metadata=output.custom_metadata,
-            attachments=attachments,
-        )
-        logger.info("PDF with attachments generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
-
-        output_pdf = notes_processor.process_pdf_with_notes(output_pdf, notes)
-
-        # Record conversion success metrics
-        duration_ms = (time.time() - start_time) * 1000
-        chromium_manager._metrics.record_success(duration_ms)
-        # Also increment Prometheus counter
-        increment_pdf_generation_success(duration_ms / 1000.0)  # Convert ms to seconds
-
+        # Use common PDF generation logic (handles notes, SVG, WeasyPrint)
+        output_pdf = await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments)
+        __record_conversion_metrics(chromium_manager, start_time, success=True)
         return await __create_response(output, output_pdf)
-
-    except AssertionError as e:
-        logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
-        chromium_manager._metrics.record_failure()
-        increment_pdf_generation_failure()
-        return __process_error(e, "Assertion error, check the request body html", 400)
-    except (UnicodeDecodeError, LookupError) as e:
-        logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
-        chromium_manager._metrics.record_failure()
-        increment_pdf_generation_failure()
-        return __process_error(e, "Cannot decode request html body", 400)
     except Exception as e:
-        logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
-        chromium_manager._metrics.record_failure()
-        increment_pdf_generation_failure()
-        return __process_error(e, "Unexpected error due converting to PDF", 500)
+        return __handle_conversion_error(e, chromium_manager)
     finally:
         logger.debug("Cleaning up temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))
         shutil.rmtree(tmpdir, ignore_errors=True)

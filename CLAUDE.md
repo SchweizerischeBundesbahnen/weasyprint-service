@@ -557,8 +557,8 @@ scrape_configs:
     static_configs:
       - targets: ['weasyprint-service:9080']
     metrics_path: '/metrics'
-    scrape_interval: 15s
-    scrape_timeout: 10s
+    scrape_interval: 10s
+    scrape_timeout: 5s
 ```
 
 **Grafana Dashboard Queries:**

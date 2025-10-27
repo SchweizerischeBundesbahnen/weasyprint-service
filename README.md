@@ -234,14 +234,14 @@ scrape_configs:
 
 ```promql
 # PDF generation rate (requests per second)
-rate(chromium_pdf_generations_total[5m])
+rate(pdf_generations_total[5m])
 
 # Error rate percentage
-(rate(chromium_pdf_generation_failures_total[5m]) + rate(chromium_svg_conversion_failures_total[5m]))
-/ (rate(chromium_pdf_generations_total[5m]) + rate(chromium_svg_conversions_total[5m])) * 100
+(rate(pdf_generation_failures_total[5m]) + rate(svg_conversion_failures_total[5m]))
+/ (rate(pdf_generations_total[5m]) + rate(svg_conversions_total[5m])) * 100
 
 # 95th percentile conversion duration
-histogram_quantile(0.95, rate(chromium_pdf_generation_duration_seconds_bucket[5m]))
+histogram_quantile(0.95, rate(pdf_generation_duration_seconds_bucket[5m]))
 
 # Memory usage (MB)
 chromium_memory_bytes / 1024 / 1024
@@ -279,6 +279,19 @@ volumes:
   prometheus-data:
   grafana-data:
 ```
+
+**Pre-configured Monitoring Stack:**
+
+For a complete, production-ready monitoring setup with pre-configured Prometheus, Grafana, and dashboards:
+
+```bash
+cd monitoring
+./start-monitoring.sh
+```
+
+This will start the WeasyPrint service, Prometheus, and Grafana with a pre-built dashboard. Access Grafana at http://localhost:3000 (admin/admin) and view the dashboard at http://localhost:3000/d/weasyprint-service.
+
+For detailed setup instructions and configuration options, see [monitoring/README.md](monitoring/README.md).
 
 For complete metric descriptions and alerting examples, see [CLAUDE.md](CLAUDE.md#prometheus-integration).
 

@@ -636,3 +636,26 @@ groups:
           summary: "Large conversion queue"
           description: "Conversion queue has {{ $value }} pending requests"
 ```
+
+**Complete Monitoring Stack:**
+
+For a full monitoring setup with Prometheus and Grafana, see `monitoring/README.md`. Quick start:
+
+```bash
+# From project root
+cd monitoring
+
+# Start monitoring stack (WeasyPrint service + Prometheus + Grafana)
+./start-monitoring.sh
+
+# Access Grafana dashboard
+open http://localhost:3000/d/weasyprint-service
+
+# Generate test load
+./generate-load.sh
+
+# Stop monitoring stack
+./stop-monitoring.sh
+```
+
+All monitoring configuration files are located in the `monitoring/` directory.

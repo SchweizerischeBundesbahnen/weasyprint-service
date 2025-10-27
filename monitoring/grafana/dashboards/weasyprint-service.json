@@ -104,8 +104,7 @@
             ]
           },
           "unit": "s",
-          "decimals": 0,
-          "suffix": "s"
+          "decimals": 0
         },
         "overrides": []
       },

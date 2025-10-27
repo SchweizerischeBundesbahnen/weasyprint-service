@@ -544,7 +544,7 @@ pdf_generation_failures_total 2.0
 # HELP svg_conversions_total Total number of successful SVG to PNG conversions
 # TYPE svg_conversions_total counter
 svg_conversions_total 458.0
-# HELP uptime_seconds Chromium browser uptime in seconds
+# HELP uptime_seconds Service uptime in seconds
 # TYPE uptime_seconds gauge
 uptime_seconds 3600.45
 ```

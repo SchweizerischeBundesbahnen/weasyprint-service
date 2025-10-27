@@ -483,18 +483,15 @@ async def __generate_pdf_from_parsed_html(
     )
 
     output_pdf = weasyprint_html.write_pdf(
+        target=None,  # ensure output_pdf is always bytes
         pdf_variant=output.pdf_variant,
         presentational_hints=render.presentational_hints,
         custom_metadata=output.custom_metadata,
         attachments=attachments,
     )
 
-    logger.info("PDF generated successfully, size: %d bytes", len(output_pdf) if output_pdf else 0)
-
-    output_pdf_with_notes = notes_processor.process_pdf_with_notes(output_pdf, notes)
-
-    # process_pdf_with_notes preserves the input type, so if input is bytes, output is bytes
-    return output_pdf_with_notes
+    logger.info("PDF generated successfully, size: %d bytes", len(output_pdf))
+    return notes_processor.process_pdf_with_notes(output_pdf, notes)
 
 
 def __record_conversion_metrics(chromium_manager: ChromiumManager, start_time: float, success: bool) -> None:
@@ -528,11 +525,9 @@ def __handle_conversion_error(e: Exception, chromium_manager: ChromiumManager, s
     Returns:
         Error response with appropriate status code
     """
-    # Record failure with duration - important for identifying fast vs slow failures
     duration_ms = (time.time() - start_time) * 1000
     chromium_manager._metrics.record_failure()
     increment_pdf_generation_failure()
-    # Record failure duration in histogram to track how long failures take
     pdf_generation_duration_seconds.observe(duration_ms / 1000.0)
 
     if isinstance(e, AssertionError):

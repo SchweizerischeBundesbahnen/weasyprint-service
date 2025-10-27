@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Get absolute path to script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOCKER_COMPOSE_PATH="${SCRIPT_DIR}/docker-compose.yml"
+
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -20,9 +24,9 @@ command_exists() {
 # Stop services
 echo -e "${YELLOW}Stopping services...${NC}"
 if command_exists docker-compose; then
-    docker-compose -f docker-compose.yml down
+    docker-compose -f "${DOCKER_COMPOSE_PATH}" down
 else
-    docker compose -f docker-compose.yml down
+    docker compose -f "${DOCKER_COMPOSE_PATH}" down
 fi
 echo -e "${GREEN}✓ Services stopped${NC}"
 echo ""
@@ -33,9 +37,9 @@ echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${YELLOW}Removing volumes...${NC}"
     if command_exists docker-compose; then
-        docker-compose -f docker-compose.yml down -v
+        docker-compose -f "${DOCKER_COMPOSE_PATH}" down -v
     else
-        docker compose -f docker-compose.yml down -v
+        docker compose -f "${DOCKER_COMPOSE_PATH}" down -v
     fi
     echo -e "${GREEN}✓ Volumes removed${NC}"
 fi

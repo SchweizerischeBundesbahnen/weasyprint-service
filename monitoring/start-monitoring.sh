@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# Get absolute path to script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DOCKERFILE_PATH="${PROJECT_ROOT}/Dockerfile"
+DOCKER_COMPOSE_PATH="${SCRIPT_DIR}/docker-compose.yml"
+
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -34,7 +40,7 @@ echo ""
 
 # Build the Docker image
 echo -e "${YELLOW}Building WeasyPrint service Docker image...${NC}"
-docker build --build-arg APP_IMAGE_VERSION=dev --file ../Dockerfile --tag weasyprint-service:dev .. || {
+docker build --build-arg APP_IMAGE_VERSION=dev --file "${DOCKERFILE_PATH}" --tag weasyprint-service:dev "${PROJECT_ROOT}" || {
     echo -e "${RED}Failed to build Docker image${NC}"
     exit 1
 }
@@ -44,9 +50,9 @@ echo ""
 # Start services
 echo -e "${YELLOW}Starting services with Docker Compose...${NC}"
 if command_exists docker-compose; then
-    docker-compose -f docker-compose.yml up -d
+    docker-compose -f "${DOCKER_COMPOSE_PATH}" up -d
 else
-    docker compose -f docker-compose.yml up -d
+    docker compose -f "${DOCKER_COMPOSE_PATH}" up -d
 fi
 echo -e "${GREEN}✓ Services started${NC}"
 echo ""

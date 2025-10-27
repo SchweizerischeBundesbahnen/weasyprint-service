@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Get absolute path to script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOCKER_COMPOSE_PATH="${SCRIPT_DIR}/docker-compose.yml"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -14,9 +18,9 @@ echo ""
 # Stop services
 echo -e "${YELLOW}Stopping services...${NC}"
 if command -v docker-compose >/dev/null 2>&1; then
-    docker-compose -f docker-compose.yml down
+    docker-compose -f "${DOCKER_COMPOSE_PATH}" down
 else
-    docker compose -f docker-compose.yml down
+    docker compose -f "${DOCKER_COMPOSE_PATH}" down
 fi
 echo -e "${GREEN}✓ Services stopped${NC}"
 echo ""
@@ -24,9 +28,9 @@ echo ""
 # Start services again
 echo -e "${YELLOW}Starting services...${NC}"
 if command -v docker-compose >/dev/null 2>&1; then
-    docker-compose -f docker-compose.yml up -d
+    docker-compose -f "${DOCKER_COMPOSE_PATH}" up -d
 else
-    docker compose -f docker-compose.yml up -d
+    docker compose -f "${DOCKER_COMPOSE_PATH}" up -d
 fi
 echo -e "${GREEN}✓ Services started${NC}"
 echo ""

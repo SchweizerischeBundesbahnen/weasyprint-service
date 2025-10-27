@@ -35,7 +35,7 @@ jobs:
           python-version-file: .tool-versions
 
       - name: 🧱 Install uv
-        uses: astral-sh/setup-uv@2ddd2b9cb38ad8efd50337e8ab201519a34c9f24  # v7.1.1
+        uses: astral-sh/setup-uv@85856786d1ce8acfbcc2f13a5f3fbd6b938f9f41  # v7.1.2
         with:
           enable-cache: true
       - name: 🧱 Install dependencies
@@ -75,7 +75,7 @@ jobs:
     steps:
       - name: 🚀 release-please
         id: release
-        uses: googleapis/release-please-action@c2a5a2bd6a758a0937f1ddb1e8950609867ed15c  # v4.3.0
+        uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38  # v4.4.0
         with:
           release-type: simple
           include-v-in-tag: false

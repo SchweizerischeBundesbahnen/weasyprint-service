@@ -103,8 +103,9 @@
               }
             ]
           },
-          "unit": "dtdhms",
-          "decimals": 0
+          "unit": "s",
+          "decimals": 0,
+          "suffix": "s"
         },
         "overrides": []
       },

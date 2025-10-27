@@ -27,6 +27,7 @@ from app.notes_processor import NotesProcessor
 from app.prometheus_metrics import (
     increment_pdf_generation_failure,
     increment_pdf_generation_success,
+    pdf_generation_duration_seconds,
     update_gauges_from_chromium_manager,
 )
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
@@ -378,10 +379,11 @@ async def convert_html(
     try:
         html = raw.decode(encoding)
         output_pdf = await __process_html_to_pdf(html, render, output, chromium_manager)
+        response = await __create_response(output, output_pdf)
         __record_conversion_metrics(chromium_manager, start_time, success=True)
-        return await __create_response(output, output_pdf)
+        return response
     except Exception as e:
-        return __handle_conversion_error(e, chromium_manager)
+        return __handle_conversion_error(e, chromium_manager, start_time)
 
 
 async def __get_encoding(request: Request, encoding: str | None) -> str:
@@ -518,19 +520,24 @@ def __record_conversion_metrics(chromium_manager: ChromiumManager, start_time: f
         increment_pdf_generation_failure()
 
 
-def __handle_conversion_error(e: Exception, chromium_manager: ChromiumManager) -> Response:
+def __handle_conversion_error(e: Exception, chromium_manager: ChromiumManager, start_time: float) -> Response:
     """
     Handle conversion errors with appropriate logging and metrics.
 
     Args:
         e: Exception that occurred
         chromium_manager: Chromium manager instance
+        start_time: Conversion start time from time.time()
 
     Returns:
         Error response with appropriate status code
     """
+    # Record failure with duration - important for identifying fast vs slow failures
+    duration_ms = (time.time() - start_time) * 1000
     chromium_manager._metrics.record_failure()
     increment_pdf_generation_failure()
+    # Record failure duration in histogram to track how long failures take
+    pdf_generation_duration_seconds.observe(duration_ms / 1000.0)
 
     if isinstance(e, AssertionError):
         logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
@@ -615,10 +622,11 @@ async def convert_html_with_attachments(
 
         # Use common PDF generation logic (handles notes, SVG, WeasyPrint)
         output_pdf = await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments)
+        response = await __create_response(output, output_pdf)
         __record_conversion_metrics(chromium_manager, start_time, success=True)
-        return await __create_response(output, output_pdf)
+        return response
     except Exception as e:
-        return __handle_conversion_error(e, chromium_manager)
+        return __handle_conversion_error(e, chromium_manager, start_time)
     finally:
         logger.debug("Cleaning up temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))
         shutil.rmtree(tmpdir, ignore_errors=True)

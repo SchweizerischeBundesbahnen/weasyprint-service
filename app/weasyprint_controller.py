@@ -494,10 +494,6 @@ async def __generate_pdf_from_parsed_html(
     output_pdf_with_notes = notes_processor.process_pdf_with_notes(output_pdf, notes)
 
     # process_pdf_with_notes preserves the input type, so if input is bytes, output is bytes
-    if output_pdf_with_notes is None:
-        msg = "PDF generation should never return None"
-        raise RuntimeError(msg)
-
     return output_pdf_with_notes
 
 

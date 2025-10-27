@@ -103,7 +103,7 @@
               }
             ]
           },
-          "unit": "dtdurations",
+          "unit": "dtdhms",
           "decimals": 0
         },
         "overrides": []
@@ -1184,7 +1184,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "5s",
+  "refresh": "1s",
   "schemaVersion": 38,
   "tags": [
     "weasyprint",

@@ -483,7 +483,7 @@ async def __generate_pdf_from_parsed_html(
     )
 
     output_pdf = weasyprint_html.write_pdf(
-        target=None,  # ensure output_pdf is always bytes
+        target=None,  # Explicitly set to default (returns bytes); included for clarity
         pdf_variant=output.pdf_variant,
         presentational_hints=render.presentational_hints,
         custom_metadata=output.custom_metadata,

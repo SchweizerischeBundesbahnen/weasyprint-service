@@ -21,7 +21,7 @@ services:
       retries: 3
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:latest@sha256:23031bfe0e74a13004252caaa74eccd0d62b6c6e7a04711d5b8bf5b7e113adc7
     ports:
       - "9090:9090"
     volumes:
@@ -38,7 +38,7 @@ services:
       - weasyprint-service
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:latest@sha256:35c41e0fd0295f5d0ee5db7e780cf33506abfaf47686196f825364889dee878b
     ports:
       - "3000:3000"
     environment:

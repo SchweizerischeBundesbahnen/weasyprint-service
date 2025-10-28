@@ -158,6 +158,12 @@ grype weasyprint-service:0.0.0
   - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
   - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, health monitoring info, and queue metrics
 - `/version` - Service version information (Python, WeasyPrint, Chromium, service versions)
+- `/metrics` - Prometheus metrics endpoint for monitoring and observability
+  - Returns metrics in Prometheus text format
+  - Automatic FastAPI metrics (request duration, in-progress requests, total requests)
+  - Custom ChromiumManager metrics (conversions, failures, error rates, resource usage)
+  - System metrics (CPU, memory, queue size)
+  - Compatible with Prometheus scraping and Grafana visualization
 - `/convert/html` - Basic HTML to PDF conversion (accepts HTML string, returns PDF binary)
 - `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data, for embedded resources)
 
@@ -485,3 +491,171 @@ curl http://localhost:9080/health?detailed=true
   }
 }
 ```
+
+### Prometheus Integration
+
+The service exposes metrics in Prometheus format via the `/metrics` endpoint for monitoring and observability.
+
+**Key Metrics Exposed:**
+
+**Automatic FastAPI Metrics** (provided by `prometheus-fastapi-instrumentator`):
+- `http_request_duration_seconds` - HTTP request duration histogram
+- `http_requests_total` - Total HTTP requests counter
+- `http_requests_inprogress` - Current in-flight HTTP requests
+
+**Custom ChromiumManager Metrics:**
+- `pdf_generations_total` - Total successful HTML→PDF conversions
+- `pdf_generation_failures_total` - Failed HTML→PDF conversions
+- `svg_conversions_total` - Total successful SVG→PNG conversions
+- `svg_conversion_failures_total` - Failed SVG→PNG conversions
+- `pdf_generation_duration_seconds` - PDF generation duration histogram (buckets: 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
+- `svg_conversion_duration_seconds` - SVG conversion duration histogram (buckets: 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
+- `pdf_generation_error_rate_percent` - PDF generation error rate percentage
+- `svg_conversion_error_rate_percent` - SVG conversion error rate percentage
+- `chromium_restarts_total` - Browser restart count
+- `uptime_seconds` - Browser uptime
+- `chromium_consecutive_failures` - Current consecutive health check failures
+
+**System & Resource Metrics:**
+- `cpu_percent` - Current Chromium CPU usage percentage
+- `chromium_memory_bytes` - Current Chromium memory usage in bytes
+- `system_memory_total_bytes` - Total system memory in bytes
+- `system_memory_available_bytes` - Available system memory in bytes
+- `queue_size` - Current number of requests in conversion queue
+- `active_pdf_generations` - Current number of active PDF generation processes
+- `queue_time_seconds` - Request queue wait time histogram (buckets: 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0)
+
+**Browser Info:**
+- `chromium_info` - Chromium browser version information
+
+**Usage Example:**
+
+```bash
+# Fetch Prometheus metrics
+curl http://localhost:9080/metrics
+
+# Example output (excerpt):
+# HELP pdf_generations_total Total number of successful HTML to PDF conversions
+# TYPE pdf_generations_total counter
+pdf_generations_total 1523.0
+# HELP pdf_generation_failures_total Total number of failed HTML to PDF conversions
+# TYPE pdf_generation_failures_total counter
+pdf_generation_failures_total 2.0
+# HELP svg_conversions_total Total number of successful SVG to PNG conversions
+# TYPE svg_conversions_total counter
+svg_conversions_total 458.0
+# HELP uptime_seconds Service uptime in seconds
+# TYPE uptime_seconds gauge
+uptime_seconds 3600.45
+```
+
+**Prometheus Scrape Configuration:**
+
+```yaml
+scrape_configs:
+  - job_name: 'weasyprint-service'
+    static_configs:
+      - targets: ['weasyprint-service:9080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+```
+
+**Grafana Dashboard Queries:**
+
+```promql
+# PDF generation rate (requests per second)
+rate(pdf_generations_total[5m])
+
+# SVG conversion rate (requests per second)
+rate(svg_conversions_total[5m])
+
+# Overall error rate percentage
+(
+  rate(pdf_generation_failures_total[5m]) +
+  rate(svg_conversion_failures_total[5m])
+) / (
+  rate(pdf_generations_total[5m]) +
+  rate(svg_conversions_total[5m])
+) * 100
+
+# 95th percentile PDF generation duration
+histogram_quantile(0.95, rate(pdf_generation_duration_seconds_bucket[5m]))
+
+# 95th percentile SVG conversion duration
+histogram_quantile(0.95, rate(svg_conversion_duration_seconds_bucket[5m]))
+
+# Memory usage trend
+chromium_memory_bytes / 1024 / 1024
+
+# Active conversions and queue size
+active_pdf_generations
+queue_size
+```
+
+**Alerting Rules Example:**
+
+```yaml
+groups:
+  - name: weasyprint_service
+    interval: 30s
+    rules:
+      - alert: HighPDFGenerationErrorRate
+        expr: pdf_generation_error_rate_percent > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High PDF generation error rate"
+          description: "PDF generation error rate is {{ $value }}% (threshold: 5%)"
+
+      - alert: ChromiumBrowserDown
+        expr: up{job="weasyprint-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WeasyPrint service is down"
+          description: "The WeasyPrint service has been unreachable for 2 minutes"
+
+      - alert: HighMemoryUsage
+        expr: chromium_memory_bytes > 2147483648  # 2GB
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Chromium memory usage"
+          description: "Chromium memory usage is {{ $value | humanize }}B"
+
+      - alert: LargeConversionQueue
+        expr: queue_size > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Large conversion queue"
+          description: "Conversion queue has {{ $value }} pending requests"
+```
+
+**Complete Monitoring Stack:**
+
+For a full monitoring setup with Prometheus and Grafana, see `monitoring/README.md`. Quick start:
+
+```bash
+# From project root
+cd monitoring
+
+# Start monitoring stack (WeasyPrint service + Prometheus + Grafana)
+./start-monitoring.sh
+
+# Access Grafana dashboard
+open http://localhost:3000/d/weasyprint-service
+
+# Generate test load
+./generate-load.sh
+
+# Stop monitoring stack
+./stop-monitoring.sh
+```
+
+All monitoring configuration files are located in the `monitoring/` directory.

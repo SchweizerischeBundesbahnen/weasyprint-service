@@ -98,7 +98,7 @@ class NotesProcessor:
 
         return Note(time=time, username=username, text=text, title=title, replies=replies)
 
-    def process_pdf_with_notes(self, pdf_content: bytes | None, notes: list[Note]) -> bytes | None:
+    def process_pdf_with_notes(self, pdf_content: bytes, notes: list[Note]) -> bytes:
         """
         Process PDF to add note annotations. Returns the PDF with notes or original PDF if processing fails.
 
@@ -113,7 +113,7 @@ class NotesProcessor:
             The processed PDF with note annotations, or the original PDF if processing fails or is not needed
         """
         # Return early if no processing needed
-        if pdf_content is None or len(notes) == 0:
+        if len(notes) == 0:
             return pdf_content
 
         try:

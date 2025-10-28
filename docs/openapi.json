@@ -507,6 +507,21 @@
         }
       }
     },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Prometheus metrics",
+        "description": "Returns Prometheus-compatible metrics for monitoring and observability",
+        "operationId": "getMetrics",
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/convert/html": {
       "post": {
         "tags": [

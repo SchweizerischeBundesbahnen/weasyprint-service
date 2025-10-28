@@ -7,6 +7,7 @@ from HTML and CSS.
 
 - Simple REST API to access [WeasyPrint](https://github.com/Kozea/WeasyPrint)
 - Real-time monitoring dashboard with metrics visualization
+- Prometheus metrics endpoint for Grafana integration and observability
 - Compatible with amd64 and arm64 architectures
 - Easily deployable via Docker
 
@@ -181,6 +182,118 @@ docker run --detach \
 - Consider restricting dashboard access via reverse proxy (nginx, Traefik)
 - Use authentication middleware for sensitive environments
 - Monitor dashboard endpoint metrics separately
+
+### Prometheus & Grafana Integration
+
+The service exposes Prometheus-compatible metrics for comprehensive monitoring and observability through Grafana dashboards.
+
+**Metrics Endpoint:** `/metrics`
+
+**Available Metrics:**
+
+**Conversion Metrics:**
+- `pdf_generations_total` - Total successful PDF generations
+- `pdf_generation_failures_total` - Total failed PDF conversions
+- `pdf_generation_error_rate_percent` - PDF generation error rate
+- `svg_conversions_total` - Total successful SVG conversions
+- `svg_conversion_failures_total` - Total failed SVG conversions
+- `svg_conversion_error_rate_percent` - SVG conversion error rate
+
+**Performance Metrics:**
+- `pdf_generation_duration_seconds` - PDF generation time histogram
+- `svg_conversion_duration_seconds` - SVG conversion time histogram
+- `queue_time_seconds` - Request queue wait time histogram
+- `http_request_duration_seconds` - HTTP request duration histogram
+
+**Resource Metrics:**
+- `cpu_percent` - Current CPU usage
+- `system_memory_total_bytes` - Total system memory
+- `system_memory_available_bytes` - Available system memory
+- `chromium_memory_bytes` - Current Chromium memory usage
+- `queue_size` - Current requests in queue
+- `active_pdf_generations` - Active PDF generations processes
+
+**Health Metrics:**
+- `uptime_seconds` - Service uptime
+- `chromium_restarts_total` - Chromium restart count
+- `chromium_consecutive_failures` - Health check failure streak
+
+**Prometheus Configuration Example:**
+
+```yaml
+scrape_configs:
+  - job_name: 'weasyprint-service'
+    static_configs:
+      - targets: ['weasyprint-service:9080']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+```
+
+**Grafana Dashboard Queries:**
+
+```promql
+# PDF generation rate (requests per second)
+rate(pdf_generations_total[5m])
+
+# Error rate percentage
+(rate(pdf_generation_failures_total[5m]) + rate(svg_conversion_failures_total[5m]))
+/ (rate(pdf_generations_total[5m]) + rate(svg_conversions_total[5m])) * 100
+
+# 95th percentile conversion duration
+histogram_quantile(0.95, rate(pdf_generation_duration_seconds_bucket[5m]))
+
+# Memory usage (MB)
+chromium_memory_bytes / 1024 / 1024
+```
+
+**Docker Compose Example with Prometheus & Grafana:**
+
+```yaml
+version: '3.8'
+services:
+  weasyprint-service:
+    image: ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+    init: true
+    ports:
+      - "9080:9080"
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+volumes:
+  prometheus-data:
+  grafana-data:
+```
+
+**Pre-configured Monitoring Stack:**
+
+For a complete, production-ready monitoring setup with pre-configured Prometheus, Grafana, and dashboards:
+
+```bash
+cd monitoring
+./start-monitoring.sh
+```
+
+This will start the WeasyPrint service, Prometheus, and Grafana with a pre-built dashboard. Access Grafana at http://localhost:3000 (admin/admin) and view the dashboard at http://localhost:3000/d/weasyprint-service.
+
+For detailed setup instructions and configuration options, see [monitoring/README.md](monitoring/README.md).
+
+For complete metric descriptions and alerting examples, see [CLAUDE.md](CLAUDE.md#prometheus-integration).
 
 ### Logging Configuration
 

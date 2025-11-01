@@ -1,5 +1,35 @@
 # Changelog
 
+## [66.0.8](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.7...v66.0.8) (2025-11-01)
+
+
+### Features
+
+* integrate Prometheus metrics endpoint and monitoring ([#258](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/258)) ([ccebdfa](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ccebdfa1bae60ae56dcec0e302fa841a2ff25ad0)), closes [#257](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/257)
+* queue monitoring and dashboard ([#251](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/251)) ([10a6fe1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/10a6fe1d54dee28464c201fb9d065dbc4b558afc)), closes [#253](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/253)
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.119.1 ([519009a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/519009a1c3ce228f1c80411b080b58fd88815c0c))
+* **deps:** update dependency fastapi to v0.120.0 ([a0ec86d](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/a0ec86ddddd77d7720c86494ca897e18e05f800f))
+* **deps:** update dependency fastapi to v0.120.1 ([df673ec](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/df673ecadc5ac0093005b964fd6102a6be593535))
+* **deps:** update dependency fastapi to v0.120.2 ([2319baf](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2319baf7efd90d957d6ee4ef57a0d6b436409fab))
+* **deps:** update dependency fastapi to v0.120.3 ([4d75eb2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4d75eb208d9798ef0fa0efdbbd465f8990b307ea))
+* **deps:** update dependency fastapi to v0.120.4 ([69c962f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/69c962fe923800069d0315e467887a7ed5c6a32b))
+* **deps:** update dependency pypdf to v6.1.2 ([40efe91](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/40efe9149e0d3a2bf4458ba23403fd73fb2077f2))
+* **deps:** update dependency pypdf to v6.1.3 [security] ([82afb2b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/82afb2b23dc64184597701501718acb24f646a60))
+* **deps:** update dependency ruff to v0.14.2 ([fb2a520](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/fb2a520a93d0b635e12d8b25838f217f9dbb616e))
+* **deps:** update dependency ruff to v0.14.3 ([1f9b525](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1f9b525fac278917d52dd6b27f891865b8a7bd8d))
+* **deps:** update dependency starlette to &gt;=0.49,&lt;0.50 [security] ([0c107a6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/0c107a6468053e7d70c4d852cdff330ef21d1bd7))
+* **deps:** update dependency tox to v4.32.0 ([ef9ed7b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ef9ed7bd2e63c599634bf226841cc6697566a0fb))
+* **deps:** update dependency uvicorn to v0.38.0 ([98579f2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/98579f2d4d806d06aea96024033d9a28ba2be34a))
+
+
+### Performance Improvements
+
+* **ci:** optimize tox.ini by removing redundant uv sync commands ([#254](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/254)) ([92a3cb3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/92a3cb37fd2d1f46d59c984f97b5f31cadf5af97)), closes [#247](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/247)
+
 ## [66.0.7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.6...v66.0.7) (2025-10-17)
 
 

@@ -476,6 +476,24 @@ def test_convert_html_with_custom_metadata(test_parameters: TestParameters) -> N
     assert producer.startswith("WeasyPrint")
 
 
+def test_convert_html_with_unicode_symbols(test_parameters: TestParameters) -> None:
+    """Test conversion of HTML containing special Unicode symbols to PDF."""
+    html = __load_test_html("tests/test-data/html-with-unicode-symbols.html")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    assert response.status_code == 200
+
+    # Render all pages to PNGs and compare all pages to references
+    pages_png = utils_pdf.pdf_bytes_to_png_pages(response.content)
+
+    ref_base = Path("tests/test-data/expected/html-with-unicode-symbols-ref.png")
+    try:
+        utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
+    except utils_pdf.ReferenceGenerated:
+        pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
+    except utils_pdf.ReferenceMissing as e:
+        pytest.skip(str(e))
+
+
 def __load_test_html(file_path: str) -> str:
     with Path(file_path).open(encoding="utf-8") as html_file:
         html = html_file.read()
@@ -493,7 +511,7 @@ def __call_convert_html_with_attachments(base_url: str, request_session: request
             logging.error(f"Error: Response content: '{response.content}'")
         return response
     except requests.exceptions.RequestException as e:
-        logging.error(f"Error: {e}")
+        logging.exception(f"Error: {e}")
         raise
 
 
@@ -507,5 +525,5 @@ def __call_convert_html(base_url: str, request_session: requests.Session, data, 
             logging.error(f"Error: Response content: '{response.content}'")
         return response
     except requests.exceptions.RequestException as e:
-        logging.error(f"Error: {e}")
+        logging.exception(f"Error: {e}")
         raise

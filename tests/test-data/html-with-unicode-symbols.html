@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Check for missing Symbols</title>
+<style>
+  :root{
+    --fg:#0f172a;
+    --muted:#475569;
+    --border:#e2e8f0;
+    --bg:#ffffff;
+  }
+  html,body{height:100%}
+  body{
+    margin:0; padding:32px;
+    color:var(--fg); background:var(--bg);
+  }
+  h1{
+    margin:0 0 18px; font-size:28px; line-height:1.2;
+    letter-spacing:.2px;
+  }
+  .sub{
+    margin:-6px 0 16px; color:var(--muted); font-size:13px;
+  }
+  .table-wrap{
+    border:1px solid var(--border); border-radius:14px; overflow:hidden;
+    box-shadow:0 1px 0 rgba(0,0,0,.02),0 6px 24px rgba(15,23,42,.05);
+  }
+  table{
+    width:100%; border-collapse:collapse; background:#fff;
+    font-variant-numeric:tabular-nums;
+  }
+  thead th{
+    text-align:left; font-size:13px; color:#334155; font-weight:600;
+    letter-spacing:.02em; background:#f8fafc; border-bottom:1px solid var(--border);
+    padding:10px 14px;
+  }
+  tbody td{
+    padding:10px 14px; border-bottom:1px solid var(--border);
+    vertical-align:middle;
+  }
+  tbody tr:nth-child(odd){ background:#fcfdff }
+  .code{ width:7.5ch; white-space:nowrap }
+  .uni{ width:10.5ch; color:#475569 }
+  .glyph{
+    text-align:center; width:6ch;
+  }
+  .name{ width:auto }
+  @media print{
+    @page{ size:A4 portrait; margin:14mm }
+    body{ padding:0 }
+    .table-wrap{ box-shadow:none; border-radius:0 }
+    tbody td{ padding:7px 10px }
+    thead th{ padding:7px 10px }
+    tbody tr{ page-break-inside:avoid; break-inside:avoid }
+    tbody .glyph{ font-size:18px }
+  }
+</style>
+</head>
+<body>
+  <div class="sub">
+    Unicode code points and symbols.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="uni">U+</th>
+          <th class="glyph">Symbol</th>
+          <th class="name">Name</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="uni">U+2316</td><td class="glyph">⌖</td><td class="name">POSITION INDICATOR</td></tr>
+        <tr><td class="uni">U+2317</td><td class="glyph">⌗</td><td class="name">VIEWDATA SQUARE</td></tr>
+        <tr><td class="uni">U+2320</td><td class="glyph">⌠</td><td class="name">CYLINDRICITY</td></tr>
+        <tr><td class="uni">U+232E</td><td class="glyph">⌮</td><td class="name">ALL AROUND – PROFILE</td></tr>
+        <tr><td class="uni">U+232F</td><td class="glyph">⌯</td><td class="name">SYMMETRY</td></tr>
+        <tr><td class="uni">U+2330</td><td class="glyph">⌰</td><td class="name">TOTAL RUNOUT</td></tr>
+        <tr><td class="uni">U+2331</td><td class="glyph">⌱</td><td class="name">DIMENSION ORIGIN</td></tr>
+        <tr><td class="uni">U+2332</td><td class="glyph">⌲</td><td class="name">CONICAL TAPER</td></tr>
+        <tr><td class="uni">U+2333</td><td class="glyph">⌳</td><td class="name">SLOPE</td></tr>
+        <tr><td class="uni">U+2334</td><td class="glyph">⌴</td><td class="name">COUNTERBORE</td></tr>
+        <tr><td class="uni">U+2337</td><td class="glyph">⌷</td><td class="name">NOT CHECK MARK</td></tr>
+        <tr><td class="uni">U+237C</td><td class="glyph">⍼</td><td class="name">RIGHT ANGLE WITH DOWNWARDS ZIGZAG ARROW</td></tr>
+        <tr><td class="uni">U+237E</td><td class="glyph">⍾</td><td class="name">VERTICAL LINE WITH MIDDLE DOT</td></tr>
+        <tr><td class="uni">U+2384</td><td class="glyph">⎄</td><td class="name">COMPOSITION SYMBOL</td></tr>
+        <tr><td class="uni">U+2395</td><td class="glyph">⎕</td><td class="name">WHITE SQUARE WITH CENTRE VERTICAL LINE</td></tr>
+        <tr><td class="uni">U+2386</td><td class="glyph">⎆</td><td class="name">ENTER SYMBOL</td></tr>
+        <tr><td class="uni">U+238C</td><td class="glyph">⎌</td><td class="name">UNDO SYMBOL</td></tr>
+        <tr><td class="uni">U+238D</td><td class="glyph">⎍</td><td class="name">MONOSTABLE SYMBOL</td></tr>
+        <tr><td class="uni">U+2390</td><td class="glyph">⎐</td><td class="name">HYSTERESIS SYMBOL</td></tr>
+        <tr><td class="uni">U+2391</td><td class="glyph">⎑</td><td class="name">OPEN-CIRCUIT-OUTPUT H-TYPE SYMBOL</td></tr>
+        <tr><td class="uni">U+2392</td><td class="glyph">⎒</td><td class="name">OPEN-CIRCUIT-OUTPUT L-TYPE SYMBOL</td></tr>
+        <tr><td class="uni">U+2393</td><td class="glyph">⎓</td><td class="name">PASSIVE-PULL-DOWN-OUTPUT SYMBOL</td></tr>
+        <tr><td class="uni">U+2394</td><td class="glyph">⎔</td><td class="name">PASSIVE-PULL-UP-OUTPUT SYMBOL</td></tr>
+        <tr><td class="uni">U+2395</td><td class="glyph">⎕</td><td class="name">DIRECT CURRENT SYMBOL FORM TWO</td></tr>
+        <tr><td class="uni">U+2396</td><td class="glyph">⎖</td><td class="name">DECIMAL SEPARATOR KEY SYMBOL</td></tr>
+        <tr><td class="uni">U+2397</td><td class="glyph">⎗</td><td class="name">PREVIOUS PAGE</td></tr>
+        <tr><td class="uni">U+2398</td><td class="glyph">⎘</td><td class="name">NEXT PAGE</td></tr>
+        <tr><td class="uni">U+2399</td><td class="glyph">⎙</td><td class="name">PRINT SCREEN SYMBOL</td></tr>
+        <tr><td class="uni">U+239A</td><td class="glyph">⎚</td><td class="name">CLEAR SCREEN SYMBOL</td></tr>
+        <tr><td class="uni">U+23AB</td><td class="glyph">⎫</td><td class="name">HORIZONTAL SCAN LINE-1</td></tr>
+        <tr><td class="uni">U+23AC</td><td class="glyph">⎬</td><td class="name">HORIZONTAL SCAN LINE-3</td></tr>
+        <tr><td class="uni">U+23AD</td><td class="glyph">⎭</td><td class="name">HORIZONTAL SCAN LINE-7</td></tr>
+        <tr><td class="uni">U+23AE</td><td class="glyph">⎮</td><td class="name">HORIZONTAL SCAN LINE-9</td></tr>
+        <tr><td class="uni">U+23CD</td><td class="glyph">⏍</td><td class="name">SQUARE FOOT</td></tr>
+        <tr><td class="uni">U+23D0</td><td class="glyph">⏐</td><td class="name">METRICAL BREVE</td></tr>
+        <tr><td class="uni">U+23D1</td><td class="glyph">⏑</td><td class="name">METRICAL LONG OVER SHORT</td></tr>
+        <tr><td class="uni">U+23D2</td><td class="glyph">⏒</td><td class="name">METRICAL SHORT OVER LONG</td></tr>
+        <tr><td class="uni">U+23D3</td><td class="glyph">⏓</td><td class="name">METRICAL LONG OVER TWO SHORTS</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</body>
+</html>

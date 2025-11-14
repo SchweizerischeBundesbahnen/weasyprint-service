@@ -28,7 +28,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pre-commit==4.4.0",
-    "ruff==0.14.4",
+    "ruff==0.14.5",
     "mypy==1.18.2",
     "types-defusedxml==0.7.0.20250822",
     "types-psutil==7.0.0.20251111",

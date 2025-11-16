@@ -853,11 +853,11 @@ wheels = [
 
 [[package]]
 name = "pypdf"
-version = "6.2.0"
+version = "6.3.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4e/2b/8795ec0378384000b0a37a2b5e6d67fa3d84802945aa2c612a78a784d7d4/pypdf-6.2.0.tar.gz", hash = "sha256:46b4d8495d68ae9c818e7964853cd9984e6a04c19fe7112760195395992dce48", size = 5272001, upload-time = "2025-11-09T11:10:41.911Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/42/fd/6b5ff827a5b751a85c1a3a778a0636d1ddbe153fc03954071c431271405c/pypdf-6.3.0.tar.gz", hash = "sha256:d066a2fdf8195e1811ae5a9d5a2f97f5bed0e1e7954297295eadee6357e76c5d", size = 5275038, upload-time = "2025-11-16T14:05:16.37Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/ba/743ddcaf1a8fb439342399645921e2cf2c600464cba5531a11f1cc0822b6/pypdf-6.2.0-py3-none-any.whl", hash = "sha256:4c0f3e62677217a777ab79abe22bf1285442d70efabf552f61c7a03b6f5c569f", size = 326592, upload-time = "2025-11-09T11:10:39.941Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/26/4ae62da67941784913606da037172d0f14b7ba120442e63a37b257110b2c/pypdf-6.3.0-py3-none-any.whl", hash = "sha256:2d5f9741e851e378908692d571374b3cbd94582fdd1c740fcf7c029ec35ac0e6", size = 328891, upload-time = "2025-11-16T14:05:14.574Z" },
 ]
 
 [[package]]
@@ -1241,8 +1241,8 @@ requires-dist = [
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0.0,<8" },
     { name = "psutil", specifier = ">=7.1.0,<8" },
     { name = "pymupdf", marker = "extra == 'test'", specifier = "==1.26.6" },
-    { name = "pypdf", specifier = "==6.2.0" },
-    { name = "pypdf", marker = "extra == 'test'", specifier = "==6.2.0" },
+    { name = "pypdf", specifier = "==6.3.0" },
+    { name = "pypdf", marker = "extra == 'test'", specifier = "==6.3.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = "==8.4.2" },
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=1.0.0,<2" },
     { name = "python-multipart", specifier = ">=0.0.20,<0.1" },

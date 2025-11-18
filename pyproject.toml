@@ -37,7 +37,7 @@ test = [
     "tox==4.32.0",
     "tox-uv==1.29.0",
     "docker==7.1.0",
-    "pytest==8.4.2",
+    "pytest==9.0.1",
     "pytest-asyncio>=1.0.0,<2",
     "pymupdf==1.26.6",
     "pypdf==6.3.0",

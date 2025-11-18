@@ -50,6 +50,11 @@ trap cleanup EXIT
 LOG_DIR_LOCAL="$(mktemp -d 2>/dev/null || mktemp -d -t weasyprint-logs)"
 export LOG_DIR="$LOG_DIR_LOCAL"
 
+# Set DYLD_LIBRARY_PATH for macOS to find WeasyPrint system libraries
+if [[ "$(uname -s)" == "Darwin" ]] && [[ -d "/opt/homebrew/lib" ]]; then
+  export DYLD_LIBRARY_PATH="/opt/homebrew/lib:${DYLD_LIBRARY_PATH:-}"
+fi
+
 # Ensure uv is available
 if ! command -v uv >/dev/null 2>&1; then
   echo "Error: uv not found. Please install uv: curl -LsSf https://astral.sh/uv/install.sh | sh" >&2

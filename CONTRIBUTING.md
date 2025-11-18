@@ -37,17 +37,34 @@ This project uses [uv](https://github.com/astral-sh/uv) for fast and modern Pyth
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-2. Install project dependencies:
+2. **macOS only**: Install WeasyPrint system dependencies:
+
+   WeasyPrint requires system libraries for PDF rendering. Install them via Homebrew:
    ```bash
-   uv sync --all-groups
+   brew install glib pango cairo libffi
    ```
 
-3. Run tests:
+   Add the library path to your `~/.zshrc`:
+   ```bash
+   export DYLD_LIBRARY_PATH="/opt/homebrew/lib:${DYLD_LIBRARY_PATH:-}"
+   ```
+
+   Then reload your shell:
+   ```bash
+   source ~/.zshrc
+   ```
+
+3. Install project dependencies:
+   ```bash
+   uv sync --all-extras
+   ```
+
+4. Run tests:
    ```bash
    uv run tox
    ```
 
-4. Run linting and formatting:
+5. Run linting and formatting:
    ```bash
    uv run ruff format
    uv run ruff check

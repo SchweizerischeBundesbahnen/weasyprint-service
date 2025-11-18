@@ -39,7 +39,7 @@ jobs:
         with:
           enable-cache: true
       - name: 🧱 Install dependencies
-        run: uv sync --extra dev --extra test
+        run: uv sync --all-extras
       - name: 🧪 Run tests
         run: uv run tox
       - name: SonarCloud scan for PR

@@ -1157,11 +1157,11 @@ wheels = [
 
 [[package]]
 name = "types-psutil"
-version = "7.1.3.20251129"
+version = "7.1.3.20251130"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4d/a2/4e9992bb56c4d1bcdeee8397134ed446ec802fa11a564d780362fef17244/types_psutil-7.1.3.20251129.tar.gz", hash = "sha256:3d6af84712be290803ed3cf4dd4ea7eb0b2fa61ed40de7d5c3a909879c4191ee", size = 24302, upload-time = "2025-11-29T03:03:40.73Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3d/0e/4c0c52099a8b4901d3e8eb5ac12ece32331b96bf87690377fb6c90f85475/types_psutil-7.1.3.20251130.tar.gz", hash = "sha256:7f42e7a7845a93397e430b48a8074a35410d7a436695fd3375ec9b687d8d95f8", size = 24467, upload-time = "2025-11-30T03:18:14.469Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/ce/65c4ea4d27701accbc3828ecc5eadf96fc61bd94a421fd4ab52c76608833/types_psutil-7.1.3.20251129-py3-none-any.whl", hash = "sha256:832299f76c6fcf096ea8714cf6eda14d3b26f5631e83bec7829941795fc3b4a5", size = 30352, upload-time = "2025-11-29T03:03:39.499Z" },
+    { url = "https://files.pythonhosted.org/packages/81/9d/353588c1fe06fa267a088a920eaebb0ac5b67f863dba0bff7c7deb4113a2/types_psutil-7.1.3.20251130-py3-none-any.whl", hash = "sha256:e9ccfaa63a1342810dab06c2e40696c843e6f422137868d335ad282b93e468e3", size = 31251, upload-time = "2025-11-30T03:18:13.359Z" },
 ]
 
 [[package]]
@@ -1334,7 +1334,7 @@ requires-dist = [
     { name = "tox", marker = "extra == 'test'", specifier = "==4.32.0" },
     { name = "tox-uv", marker = "extra == 'test'", specifier = "==1.29.0" },
     { name = "types-defusedxml", marker = "extra == 'dev'", specifier = "==0.7.0.20250822" },
-    { name = "types-psutil", marker = "extra == 'dev'", specifier = "==7.1.3.20251129" },
+    { name = "types-psutil", marker = "extra == 'dev'", specifier = "==7.1.3.20251130" },
     { name = "uvicorn", specifier = "==0.38.0" },
     { name = "weasyprint", specifier = "==66.0" },
 ]

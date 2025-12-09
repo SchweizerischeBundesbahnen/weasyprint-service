@@ -4,8 +4,6 @@ FROM ghcr.io/astral-sh/uv:0.9.16@sha256:ae9ff79d095a61faf534a882ad6378e8159d2ce3
 # Use debian:trixie-slim as base (same base as python:3.14-slim)
 FROM debian:trixie-slim@sha256:e711a7b30ec1261130d0a121050b4ed81d7fb28aeabcf4ea0c7876d4e9f5aca2
 
-LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
-
 # Copy uv binary from source stage
 COPY --from=uv-source /uv /usr/local/bin/uv
 
@@ -52,12 +50,17 @@ RUN mkdir -p ${WORKING_DIR}/logs && \
 
 WORKDIR ${WORKING_DIR}
 
-# Copy dependency files
-COPY pyproject.toml uv.lock ./
+# Copy Python version file and dependency files
+COPY .tool-versions pyproject.toml uv.lock ./
 
-# Install Python via uv and dependencies
+# Install Python via uv to /opt/python (version from .tool-versions file)
 ENV UV_PYTHON_INSTALL_DIR=/opt/python
-RUN uv python install 3.14 && \
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
+    uv python install "${PYTHON_VERSION}"
+
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project && \
     uv run playwright install chromium --with-deps
 
@@ -79,14 +82,30 @@ ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
 # Verify WeasyPrint is installed and working
 RUN weasyprint --version
 
+# Create and configure non-root user
 # Make Python installation readable by all users
 RUN chmod -R a+rX /opt/python && \
-    chmod -R a+rx ${WORKING_DIR}/.venv/bin
+    chmod -R a+rx ${WORKING_DIR}/.venv/bin && \
+    useradd -u 1000 -m -s /bin/bash appuser && \
+    chown -R appuser:appuser ${WORKING_DIR} && \
+    mkdir -p /tmp/strictdoc && \
+    chown -R appuser:appuser /tmp/strictdoc
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE ${PORT}
 
 # Add healthcheck
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:9080/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
-ENTRYPOINT [ "./entrypoint.sh" ]
+ENTRYPOINT ["./entrypoint.sh"]
+
+# Security and metadata labels
+LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>" \
+      org.opencontainers.image.title="WeasyPrint Service (Debian)" \
+      org.opencontainers.image.description="API service for WeasyPrint document processing" \
+      org.opencontainers.image.vendor="SBB" \
+      org.opencontainers.image.security.caps.drop="ALL" \
+      org.opencontainers.image.security.no-new-privileges="true"

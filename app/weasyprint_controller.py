@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import logging
 import os
@@ -5,14 +7,18 @@ import platform
 import shutil
 import tempfile
 import time
-from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 from urllib.parse import unquote
 
 import weasyprint  # type: ignore
-from bs4 import BeautifulSoup
 from fastapi import Depends, FastAPI, Query, Request, Response
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from bs4 import BeautifulSoup
+
 from fastapi.responses import HTMLResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator

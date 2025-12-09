@@ -50,8 +50,8 @@ fileExistenceTests:
     path: /opt/weasyprint/logs
     shouldExist: true
     permissions: drwxrwxrwx
-    uid: 0
-    gid: 0
+    uid: 1000
+    gid: 1000
   - name: Dashboard HTML resource
     path: /opt/weasyprint/app/resources/dashboard.html
     shouldExist: true

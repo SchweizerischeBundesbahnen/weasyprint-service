@@ -1,26 +1,26 @@
 ---
 schemaVersion: 2.0.0
 commandTests:
-  - name: Python installation - check that the python binary is in the correct location
+  - name: Python installation - check uv-installed Python is in venv
     command: which
     args: [python]
-    expectedOutput: [/usr/local/bin/python]
+    expectedOutput: [/opt/weasyprint/.venv/bin/python]
   - name: Python version is correct
     command: python
     args: [--version]
-    expectedOutput: [Python 3.13.*]
+    expectedOutput: [Python 3.14.*]
   - name: uv version is correct
     command: uv
     args: [--version]
     expectedOutput: [uv 0.*.*]
   - name: Weasyprint version is correct
-    command: uv
-    args: [run, weasyprint, --version]
-    expectedOutput: [66.0]
-  - name: Chromium version is correct
-    command: /root/.cache/ms-playwright/chromium-1187/chrome-linux/chrome
+    command: weasyprint
     args: [--version]
-    expectedOutput: [Chromium 140.*.*.*]
+    expectedOutput: [67.0]
+  - name: Chromium version is correct
+    command: /root/.cache/ms-playwright/chromium-1200/chrome-linux/chrome
+    args: [--version]
+    expectedOutput: [Chromium 143.*.*.*]
   - name: Tox should not be installed
     command: uv
     args: [run, --no-sync, tox, --version]
@@ -40,6 +40,10 @@ commandTests:
   - name: Python logging module is available
     command: python
     args: [-c, import logging; logging.basicConfig(); logging.info('test')]
+    exitCode: 0
+  - name: uv-installed Python directory exists
+    command: test
+    args: [-d, /opt/python]
     exitCode: 0
 fileExistenceTests:
   - name: Log directory

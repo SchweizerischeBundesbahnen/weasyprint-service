@@ -121,10 +121,15 @@ class ReferenceGenerated(RuntimeError):
 def get_pdf_variant_from_metadata(pdf_reader: PyPDF.PdfReader) -> str:
     if pdf_reader.xmp_metadata and pdf_reader.xmp_metadata.rdf_root:
         for rdf_node in pdf_reader.xmp_metadata.rdf_root.childNodes:
+            # Check for PDF/A metadata
             part = rdf_node.attributes.get("pdfaid:part")
             conformance = rdf_node.attributes.get("pdfaid:conformance")
             if part and conformance:
                 return f"pdf/a-{part.value}{conformance.value}".lower()
+            # Check for PDF/UA metadata
+            ua_part = rdf_node.attributes.get("pdfuaid:part")
+            if ua_part:
+                return f"pdf/ua-{ua_part.value}".lower()
     return ""
 
 

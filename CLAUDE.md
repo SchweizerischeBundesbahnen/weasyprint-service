@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Run complete test suite (optimized sequence, no redundancy)
 # 1. Install dependencies first (required before running tox)
-uv sync --extra dev --extra test
+uv sync --group dev --group test
 
 # 2. Run tox - handles linting, formatting, type checking, and tests with coverage
 uv run tox
@@ -36,7 +36,7 @@ Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
 ### Development Environment Setup
 ```bash
 # Install dependencies using uv
-uv sync --extra dev --extra test
+uv sync --group dev --group test
 ```
 
 ### Testing and Quality Assurance

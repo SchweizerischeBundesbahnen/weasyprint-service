@@ -37,6 +37,29 @@ The service will be accessible on port 9080.
 
 > **Important**: The `--init` flag enables Docker's built-in init process which handles signal forwarding and zombie process reaping. This is required for proper operation of the service.
 
+### PDF Variants
+
+The service supports generating PDFs in various archival and accessibility formats via the `pdf_variant` query parameter.
+
+**Supported PDF/A variants (archival):**
+- `pdf/a-1b`, `pdf/a-2b`, `pdf/a-3b` - Basic conformance levels
+- `pdf/a-2u`, `pdf/a-3u`, `pdf/a-4u` - Unicode conformance levels
+- `pdf/a-1a`, `pdf/a-2a`, `pdf/a-3a` - Accessible conformance levels
+- `pdf/a-4e`, `pdf/a-4f` - PDF/A-4 variants
+
+**Supported PDF/UA variants (universal accessibility):**
+- `pdf/ua-1`, `pdf/ua-2`
+
+**Example usage:**
+```bash
+curl -X POST "http://localhost:9080/convert/html?pdf_variant=pdf/a-2b" \
+  -H "Content-Type: text/html" \
+  -d "<html><body>Hello World</body></html>" \
+  --output document.pdf
+```
+
+> **Breaking Change (WeasyPrint 67.0):** The `pdf/a-4b` variant is no longer supported. Use `pdf/a-4f` or `pdf/a-4e` instead.
+
 ### Device Scaling
 
 Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.

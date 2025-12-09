@@ -167,6 +167,21 @@ grype weasyprint-service:0.0.0
 - `/convert/html` - Basic HTML to PDF conversion (accepts HTML string, returns PDF binary)
 - `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data, for embedded resources)
 
+**Query Parameters for PDF conversion:**
+- `pdf_variant` - PDF profile/variant (see supported variants below)
+- `presentational_hints` - Use HTML presentational hints (default: true)
+- `custom_metadata` - Include custom metadata in PDF (default: false)
+- `device_scale_factor` - Override default SVG to PNG scale factor
+
+**Supported PDF variants (WeasyPrint 67.0):**
+- PDF/A basic: `pdf/a-1b`, `pdf/a-2b`, `pdf/a-3b`
+- PDF/A unicode: `pdf/a-2u`, `pdf/a-3u`, `pdf/a-4u`
+- PDF/A accessible: `pdf/a-1a`, `pdf/a-2a`, `pdf/a-3a`
+- PDF/A-4: `pdf/a-4e`, `pdf/a-4f`
+- PDF/UA: `pdf/ua-1`, `pdf/ua-2`
+
+> **Breaking Change (WeasyPrint 67.0):** `pdf/a-4b` is no longer supported. Use `pdf/a-4f` or `pdf/a-4e` instead.
+
 ### Configuration and Environment Variables
 
 **General Configuration:**

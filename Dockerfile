@@ -59,9 +59,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
     uv python install "${PYTHON_VERSION}"
 
-# Install dependencies with cache mount
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project && \
+# Install dependencies
+RUN uv sync --frozen --no-dev --no-install-project && \
     uv run playwright install chromium --with-deps
 
 # Create build timestamp

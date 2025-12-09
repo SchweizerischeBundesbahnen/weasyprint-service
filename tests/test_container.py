@@ -408,14 +408,28 @@ def test_convert_incorrect_data(test_parameters: TestParameters) -> None:
 @pytest.mark.parametrize(
     "variant, is_supported",
     [
+        # PDF/A-b variants (basic conformance)
         ("pdf/a-1b", True),
         ("pdf/a-2b", True),
         ("pdf/a-3b", True),
-        ("pdf/a-4b", True),
+        # PDF/A-u variants (Unicode conformance)
         ("pdf/a-2u", True),
         ("pdf/a-3u", True),
         ("pdf/a-4u", True),
+        # PDF/A-a variants (accessible conformance) - added in WeasyPrint 67.0
+        ("pdf/a-1a", True),
+        ("pdf/a-2a", True),
+        ("pdf/a-3a", True),
+        # PDF/A-4 variants - added in WeasyPrint 67.0
+        ("pdf/a-4e", True),
+        ("pdf/a-4f", True),
+        # PDF/UA variants (universal accessibility) - added in WeasyPrint 67.0
+        ("pdf/ua-1", True),
+        ("pdf/ua-2", True),
+        # Empty variant (default PDF)
         ("", True),
+        # Unsupported variants
+        ("pdf/a-4b", False),  # removed in WeasyPrint 67.0
         ("pdf/a-5b", False),
         ("pdf/a-5u", False),
         ("some_string", False),

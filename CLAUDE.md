@@ -387,10 +387,14 @@ The repository uses extensive pre-commit hooks including:
 ### Docker Considerations
 - Multi-architecture support (amd64/arm64)
 - Uses `--init` flag for proper signal handling and zombie process reaping
+- **Non-root user**: Container runs as `appuser` (uid 1000) for enhanced security
+- **Python via uv**: Python version installed from `.tool-versions` file (single source of truth)
+- **Base image**: `debian:trixie-slim` with uv for Python management
 - Includes fonts and Playwright Chromium for complete PDF rendering capabilities
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
 - Playwright Chromium browser installed via `playwright install chromium --with-deps`
+- **OCI labels**: Security metadata labels for container scanning tools
 
 ### Security and Compliance
 - Follows security practices with comprehensive pre-commit hooks

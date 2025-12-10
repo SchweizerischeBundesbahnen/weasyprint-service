@@ -85,11 +85,9 @@ ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
 RUN weasyprint --version
 
 # Create and configure non-root user
-# Make Python installation and Playwright browsers readable by all users
-RUN chmod -R a+rX /opt/python && \
-    chmod -R a+rX /opt/playwright && \
-    chmod -R a+rx ${WORKING_DIR}/.venv/bin && \
-    useradd -u 1000 -m -s /bin/bash appuser && \
+# Note: /opt/python, /opt/playwright, and .venv are already world-readable (755)
+# Only need to ensure .venv/bin scripts are executable and set ownership for working dir
+RUN useradd -u 1000 -m -s /bin/bash appuser && \
     chown -R appuser:appuser ${WORKING_DIR} && \
     mkdir -p /tmp/strictdoc && \
     chown -R appuser:appuser /tmp/strictdoc

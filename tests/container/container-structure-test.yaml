@@ -18,7 +18,7 @@ commandTests:
     args: [--version]
     expectedOutput: [67.0]
   - name: Chromium version is correct
-    command: /root/.cache/ms-playwright/chromium-1200/chrome-linux/chrome
+    command: /opt/playwright/chromium-1200/chrome-linux/chrome
     args: [--version]
     expectedOutput: [Chromium 143.*.*.*]
   - name: Tox should not be installed

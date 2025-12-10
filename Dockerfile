@@ -44,9 +44,15 @@ ENV WORKING_DIR="/opt/weasyprint" \
     PORT=9080 \
     LOG_LEVEL=INFO
 
-# Create and configure logging directory
+# Create non-root user early (before creating directories that need ownership)
+RUN useradd -u 1000 -m -s /bin/bash appuser
+
+# Create and configure logging directory (owned by appuser)
 RUN mkdir -p ${WORKING_DIR}/logs && \
-    chmod 777 ${WORKING_DIR}/logs
+    chown appuser:appuser ${WORKING_DIR}/logs && \
+    chmod 777 ${WORKING_DIR}/logs && \
+    mkdir -p /tmp/strictdoc && \
+    chown -R appuser:appuser /tmp/strictdoc
 
 WORKDIR ${WORKING_DIR}
 
@@ -62,7 +68,7 @@ RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
 # Set Playwright browser path to a shared location (accessible by both root and appuser)
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
-# Install dependencies
+# Install dependencies (as root - venv will be world-readable)
 RUN uv sync --frozen --no-dev --no-install-project && \
     uv run playwright install chromium --with-deps
 
@@ -70,11 +76,11 @@ RUN uv sync --frozen --no-dev --no-install-project && \
 RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
     echo "${BUILD_TIMESTAMP}" > "${WORKING_DIR}/.build_timestamp"
 
-# Copy application code and resources
-COPY ./app/*.py ${WORKING_DIR}/app/
-COPY ./app/static/ ${WORKING_DIR}/app/static/
-COPY ./app/resources/ ${WORKING_DIR}/app/resources/
-COPY ./entrypoint.sh ${WORKING_DIR}/entrypoint.sh
+# Copy application code and resources (owned by appuser for potential runtime writes)
+COPY --chown=appuser:appuser ./app/*.py ${WORKING_DIR}/app/
+COPY --chown=appuser:appuser ./app/static/ ${WORKING_DIR}/app/static/
+COPY --chown=appuser:appuser ./app/resources/ ${WORKING_DIR}/app/resources/
+COPY --chown=appuser:appuser ./entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh
 
 # Add venv to PATH
@@ -83,14 +89,6 @@ ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
 
 # Verify WeasyPrint is installed and working
 RUN weasyprint --version
-
-# Create and configure non-root user
-# Note: /opt/python, /opt/playwright, and .venv are already world-readable (755)
-# Only need to ensure .venv/bin scripts are executable and set ownership for working dir
-RUN useradd -u 1000 -m -s /bin/bash appuser && \
-    chown -R appuser:appuser ${WORKING_DIR} && \
-    mkdir -p /tmp/strictdoc && \
-    chown -R appuser:appuser /tmp/strictdoc
 
 # Switch to non-root user
 USER appuser

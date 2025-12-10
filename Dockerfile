@@ -59,6 +59,9 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
     uv python install "${PYTHON_VERSION}"
 
+# Set Playwright browser path to a shared location (accessible by both root and appuser)
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+
 # Install dependencies
 RUN uv sync --frozen --no-dev --no-install-project && \
     uv run playwright install chromium --with-deps
@@ -82,8 +85,9 @@ ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
 RUN weasyprint --version
 
 # Create and configure non-root user
-# Make Python installation readable by all users
+# Make Python installation and Playwright browsers readable by all users
 RUN chmod -R a+rX /opt/python && \
+    chmod -R a+rX /opt/playwright && \
     chmod -R a+rx ${WORKING_DIR}/.venv/bin && \
     useradd -u 1000 -m -s /bin/bash appuser && \
     chown -R appuser:appuser ${WORKING_DIR} && \

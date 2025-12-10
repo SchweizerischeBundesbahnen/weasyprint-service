@@ -1107,7 +1107,7 @@ wheels = [
 [[package]]
 name = "weasyprint-service"
 version = "0.0.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "defusedxml" },

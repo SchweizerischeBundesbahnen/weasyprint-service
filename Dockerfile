@@ -1,6 +1,13 @@
-FROM python:3.14.2-slim@sha256:10f5458f950e21b5ebe9ef12f75d8b9fc6adef232b0f0fc782ef71be59c2b871
-LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>"
+# Copy uv from official image (version matches .tool-versions)
+FROM ghcr.io/astral-sh/uv:0.9.16@sha256:ae9ff79d095a61faf534a882ad6378e8159d2ce322691153d68d2afac7422840 AS uv-source
 
+# Use debian:trixie-slim as base (same base as python:3.14-slim)
+FROM debian:trixie-slim@sha256:e711a7b30ec1261130d0a121050b4ed81d7fb28aeabcf4ea0c7876d4e9f5aca2
+
+# Copy uv binary from source stage
+COPY --from=uv-source /uv /usr/local/bin/uv
+
+# Install dependencies
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -26,9 +33,7 @@ RUN apt-get update && \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
-    procps \
-    python3-brotli \
-    python3-cffi && \
+    procps && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*
@@ -39,34 +44,67 @@ ENV WORKING_DIR="/opt/weasyprint" \
     PORT=9080 \
     LOG_LEVEL=INFO
 
-# Create and configure logging directory
+# Create non-root user early (before creating directories that need ownership)
+RUN useradd -u 1000 -m -s /bin/bash appuser
+
+# Create and configure logging directory (owned by appuser)
 RUN mkdir -p ${WORKING_DIR}/logs && \
-    chmod 777 ${WORKING_DIR}/logs
+    chown appuser:appuser ${WORKING_DIR}/logs && \
+    chmod 777 ${WORKING_DIR}/logs && \
+    mkdir -p /tmp/strictdoc && \
+    chown -R appuser:appuser /tmp/strictdoc
 
 WORKDIR ${WORKING_DIR}
 
+# Copy Python version file and dependency files
+COPY .tool-versions pyproject.toml uv.lock ./
+
+# Install Python via uv to /opt/python (version from .tool-versions file)
+ENV UV_PYTHON_INSTALL_DIR=/opt/python
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
+    uv python install "${PYTHON_VERSION}"
+
+# Set Playwright browser path to a shared location (accessible by both root and appuser)
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+
+# Install dependencies (as root - venv will be world-readable)
+RUN uv sync --frozen --no-dev --no-install-project && \
+    uv run playwright install chromium --with-deps
+
+# Create build timestamp
 RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \
     echo "${BUILD_TIMESTAMP}" > "${WORKING_DIR}/.build_timestamp"
 
-COPY ./requirements.txt ${WORKING_DIR}/requirements.txt
-
-COPY ./app/*.py ${WORKING_DIR}/app/
-COPY ./app/static/ ${WORKING_DIR}/app/static/
-COPY ./app/resources/ ${WORKING_DIR}/app/resources/
-COPY ./pyproject.toml ${WORKING_DIR}/pyproject.toml
-COPY ./uv.lock ${WORKING_DIR}/uv.lock
-
-RUN pip install --no-cache-dir -r "${WORKING_DIR}"/requirements.txt && \
-    uv sync --frozen --no-dev --no-install-project && \
-    uv run playwright install chromium --with-deps
-
-COPY ./entrypoint.sh ${WORKING_DIR}/entrypoint.sh
+# Copy application code and resources (owned by appuser for potential runtime writes)
+COPY --chown=appuser:appuser ./app/*.py ${WORKING_DIR}/app/
+COPY --chown=appuser:appuser ./app/static/ ${WORKING_DIR}/app/static/
+COPY --chown=appuser:appuser ./app/resources/ ${WORKING_DIR}/app/resources/
+COPY --chown=appuser:appuser ./entrypoint.sh ${WORKING_DIR}/entrypoint.sh
 RUN chmod +x ${WORKING_DIR}/entrypoint.sh
+
+# Add venv to PATH
+ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
+    PYTHONPATH=${WORKING_DIR}
+
+# Verify WeasyPrint is installed and working
+RUN weasyprint --version
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE ${PORT}
 
 # Add healthcheck
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:9080/health || exit 1
+    CMD curl -f http://localhost:${PORT}/health || exit 1
 
-ENTRYPOINT [ "./entrypoint.sh" ]
+ENTRYPOINT ["./entrypoint.sh"]
+
+# Security and metadata labels
+LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>" \
+      org.opencontainers.image.title="WeasyPrint Service (Debian)" \
+      org.opencontainers.image.description="API service for WeasyPrint document processing" \
+      org.opencontainers.image.vendor="SBB" \
+      org.opencontainers.image.security.caps.drop="ALL" \
+      org.opencontainers.image.security.no-new-privileges="true"

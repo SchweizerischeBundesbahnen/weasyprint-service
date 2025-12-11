@@ -8,6 +8,8 @@ Note: Counters are incremented when events occur (not synced from external state
       Gauges are updated periodically to reflect current state.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -165,7 +167,7 @@ def increment_chromium_restart() -> None:
     chromium_restarts_total.inc()
 
 
-def update_gauges_from_chromium_manager(chromium_manager: "ChromiumManager") -> None:
+def update_gauges_from_chromium_manager(chromium_manager: ChromiumManager) -> None:
     """
     Update Prometheus gauges from ChromiumManager current state.
 

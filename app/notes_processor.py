@@ -7,6 +7,8 @@ Features:
 - Supports custom PNG icons via appearance streams
 """
 
+from __future__ import annotations
+
 import logging
 import uuid
 import zlib
@@ -47,7 +49,7 @@ class Note:
     username: str
     text: str
     title: str = ""
-    replies: list["Note"] = field(default_factory=list)
+    replies: list[Note] = field(default_factory=list)
     uuid: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 

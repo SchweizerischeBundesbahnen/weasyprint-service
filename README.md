@@ -10,6 +10,7 @@ from HTML and CSS.
 - Prometheus metrics endpoint for Grafana integration and observability
 - Compatible with amd64 and arm64 architectures
 - Easily deployable via Docker
+- **Security-hardened container**: Runs as non-root user with OCI security labels
 
 ## Getting Started
 
@@ -26,11 +27,11 @@ docker pull ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 To start the WeasyPrint service container, execute:
 
 ```bash
-  docker run --detach \
-    --init \
-    --publish 9080:9080 \
-    --name weasyprint-service \
-    ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+docker run --detach \
+  --init \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
 The service will be accessible on port 9080.
@@ -70,6 +71,7 @@ To customize the device scaling when running the container:
 
 ```bash
 docker run --detach \
+  --init \
   --publish 9080:9080 \
   --name weasyprint-service \
   --env DEVICE_SCALE_FACTOR=2.0 \
@@ -88,6 +90,7 @@ To customize the concurrency limit when running the container:
 
 ```bash
 docker run --detach \
+  --init \
   --publish 9080:9080 \
   --name weasyprint-service \
   --env MAX_CONCURRENT_CONVERSIONS=20 \
@@ -106,6 +109,7 @@ To enable automatic restart after every 1000 conversions:
 
 ```bash
 docker run --detach \
+  --init \
   --publish 9080:9080 \
   --name weasyprint-service \
   --env CHROMIUM_RESTART_AFTER_N_CONVERSIONS=1000 \
@@ -141,6 +145,7 @@ The service requires a persistent Chromium browser instance for SVG to PNG conve
 To customize the number of retry attempts:
 ```bash
 docker run --detach \
+  --init \
   --publish 9080:9080 \
   --name weasyprint-service \
   --env CHROMIUM_MAX_CONVERSION_RETRIES=3 \
@@ -193,6 +198,7 @@ To use dark theme:
 
 ```bash
 docker run --detach \
+  --init \
   --publish 9080:9080 \
   --name weasyprint-service \
   --env DASHBOARD_THEME=dark \
@@ -331,6 +337,7 @@ To customize logging when running the container:
 
 ```bash
 docker run --detach \
+  --init \
   --publish 9080:9080 \
   --name weasyprint-service \
   --env LOG_LEVEL=DEBUG \
@@ -345,6 +352,38 @@ Available log levels:
 - WARNING: Warning messages for potential issues
 - ERROR: Error messages for failed operations
 - CRITICAL: Critical issues that require immediate attention
+
+### Container Security
+
+The container is built with security best practices:
+
+**Non-root User:**
+- Container runs as `appuser` (uid 1000) instead of root
+- Reduces attack surface and follows principle of least privilege
+- Compatible with Kubernetes pod security policies requiring non-root containers
+
+**OCI Security Labels:**
+The image includes security metadata labels for container scanning and policy enforcement:
+- `org.opencontainers.image.security.caps.drop="ALL"` - Indicates all capabilities should be dropped
+- `org.opencontainers.image.security.no-new-privileges="true"` - Prevents privilege escalation
+
+**Recommended Runtime Security:**
+```bash
+docker run --detach \
+  --init \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --security-opt no-new-privileges:true \
+  --cap-drop ALL \
+  --read-only \
+  --tmpfs /tmp \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+**Note:** When using `--read-only`, ensure log volume is mounted if persistent logging is required:
+```bash
+--volume /path/to/logs:/opt/weasyprint/logs
+```
 
 ### Using as a Base Image
 
@@ -394,7 +433,7 @@ docker run --detach \
 The following entry may be added to the `run` command:
 
 ```bash
-  docker run -v /path/to/host/fonts:/usr/share/fonts/custom ...
+docker run --init -v /path/to/host/fonts:/usr/share/fonts/custom ...
 ```
 
 Replace `/path/to/host/fonts` with the folder containing custom fonts
@@ -421,15 +460,30 @@ You can insert native PDF sticky note annotations at specific positions in the r
 
 ## Development
 
+### Docker Image Architecture
+
+The Docker image uses a multi-stage build with the following components:
+
+- **Base image**: `debian:trixie-slim` (same base as `python:3.14-slim`)
+- **Python**: Installed via [uv](https://github.com/astral-sh/uv) from `.tool-versions` file
+- **Package manager**: uv for fast, reproducible dependency management
+- **Runtime user**: Non-root `appuser` (uid 1000)
+
+**Key benefits:**
+- Single source of truth for Python version (`.tool-versions`)
+- Faster builds with uv cache mounts
+- Smaller attack surface with non-root execution
+- Consistent with local development environment
+
 ### Building the Docker Image
 
 To build the Docker image from the source with a custom version, use:
 
 ```bash
-  docker build \
-    --build-arg APP_IMAGE_VERSION=0.0.0 \
-    --file Dockerfile \
-    --tag weasyprint-service:0.0.0 .
+docker build \
+  --build-arg APP_IMAGE_VERSION=0.0.0 \
+  --file Dockerfile \
+  --tag weasyprint-service:0.0.0 .
 ```
 
 Replace 0.0.0 with the desired version number.
@@ -439,10 +493,11 @@ Replace 0.0.0 with the desired version number.
 To start the Docker container with your custom-built image:
 
 ```bash
-  docker run --detach \
-    --publish 9080:9080 \
-    --name weasyprint-service \
-    weasyprint-service:0.0.0
+docker run --detach \
+  --init \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  weasyprint-service:0.0.0
 ```
 
 ### Stopping the Container
@@ -450,7 +505,7 @@ To start the Docker container with your custom-built image:
 To stop the running container, execute:
 
 ```bash
-  docker container stop weasyprint-service
+docker container stop weasyprint-service
 ```
 
 ### Testing

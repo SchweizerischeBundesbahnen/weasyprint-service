@@ -1,5 +1,16 @@
 # Changelog
 
+## [67.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v67.0.0...v67.0.1) (2025-12-12)
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.124.2 ([c67aafa](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/c67aafa98dc9ecc4a358901cf497f9bdb4e51b05))
+* **deps:** update dependency fastapi to v0.124.4 ([7b12540](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7b125405ee0eda6420cd506ec0d62275f7450782))
+* **deps:** update dependency types-psutil to v7.1.3.20251210 ([1df409e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1df409ec75e78a79459055df8fa48e1fc5998a74))
+* **deps:** update dependency types-psutil to v7.1.3.20251211 ([ecb9d66](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ecb9d6686cdbac755abd806469ae627893c8c32d))
+* **docker:** add non-root user and use uv for Python installation ([#275](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/275)) ([c7f54c9](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/c7f54c9691844ac30f13b581e4718c1c4260322e))
+
 ## [67.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.8...v67.0.0) (2025-12-09)
 
 

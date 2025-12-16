@@ -42,6 +42,7 @@ ARG APP_IMAGE_VERSION=0.0.0
 ENV WORKING_DIR="/opt/weasyprint" \
     WEASYPRINT_SERVICE_VERSION=${APP_IMAGE_VERSION} \
     PORT=9080 \
+    METRICS_PORT=9180 \
     LOG_LEVEL=INFO
 
 # Create non-root user early (before creating directories that need ownership)
@@ -94,6 +95,7 @@ RUN weasyprint --version
 USER appuser
 
 EXPOSE ${PORT}
+EXPOSE ${METRICS_PORT}
 
 # Add healthcheck
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \

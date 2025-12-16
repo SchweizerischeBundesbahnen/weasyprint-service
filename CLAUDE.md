@@ -158,7 +158,8 @@ grype weasyprint-service:0.0.0
   - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
   - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, health monitoring info, and queue metrics
 - `/version` - Service version information (Python, WeasyPrint, Chromium, service versions)
-- `/metrics` - Prometheus metrics endpoint for monitoring and observability
+- `/metrics` - Prometheus metrics endpoint (served on dedicated port, default: 9180)
+  - **Security**: Exposed on separate port from main API for network-level isolation
   - Returns metrics in Prometheus text format
   - Automatic FastAPI metrics (request duration, in-progress requests, total requests)
   - Custom ChromiumManager metrics (conversions, failures, error rates, resource usage)
@@ -208,6 +209,10 @@ grype weasyprint-service:0.0.0
 
 **Dashboard Configuration:**
 - `DASHBOARD_THEME`: Dashboard theme (light/dark, case-insensitive, default: light)
+
+**Metrics Server Configuration:**
+- `METRICS_PORT`: Port for the dedicated Prometheus metrics server (default: 9180, range: 1024-65535)
+- `METRICS_SERVER_ENABLED`: Enable/disable the dedicated metrics server (true/false, default: true)
 
 ## Development Practices
 
@@ -574,10 +579,20 @@ uptime_seconds 3600.45
 scrape_configs:
   - job_name: 'weasyprint-service'
     static_configs:
-      - targets: ['weasyprint-service:9080']
+      - targets: ['weasyprint-service:9180']  # Metrics served on dedicated port
     metrics_path: '/metrics'
     scrape_interval: 10s
     scrape_timeout: 5s
+```
+
+**Security Group Configuration (EC2/AWS example):**
+
+```bash
+# Application port - accessible by clients
+Inbound: TCP 9080 from <client CIDR or ALB SG>
+
+# Metrics port - Prometheus only
+Inbound: TCP 9180 from <Prometheus server IP/SG only>
 ```
 
 **Grafana Dashboard Queries:**

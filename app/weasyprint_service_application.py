@@ -87,13 +87,26 @@ def main() -> None:
 
     Parses command line arguments, initializes logging, and starts the server.
     The service port can be specified via command line argument (defaults to 9080).
+    The metrics port can be specified via command line argument (defaults to 9180).
     """
     parser = argparse.ArgumentParser(description="Weasyprint service")
     parser.add_argument("--port", default=9080, type=int, required=False, help="Service port")
+    parser.add_argument("--metrics-port", default=9180, type=int, required=False, help="Metrics server port (0 to disable)")
     args = parser.parse_args()
 
+    # Set metrics port environment variable if provided via CLI
+    if args.metrics_port == 0:
+        os.environ["METRICS_SERVER_ENABLED"] = "false"
+    else:
+        os.environ["METRICS_PORT"] = str(args.metrics_port)
+
     setup_logging()
-    logging.info("Weasyprint service listening port: " + str(args.port))
+    logging.info("Weasyprint service listening port: %d", args.port)
+
+    if os.environ.get("METRICS_SERVER_ENABLED", "true").lower() in ("true", "1", "yes", "on"):
+        logging.info("Metrics server listening port: %s", os.environ.get("METRICS_PORT", "9180"))
+    else:
+        logging.info("Metrics server disabled")
 
     start_server(args.port)
 

@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from bs4 import BeautifulSoup
 
 from fastapi.responses import HTMLResponse
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from starlette.staticfiles import StaticFiles
@@ -29,12 +28,12 @@ from app.attachment_manager import AttachmentManager
 from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
+from app.metrics_server import MetricsServer, get_metrics_port, is_metrics_server_enabled
 from app.notes_processor import NotesProcessor
 from app.prometheus_metrics import (
     increment_pdf_generation_failure,
     increment_pdf_generation_success,
     pdf_generation_duration_seconds,
-    update_gauges_from_chromium_manager,
 )
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
@@ -44,29 +43,46 @@ from app.svg_processor import SvgProcessor
 @contextlib.asynccontextmanager
 async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG001
     """
-    Manage the lifecycle of the Chromium browser for SVG to PNG conversion.
+    Manage the lifecycle of the Chromium browser and metrics server.
 
     This ensures a single persistent Chromium instance is started when the
     FastAPI application starts and properly cleaned up on shutdown.
 
     If Chromium fails to start, the application will not start and the
     service will terminate (fail-fast behavior for containerized environments).
+
+    The metrics server is started on a dedicated port (default: 9180) for
+    security isolation from the main application API.
     """
     chromium_manager = get_chromium_manager()
-    logger = logging.getLogger(__name__)
+    lifespan_logger = logging.getLogger(__name__)
 
-    logger.info("Prepare Chromium browser for SVG conversion...")
+    lifespan_logger.info("Prepare Chromium browser for SVG conversion...")
     await chromium_manager.start()
-    logger.info("Chromium browser prepared successfully")
+    lifespan_logger.info("Chromium browser prepared successfully")
+
+    # Start metrics server if enabled
+    metrics_server: MetricsServer | None = None
+    if is_metrics_server_enabled():
+        metrics_port = get_metrics_port()
+        metrics_server = MetricsServer(port=metrics_port)
+        await metrics_server.start()
 
     yield  # Application runs here
 
+    # Stop metrics server
+    if metrics_server:
+        try:
+            await metrics_server.stop()
+        except Exception as e:  # noqa: BLE001
+            lifespan_logger.error("Error stopping metrics server: %s", e)
+
     try:
-        logger.info("Stopping Chromium browser...")
+        lifespan_logger.info("Stopping Chromium browser...")
         await chromium_manager.stop()
-        logger.info("Chromium browser stopped successfully")
+        lifespan_logger.info("Chromium browser stopped successfully")
     except Exception as e:  # noqa: BLE001
-        logger.error("Error stopping Chromium browser: %s", e)
+        lifespan_logger.error("Error stopping Chromium browser: %s", e)
 
 
 logger = logging.getLogger(__name__)
@@ -81,13 +97,12 @@ app = FastAPI(
 )
 
 # Initialize Prometheus Instrumentator for automatic HTTP metrics
-# Note: We instrument but don't expose() - we'll create our own /metrics endpoint
+# Note: We instrument but don't expose() - metrics are served on a dedicated port via metrics_server
 Instrumentator(
     should_group_status_codes=False,
     should_ignore_untemplated=True,
     should_respect_env_var=True,
     should_instrument_requests_inprogress=True,
-    excluded_handlers=["/metrics"],
     env_var_name="ENABLE_METRICS",
     inprogress_name="http_requests_inprogress",
     inprogress_labels=True,
@@ -225,37 +240,6 @@ async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chrom
     }
     logger.debug("Version info: %s", version_info)
     return version_info
-
-
-@app.get(
-    "/metrics",
-    summary="Prometheus metrics",
-    description="Returns Prometheus-compatible metrics for monitoring and observability",
-    operation_id="getMetrics",
-    tags=["meta"],
-    response_class=Response,
-)
-async def metrics(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> Response:
-    """
-    Expose Prometheus metrics endpoint.
-
-    This endpoint returns metrics in Prometheus text format, including:
-    - Automatic FastAPI request metrics (duration, in-progress, total) from prometheus-fastapi-instrumentator
-    - Custom ChromiumManager metrics (conversions, failures, resource usage)
-    - System metrics (CPU, memory)
-
-    The metrics are automatically scraped by Prometheus for monitoring and alerting.
-
-    Note: Counters are incremented when events occur. This endpoint only updates gauges
-    to reflect current state (CPU, memory, queue size, etc.).
-    """
-    # Update gauges from ChromiumManager before serving (counters are updated when events occur)
-    update_gauges_from_chromium_manager(chromium_manager)
-
-    # Generate Prometheus metrics output
-    metrics_output = generate_latest()
-
-    return Response(content=metrics_output, media_type=CONTENT_TYPE_LATEST)
 
 
 class RenderOptions(BaseModel):

@@ -122,6 +122,11 @@ class MetricsServer:
         )
         self._server = uvicorn.Server(config)
         self._task = asyncio.create_task(self._server.serve())
+
+        # Wait for server to be ready before returning
+        while not self._server.started:
+            await asyncio.sleep(0.01)
+
         self._started = True
         logger.info("Metrics server started on port %d", self.port)
 
@@ -138,6 +143,7 @@ class MetricsServer:
                 await asyncio.wait_for(self._task, timeout=5.0)
             except TimeoutError:
                 self._task.cancel()
+                # Await cancelled task to ensure proper cleanup (will raise CancelledError)
                 with contextlib.suppress(asyncio.CancelledError):
                     await self._task
 

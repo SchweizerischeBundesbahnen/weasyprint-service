@@ -1,7 +1,8 @@
 """Tests for the dedicated metrics server module."""
 
+import asyncio
 import os
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -222,3 +223,80 @@ class TestMetricsServer:
 
             await server.stop()
             assert server.is_running is False
+
+    @pytest.mark.asyncio
+    async def test_stop_with_timeout(self):
+        """Test stop() handles timeout and cancels task."""
+        server = MetricsServer(port=9195)
+
+        with patch("app.metrics_server.uvicorn.Server") as mock_server_cls:
+            mock_server = AsyncMock()
+            mock_server.started = True
+
+            # Create a task that will hang and cause timeout
+            async def hang_forever() -> None:
+                await asyncio.sleep(100)
+
+            mock_server.serve = hang_forever
+            mock_server_cls.return_value = mock_server
+
+            await server.start()
+            assert server.is_running is True
+
+            # Patch wait_for to raise TimeoutError
+            with patch("app.metrics_server.asyncio.wait_for", side_effect=TimeoutError):
+                await server.stop()
+
+            assert server.is_running is False
+
+    @pytest.mark.asyncio
+    async def test_stop_task_cancelled_error_suppressed(self):
+        """Test stop() suppresses CancelledError when cancelling task."""
+        server = MetricsServer(port=9194)
+        server._started = True
+
+        # Create an actual asyncio task that we can cancel
+        async def long_running() -> None:
+            try:
+                await asyncio.sleep(100)
+            except asyncio.CancelledError:
+                raise
+
+        task = asyncio.create_task(long_running())
+        server._task = task
+        server._server = AsyncMock()
+
+        # Patch wait_for to raise TimeoutError to trigger the cancel path
+        with patch("app.metrics_server.asyncio.wait_for", side_effect=TimeoutError):
+            # Should not raise - CancelledError should be suppressed
+            await server.stop()
+
+        assert server.is_running is False
+        assert task.cancelled()
+
+    @pytest.mark.asyncio
+    async def test_stop_without_server(self):
+        """Test stop() handles case when server is None."""
+        server = MetricsServer(port=9193)
+        server._started = True
+        server._server = None
+        server._task = None
+
+        # Should not raise
+        await server.stop()
+
+        assert server.is_running is False
+
+    @pytest.mark.asyncio
+    async def test_stop_without_task(self):
+        """Test stop() handles case when task is None."""
+        server = MetricsServer(port=9192)
+        server._started = True
+        server._server = AsyncMock()
+        server._task = None
+
+        # Should not raise
+        await server.stop()
+
+        assert server.is_running is False
+        assert server._server.should_exit is True

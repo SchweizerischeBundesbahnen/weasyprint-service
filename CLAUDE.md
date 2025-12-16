@@ -120,8 +120,8 @@ uv run python -m app.weasyprint_service_application --port 9080
 # Build development image
 docker build --build-arg APP_IMAGE_VERSION=0.0.0 --file Dockerfile --tag weasyprint-service:0.0.0 .
 
-# Run development container
-docker run --detach --init --publish 9080:9080 --name weasyprint-service weasyprint-service:0.0.0
+# Run development container (expose both application and metrics ports)
+docker run --detach --init --publish 9080:9080 --publish 9180:9180 --name weasyprint-service weasyprint-service:0.0.0
 
 # Test container structure
 container-structure-test test --image weasyprint-service:0.0.0 --config ./tests/container/container-structure-test.yaml
@@ -518,7 +518,7 @@ curl http://localhost:9080/health?detailed=true
 
 ### Prometheus Integration
 
-The service exposes metrics in Prometheus format via the `/metrics` endpoint for monitoring and observability.
+The service exposes metrics in Prometheus format via the `/metrics` endpoint on a **dedicated port** (default: 9180) for security. This allows network-level isolation between the main API and metrics endpoint (e.g., restricting metrics access to Prometheus server only via security groups).
 
 **Key Metrics Exposed:**
 
@@ -555,8 +555,8 @@ The service exposes metrics in Prometheus format via the `/metrics` endpoint for
 **Usage Example:**
 
 ```bash
-# Fetch Prometheus metrics
-curl http://localhost:9080/metrics
+# Fetch Prometheus metrics (served on dedicated port 9180)
+curl http://localhost:9180/metrics
 
 # Example output (excerpt):
 # HELP pdf_generations_total Total number of successful HTML to PDF conversions

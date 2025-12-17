@@ -120,8 +120,8 @@ uv run python -m app.weasyprint_service_application --port 9080
 # Build development image
 docker build --build-arg APP_IMAGE_VERSION=0.0.0 --file Dockerfile --tag weasyprint-service:0.0.0 .
 
-# Run development container
-docker run --detach --init --publish 9080:9080 --name weasyprint-service weasyprint-service:0.0.0
+# Run development container (expose both application and metrics ports)
+docker run --detach --init --publish 9080:9080 --publish 9180:9180 --name weasyprint-service weasyprint-service:0.0.0
 
 # Test container structure
 container-structure-test test --image weasyprint-service:0.0.0 --config ./tests/container/container-structure-test.yaml
@@ -158,7 +158,8 @@ grype weasyprint-service:0.0.0
   - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
   - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, health monitoring info, and queue metrics
 - `/version` - Service version information (Python, WeasyPrint, Chromium, service versions)
-- `/metrics` - Prometheus metrics endpoint for monitoring and observability
+- `/metrics` - Prometheus metrics endpoint (served on dedicated port, default: 9180)
+  - **Security**: Exposed on separate port from main API for network-level isolation
   - Returns metrics in Prometheus text format
   - Automatic FastAPI metrics (request duration, in-progress requests, total requests)
   - Custom ChromiumManager metrics (conversions, failures, error rates, resource usage)
@@ -208,6 +209,10 @@ grype weasyprint-service:0.0.0
 
 **Dashboard Configuration:**
 - `DASHBOARD_THEME`: Dashboard theme (light/dark, case-insensitive, default: light)
+
+**Metrics Server Configuration:**
+- `METRICS_PORT`: Port for the dedicated Prometheus metrics server (default: 9180, range: 1024-65535)
+- `METRICS_SERVER_ENABLED`: Enable/disable the dedicated metrics server (true/false, default: true)
 
 ## Development Practices
 
@@ -513,7 +518,7 @@ curl http://localhost:9080/health?detailed=true
 
 ### Prometheus Integration
 
-The service exposes metrics in Prometheus format via the `/metrics` endpoint for monitoring and observability.
+The service exposes metrics in Prometheus format via the `/metrics` endpoint on a **dedicated port** (default: 9180) for security. This allows network-level isolation between the main API and metrics endpoint (e.g., restricting metrics access to Prometheus server only via security groups).
 
 **Key Metrics Exposed:**
 
@@ -550,8 +555,8 @@ The service exposes metrics in Prometheus format via the `/metrics` endpoint for
 **Usage Example:**
 
 ```bash
-# Fetch Prometheus metrics
-curl http://localhost:9080/metrics
+# Fetch Prometheus metrics (served on dedicated port 9180)
+curl http://localhost:9180/metrics
 
 # Example output (excerpt):
 # HELP pdf_generations_total Total number of successful HTML to PDF conversions
@@ -574,10 +579,20 @@ uptime_seconds 3600.45
 scrape_configs:
   - job_name: 'weasyprint-service'
     static_configs:
-      - targets: ['weasyprint-service:9080']
+      - targets: ['weasyprint-service:9180']  # Metrics served on dedicated port
     metrics_path: '/metrics'
     scrape_interval: 10s
     scrape_timeout: 5s
+```
+
+**Security Group Configuration (EC2/AWS example):**
+
+```bash
+# Application port - accessible by clients
+Inbound: TCP 9080 from <client CIDR or ALB SG>
+
+# Metrics port - Prometheus only
+Inbound: TCP 9180 from <Prometheus server IP/SG only>
 ```
 
 **Grafana Dashboard Queries:**

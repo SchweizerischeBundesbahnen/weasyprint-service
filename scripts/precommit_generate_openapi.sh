@@ -68,7 +68,8 @@ if lsof -ti :"${PORT}" >/dev/null 2>&1; then
 fi
 
 echo "Starting local FastAPI app via uv on port ${PORT}..."
-(cd "$ROOT_DIR" && LOG_DIR="$LOG_DIR_LOCAL" uv run python -m app.weasyprint_service_application --port "${PORT}") >/dev/null 2>&1 &
+# Disable metrics server during OpenAPI generation (not needed for schema)
+(cd "$ROOT_DIR" && LOG_DIR="$LOG_DIR_LOCAL" METRICS_SERVER_ENABLED=false uv run python -m app.weasyprint_service_application --port "${PORT}") >/dev/null 2>&1 &
 
 wait_for_url "$URL" 60
 

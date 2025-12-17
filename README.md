@@ -7,7 +7,7 @@ from HTML and CSS.
 
 - Simple REST API to access [WeasyPrint](https://github.com/Kozea/WeasyPrint)
 - Real-time monitoring dashboard with metrics visualization
-- Prometheus metrics endpoint for Grafana integration and observability
+- Prometheus metrics endpoint on dedicated port (9180) for security and Grafana integration
 - Compatible with amd64 and arm64 architectures
 - Easily deployable via Docker
 - **Security-hardened container**: Runs as non-root user with OCI security labels
@@ -30,11 +30,12 @@ To start the WeasyPrint service container, execute:
 docker run --detach \
   --init \
   --publish 9080:9080 \
+  --publish 9180:9180 \
   --name weasyprint-service \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
-The service will be accessible on port 9080.
+The service will be accessible on port 9080, and Prometheus metrics on port 9180.
 
 > **Important**: The `--init` flag enables Docker's built-in init process which handles signal forwarding and zombie process reaping. This is required for proper operation of the service.
 
@@ -216,7 +217,9 @@ docker run --detach \
 
 The service exposes Prometheus-compatible metrics for comprehensive monitoring and observability through Grafana dashboards.
 
-**Metrics Endpoint:** `/metrics`
+**Metrics Endpoint:** `/metrics` on port 9180 (dedicated metrics port)
+
+> **Security:** The metrics endpoint is served on a separate port (9180) from the main API (9080). This allows network-level isolation using security groups or firewall rules to restrict metrics access to your Prometheus server only.
 
 **Available Metrics:**
 
@@ -253,7 +256,7 @@ The service exposes Prometheus-compatible metrics for comprehensive monitoring a
 scrape_configs:
   - job_name: 'weasyprint-service'
     static_configs:
-      - targets: ['weasyprint-service:9080']
+      - targets: ['weasyprint-service:9180']  # Metrics on dedicated port
     metrics_path: '/metrics'
     scrape_interval: 15s
     scrape_timeout: 10s
@@ -285,7 +288,8 @@ services:
     image: ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
     init: true
     ports:
-      - "9080:9080"
+      - "9080:9080"   # Main API
+      - "9180:9180"   # Metrics endpoint
 
   prometheus:
     image: prom/prometheus:latest
@@ -496,6 +500,7 @@ To start the Docker container with your custom-built image:
 docker run --detach \
   --init \
   --publish 9080:9080 \
+  --publish 9180:9180 \
   --name weasyprint-service \
   weasyprint-service:0.0.0
 ```

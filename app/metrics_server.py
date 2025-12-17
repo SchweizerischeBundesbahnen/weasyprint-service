@@ -117,7 +117,7 @@ class MetricsServer:
 
         config = uvicorn.Config(
             app=metrics_app,
-            host="0.0.0.0",  # noqa: S104  # Binding to all interfaces is intentional for containerized environments
+            host="",
             port=self.port,
             log_level="warning",
         )

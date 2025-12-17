@@ -211,25 +211,15 @@ class TestMetricsServer:
             mock_server.serve = AsyncMock(return_value=None)
             mock_server_cls.return_value = mock_server
 
-            # Patch the timeout to be very short for testing
+            # Patch timeout to 0 so it times out immediately
             with (
+                patch("app.metrics_server.STARTUP_TIMEOUT_SECONDS", 0),
                 patch.object(server, "stop", new_callable=AsyncMock) as mock_stop,
                 pytest.raises(TimeoutError, match="Metrics server failed to start"),
             ):
-                # Patch the time function to simulate timeout
-                original_time = asyncio.get_event_loop().time
-                call_count = [0]
+                await server.start()
 
-                def mock_time() -> float:
-                    call_count[0] += 1
-                    if call_count[0] > 2:
-                        return original_time() + 20  # Simulate 20 seconds passed
-                    return original_time()
-
-                with patch.object(asyncio.get_event_loop(), "time", mock_time):
-                    await server.start()
-
-                mock_stop.assert_called_once()
+            mock_stop.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_stop_when_not_started(self):

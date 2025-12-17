@@ -199,6 +199,38 @@ class TestMetricsServer:
         server._started = False
 
     @pytest.mark.asyncio
+    async def test_start_timeout(self):
+        """Test start() raises TimeoutError if server doesn't start in time."""
+        server = MetricsServer(port=9191)
+
+        with patch("app.metrics_server.uvicorn.Server") as mock_server_cls:
+            mock_server = AsyncMock()
+            # Server never becomes ready
+            mock_server.started = False
+            mock_server.serve = AsyncMock(return_value=None)
+            mock_server_cls.return_value = mock_server
+
+            # Patch the timeout to be very short for testing
+            with (
+                patch.object(server, "stop", new_callable=AsyncMock) as mock_stop,
+                pytest.raises(TimeoutError, match="Metrics server failed to start"),
+            ):
+                # Patch the time function to simulate timeout
+                original_time = asyncio.get_event_loop().time
+                call_count = [0]
+
+                def mock_time() -> float:
+                    call_count[0] += 1
+                    if call_count[0] > 2:
+                        return original_time() + 20  # Simulate 20 seconds passed
+                    return original_time()
+
+                with patch.object(asyncio.get_event_loop(), "time", mock_time):
+                    await server.start()
+
+                mock_stop.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_stop_when_not_started(self):
         """Test stop() does nothing when not started."""
         server = MetricsServer(port=9197)

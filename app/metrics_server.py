@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 MIN_VALID_PORT = 1024
 MAX_VALID_PORT = 65535
 DEFAULT_METRICS_PORT = 9180
+STARTUP_TIMEOUT_SECONDS = 10.0
 
 # Minimal FastAPI app for metrics only
 metrics_app = FastAPI(
@@ -123,8 +124,13 @@ class MetricsServer:
         self._server = uvicorn.Server(config)
         self._task = asyncio.create_task(self._server.serve())
 
-        # Wait for server to be ready before returning
+        # Wait for server to be ready before returning (with timeout)
+        start_time = asyncio.get_event_loop().time()
         while not self._server.started:
+            if asyncio.get_event_loop().time() - start_time > STARTUP_TIMEOUT_SECONDS:
+                logger.error("Metrics server failed to start within %s seconds", STARTUP_TIMEOUT_SECONDS)
+                await self.stop()
+                raise TimeoutError(f"Metrics server failed to start within {STARTUP_TIMEOUT_SECONDS} seconds")
             await asyncio.sleep(0.01)
 
         self._started = True

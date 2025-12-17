@@ -174,6 +174,7 @@ class TestMetricsServer:
 
         with patch("app.metrics_server.uvicorn.Server") as mock_server_cls:
             mock_server = AsyncMock()
+            mock_server.started = True  # Simulate server ready state
             mock_server.serve = AsyncMock()
             mock_server_cls.return_value = mock_server
 
@@ -247,6 +248,7 @@ class TestMetricsServer:
 
         with patch("app.metrics_server.uvicorn.Server") as mock_server_cls:
             mock_server = AsyncMock()
+            mock_server.started = True  # Simulate server ready state
             mock_server.serve = AsyncMock(return_value=None)
             mock_server_cls.return_value = mock_server
 

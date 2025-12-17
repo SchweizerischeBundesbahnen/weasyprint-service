@@ -9,7 +9,6 @@ isolation between the main application API and the metrics endpoint.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 import os
 from typing import Annotated
@@ -149,9 +148,6 @@ class MetricsServer:
                 await asyncio.wait_for(self._task, timeout=5.0)
             except TimeoutError:
                 self._task.cancel()
-                # Await cancelled task to ensure proper cleanup (will raise CancelledError)
-                with contextlib.suppress(asyncio.CancelledError):
-                    await self._task
 
         self._started = False
         logger.info("Metrics server stopped")

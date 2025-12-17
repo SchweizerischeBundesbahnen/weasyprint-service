@@ -284,17 +284,14 @@ class TestMetricsServer:
             assert server.is_running is False
 
     @pytest.mark.asyncio
-    async def test_stop_task_cancelled_error_suppressed(self):
-        """Test stop() suppresses CancelledError when cancelling task."""
+    async def test_stop_cancels_task_on_timeout(self):
+        """Test stop() cancels task when timeout occurs."""
         server = MetricsServer(port=9194)
         server._started = True
 
         # Create an actual asyncio task that we can cancel
         async def long_running() -> None:
-            try:
-                await asyncio.sleep(100)
-            except asyncio.CancelledError:
-                raise
+            await asyncio.sleep(100)
 
         task = asyncio.create_task(long_running())
         server._task = task
@@ -302,8 +299,10 @@ class TestMetricsServer:
 
         # Patch wait_for to raise TimeoutError to trigger the cancel path
         with patch("app.metrics_server.asyncio.wait_for", side_effect=TimeoutError):
-            # Should not raise - CancelledError should be suppressed
             await server.stop()
+
+        # Allow event loop to process cancellation
+        await asyncio.sleep(0)
 
         assert server.is_running is False
         assert task.cancelled()

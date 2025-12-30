@@ -2,7 +2,7 @@
 FROM ghcr.io/astral-sh/uv:0.9.20@sha256:81f1a183fbdd9cec1498b066a32f0da043d4a9dda12b8372c7bfd183665e485d AS uv-source
 
 # Use debian:trixie-slim as base (same base as python:3.14-slim)
-FROM debian:trixie-slim@sha256:91e29de1e4e20f771e97d452c8fa6370716ca4044febbec4838366d459963801
+FROM debian:trixie-slim@sha256:4bcb9db66237237d03b55b969271728dd3d955eaaa254b9db8a3db94550b1885
 
 # Copy uv binary from source stage
 COPY --from=uv-source /uv /usr/local/bin/uv

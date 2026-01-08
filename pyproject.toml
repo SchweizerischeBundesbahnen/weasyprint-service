@@ -32,7 +32,7 @@ package = false
 [dependency-groups]
 dev = [
     "pre-commit==4.5.1",
-    "ruff==0.14.10",
+    "ruff==0.14.11",
     "mypy==1.19.1",
     "types-defusedxml==0.7.0.20250822",
     "types-psutil==7.2.1.20251231",

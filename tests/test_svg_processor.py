@@ -238,7 +238,7 @@ def test_convert_to_px():
     """
     svg_processor = SvgProcessor()
     assert svg_processor.convert_to_px("10", "px") == 10
-    assert svg_processor.convert_to_px("1", "mm") == 378
+    assert svg_processor.convert_to_px("1", "mm") == 4  # ceil(96/25.4) = ceil(3.78)
     assert svg_processor.convert_to_px(None, "px") is None
     assert svg_processor.convert_to_px("abc", "px") is None
     assert svg_processor.convert_to_px("100", "vh") is None
@@ -257,7 +257,7 @@ def test_px_conversion_ratio():
     assert svg_processor.get_px_conversion_ratio("pt") == 4 / 3
     assert svg_processor.get_px_conversion_ratio("in") == 96
     assert svg_processor.get_px_conversion_ratio("cm") == 96 / 2.54
-    assert svg_processor.get_px_conversion_ratio("mm") == 96 / 2.54 * 10
+    assert svg_processor.get_px_conversion_ratio("mm") == 96 / 2.54 / 10
     assert svg_processor.get_px_conversion_ratio("pc") == 16
     assert svg_processor.get_px_conversion_ratio("ex") == 8
     assert svg_processor.get_px_conversion_ratio("abcde") == 1
@@ -383,3 +383,29 @@ def test_ensure_mandatory_attributes(svg_input):
 
     svg_content = svg_processor.svg_to_string(updated_svg)
     assert svg_content.count('xmlns="http://www.w3.org/2000/svg"') == 1
+
+
+def test_apply_img_dimensions_from_svg():
+    """Test that existing width/height styles are replaced when applying SVG dimensions."""
+    from bs4 import BeautifulSoup
+
+    svg_processor = SvgProcessor()
+
+    # Create an img tag with existing width/height styles
+    html = '<img style="width: 500px; height: 300px; color: red;">'
+    soup = BeautifulSoup(html, "html.parser")
+    node = soup.find("img")
+
+    # Create SVG with known dimensions
+    svg = DET.fromstring('<svg width="100" height="200"></svg>')
+
+    svg_processor._apply_img_dimensions_from_svg(node, svg)
+
+    # Check width attribute is set
+    assert node.get("width") == "100px"
+
+    # Check style: width replaced, height removed, other styles preserved
+    style = node.get("style")
+    assert "width: 100px" in style
+    assert "height:" not in style.lower()
+    assert "color: red" in style

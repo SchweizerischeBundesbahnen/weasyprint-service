@@ -152,7 +152,7 @@ class SvgProcessor:
 
             if isinstance(w, int):
                 node["width"] = f"{w}px"
-                style_parts = [p for p in style_parts if not p.lower().startswith("width:")]
+                style_parts = [p for p in style_parts if not p.lower().startswith(("width:", "height:"))]
                 style_parts.append(f"width: {w}px")
 
             if style_parts:
@@ -378,7 +378,7 @@ class SvgProcessor:
             "pt": 4 / 3,
             "in": 96.0,
             "cm": 96 / 2.54,
-            "mm": 96 / 2.54 * 10,
+            "mm": 96 / 2.54 / 10,
             "pc": 16.0,
             "ex": 8.0,
         }.get(unit, 1.0)

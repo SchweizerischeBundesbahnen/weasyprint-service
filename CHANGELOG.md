@@ -1,5 +1,40 @@
 # Changelog
 
+## [67.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v67.0.0...v67.0.1) (2026-01-15)
+
+
+### Features
+
+* add dedicated Prometheus metrics server with configurable port ([#277](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/277)) ([3f7297a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/3f7297a7f13540031cfdb509e4a01177ae795670)), closes [#274](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/274)
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.124.2 ([c67aafa](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/c67aafa98dc9ecc4a358901cf497f9bdb4e51b05))
+* **deps:** update dependency fastapi to v0.124.4 ([7b12540](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7b125405ee0eda6420cd506ec0d62275f7450782))
+* **deps:** update dependency fastapi to v0.125.0 ([c7a88a1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/c7a88a1ea4e4673ae50041e6447f1f7977dbb15d))
+* **deps:** update dependency fastapi to v0.126.0 ([17daafc](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/17daafc46333bd7bc1c254948f4cf5659613d5a7))
+* **deps:** update dependency fastapi to v0.127.0 ([6021f82](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6021f8274ca1f2122e1892b1147666d0c8f26104))
+* **deps:** update dependency fastapi to v0.127.1 ([42eb9be](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/42eb9beb9fe41c27cf6a60516365766028d24083))
+* **deps:** update dependency fastapi to v0.128.0 ([5dd9975](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/5dd9975c502ecac5b340e58a4824879b0e86f800))
+* **deps:** update dependency pillow to v12.1.0 ([ca62fdb](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ca62fdb5b0544c7a1862fb3d5b5a544adce42cb6))
+* **deps:** update dependency psutil to v7.2.0 ([#279](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/279)) ([8cf6760](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/8cf6760a58534bc0c567d55af7f528ba7e7ba0b6))
+* **deps:** update dependency psutil to v7.2.1 ([ebb026a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ebb026a8088acd8ef50f1db453346d3d2004f12a))
+* **deps:** update dependency pypdf to v6.4.2 ([6334556](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/63345561e752d7bd0cd9e12e7a06deff040466c1))
+* **deps:** update dependency pypdf to v6.5.0 ([cbbdfc1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/cbbdfc13cdead0ba78dcdd65a6a92f52beaf5fc5))
+* **deps:** update dependency pypdf to v6.6.0 ([41d0adf](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/41d0adfa225e836b6c0f94018ebde5cc873d2185))
+* **deps:** update dependency python-multipart to v0.0.21 ([d4c22d0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d4c22d0a6a0a185d93f56fb73aad6694cffe9b44))
+* **deps:** update dependency types-psutil to v7.1.3.20251210 ([1df409e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1df409ec75e78a79459055df8fa48e1fc5998a74))
+* **deps:** update dependency types-psutil to v7.1.3.20251211 ([ecb9d66](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ecb9d6686cdbac755abd806469ae627893c8c32d))
+* **deps:** update dependency uvicorn to v0.40.0 ([7add8c4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7add8c47fdb1be5c92795ddca0e33cc3eeea177e))
+* **docker:** add non-root user and use uv for Python installation ([#275](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/275)) ([c7f54c9](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/c7f54c9691844ac30f13b581e4718c1c4260322e))
+* incorrect mm to px conversion in SVG processing ([#284](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/284)) ([9d123f2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9d123f28563faa579a71794d82d7feadb0a67682)), closes [#283](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/283)
+
+
+### Miscellaneous Chores
+
+* release 67.0.1 ([#278](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/278)) ([2566783](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2566783e2da193031b08e5437ec31a71cd73d865))
+
 ## [67.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v66.0.8...v67.0.0) (2025-12-09)
 
 

@@ -35,7 +35,7 @@ dev = [
     "ruff==0.14.13",
     "mypy==1.19.1",
     "types-defusedxml==0.7.0.20250822",
-    "types-psutil==7.2.1.20251231",
+    "types-psutil==7.2.1.20260116",
 ]
 test = [
     "tox==4.34.1",

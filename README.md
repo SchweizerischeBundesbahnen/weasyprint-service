@@ -492,6 +492,20 @@ docker build \
 
 Replace 0.0.0 with the desired version number.
 
+#### VSDX Support
+
+To enable VSDX (Microsoft Visio) file conversion support, add the `ENABLE_VSDX_SUPPORT=true` build argument:
+
+```bash
+docker build \
+  --build-arg APP_IMAGE_VERSION=0.0.0 \
+  --build-arg ENABLE_VSDX_SUPPORT=true \
+  --file Dockerfile \
+  --tag weasyprint-service:0.0.0 .
+```
+
+This installs LibreOffice (~200MB additional size) for VSDX to PNG conversion. Without this flag, VSDX images will remain unchanged in the output.
+
 ### Running the Development Container
 
 To start the Docker container with your custom-built image:

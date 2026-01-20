@@ -461,7 +461,6 @@ async def __generate_pdf_from_parsed_html(
         string=processed_html,
         base_url=base_url,
         media_type=render.media_type,
-        encoding=render.encoding,
     )
 
     logger.debug(

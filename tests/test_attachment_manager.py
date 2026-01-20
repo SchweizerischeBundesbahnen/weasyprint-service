@@ -114,7 +114,7 @@ def test_builds_for_unreferenced_and_avoids_duplicates(tmp_path: Path):
     # weasyprint.Attachment doesn't expose original filename; ensure it yields a file source
     # In WeasyPrint 68.0, source context manager returns tuple (file_obj, url, None, None)
     with atts[0].source as (file_obj, url, _, _):
-        assert hasattr(file_obj, 'read')
+        assert isinstance(file_obj, io.BufferedReader)
         assert url.startswith('file://')
 
 

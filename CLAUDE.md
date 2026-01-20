@@ -174,14 +174,14 @@ grype weasyprint-service:0.0.0
 - `custom_metadata` - Include custom metadata in PDF (default: false)
 - `device_scale_factor` - Override default SVG to PNG scale factor
 
-**Supported PDF variants (WeasyPrint 67.0):**
+**Supported PDF variants (WeasyPrint 68.0):**
 - PDF/A basic: `pdf/a-1b`, `pdf/a-2b`, `pdf/a-3b`
 - PDF/A unicode: `pdf/a-2u`, `pdf/a-3u`, `pdf/a-4u`
 - PDF/A accessible: `pdf/a-1a`, `pdf/a-2a`, `pdf/a-3a`
 - PDF/A-4: `pdf/a-4e`, `pdf/a-4f`
 - PDF/UA: `pdf/ua-1`, `pdf/ua-2`
 
-> **Breaking Change (WeasyPrint 67.0):** `pdf/a-4b` is no longer supported. Use `pdf/a-4f` or `pdf/a-4e` instead.
+> **Note:** `pdf/a-4b` is not supported. Use `pdf/a-4f` or `pdf/a-4e` instead.
 
 ### Configuration and Environment Variables
 

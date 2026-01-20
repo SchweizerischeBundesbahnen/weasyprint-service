@@ -112,8 +112,8 @@ def test_builds_for_unreferenced_and_avoids_duplicates(tmp_path: Path):
     assert len(atts) == 1
     assert isinstance(atts[0], weasyprint.Attachment)
     # weasyprint.Attachment doesn't expose original filename; ensure it yields a file source
-    with atts[0].source as (kind, file_obj, url, _):
-        assert kind == 'file_obj'
+    # In WeasyPrint 68.0, source context manager returns tuple (file_obj, url, None, None)
+    with atts[0].source as (file_obj, url, _, _):
         assert hasattr(file_obj, 'read')
         assert url.startswith('file://')
 

@@ -26,6 +26,7 @@ from starlette.staticfiles import StaticFiles
 
 from app.attachment_manager import AttachmentManager
 from app.chromium_manager import ChromiumManager, get_chromium_manager
+from app.constants import API_VERSION
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.metrics_server import MetricsServer, get_metrics_port, is_metrics_server_enabled
@@ -38,11 +39,6 @@ from app.prometheus_metrics import (
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
-
-# API version for compatibility checking with pdf-exporter.
-# Increment this ONLY when making breaking changes to the API contract.
-# Minor updates and bug fixes should NOT change this version.
-API_VERSION = 1
 
 
 @contextlib.asynccontextmanager

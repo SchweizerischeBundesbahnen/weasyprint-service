@@ -905,6 +905,11 @@
       },
       "VersionSchema": {
         "properties": {
+          "apiVersion": {
+            "type": "integer",
+            "title": "API Version",
+            "description": "API version for compatibility checking with pdf-exporter"
+          },
           "python": {
             "type": "string",
             "title": "Python",
@@ -954,6 +959,7 @@
         },
         "type": "object",
         "required": [
+          "apiVersion",
           "python",
           "weasyprint",
           "weasyprintService",

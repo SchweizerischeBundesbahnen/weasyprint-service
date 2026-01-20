@@ -26,6 +26,7 @@ from starlette.staticfiles import StaticFiles
 
 from app.attachment_manager import AttachmentManager
 from app.chromium_manager import ChromiumManager, get_chromium_manager
+from app.constants import API_VERSION
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.metrics_server import MetricsServer, get_metrics_port, is_metrics_server_enabled
@@ -226,12 +227,13 @@ async def health(
     operation_id="getVersion",
     tags=["meta"],
 )
-async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | None]:
+async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | int | None]:
     """
     Get version information
     """
     logger.info("Version endpoint called")
     version_info = {
+        "apiVersion": API_VERSION,
         "python": platform.python_version(),
         "weasyprint": weasyprint.__version__,
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),

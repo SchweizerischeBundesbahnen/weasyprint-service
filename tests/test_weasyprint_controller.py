@@ -14,6 +14,7 @@ def test_version():
     with TestClient(app) as test_client:
         version = test_client.get("/version").json()
 
+        assert version["apiVersion"] == 1
         assert version["python"] == platform.python_version()
         assert version["weasyprint"] is not None
         assert version["weasyprintService"] == "test1"

@@ -157,7 +157,8 @@ grype weasyprint-service:0.0.0
 - `/health` - Health check endpoint with optional detailed metrics
   - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
   - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, health monitoring info, and queue metrics
-- `/version` - Service version information (Python, WeasyPrint, Chromium, service versions)
+- `/version` - Service version information (apiVersion, Python, WeasyPrint, Chromium, service versions)
+  - `apiVersion`: Integer for compatibility checking with pdf-exporter. Increment only on breaking API changes.
 - `/metrics` - Prometheus metrics endpoint (served on dedicated port, default: 9180)
   - **Security**: Exposed on separate port from main API for network-level isolation
   - Returns metrics in Prometheus text format

@@ -1,5 +1,22 @@
 # Changelog
 
+## [68.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v67.0.1...v68.0.0) (2026-01-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* upgrade to WeasyPrint 68.0 ([#288](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/288))
+
+### Features
+
+* api version ([#290](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/290)) ([b6a9cb5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b6a9cb5c1e6b519d319527b4d38aa4f29b9674c8)), closes [#291](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/291)
+* upgrade to WeasyPrint 68.0 ([#288](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/288)) ([dcd9bf1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/dcd9bf145760a4fc47b930b8ae4c78943f0b94e9)), closes [#289](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/289)
+
+
+### Bug Fixes
+
+* **deps:** remove explicit starlette dependency ([#294](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/294)) ([150ce6a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/150ce6a224c5572ffca85ac691f33c44c314f964))
+
 ## [67.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v67.0.0...v67.0.1) (2026-01-15)
 
 

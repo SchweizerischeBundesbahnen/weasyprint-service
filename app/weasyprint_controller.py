@@ -39,6 +39,11 @@ from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
 
+# API version for compatibility checking with pdf-exporter.
+# Increment this ONLY when making breaking changes to the API contract.
+# Minor updates and bug fixes should NOT change this version.
+API_VERSION = 1
+
 
 @contextlib.asynccontextmanager
 async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG001
@@ -226,12 +231,13 @@ async def health(
     operation_id="getVersion",
     tags=["meta"],
 )
-async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | None]:
+async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | int | None]:
     """
     Get version information
     """
     logger.info("Version endpoint called")
     version_info = {
+        "apiVersion": API_VERSION,
         "python": platform.python_version(),
         "weasyprint": weasyprint.__version__,
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),

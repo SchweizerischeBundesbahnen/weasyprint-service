@@ -48,7 +48,7 @@ class FormParser:
         form_data = await request.form(
             max_files=self.max_files,
             max_fields=self.max_fields,
-            max_part_size=self.max_part_size,
+            max_part_size=self.max_part_size, # NOSONAR False positive - max_part_size is valid parameter
         )
         logger.info("Parsed form data successfully")
         return form_data

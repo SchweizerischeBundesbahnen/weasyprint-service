@@ -45,7 +45,7 @@ test = [
     "pymupdf==1.26.7",
     "pypdf==6.6.0",
     "httpx==0.28.1",
-    "coverage==7.13.1",
+    "coverage==7.13.2",
 ]
 
 [tool.ruff]

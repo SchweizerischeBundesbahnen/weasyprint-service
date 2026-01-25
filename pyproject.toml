@@ -14,7 +14,7 @@ dependencies = [
     "fastapi==0.128.0",
     "uvicorn==0.40.0",
     "requests==2.32.5",
-    "python-multipart==0.0.21",
+    "python-multipart==0.0.22",
     "beautifulsoup4==4.14.3",
     "html5lib==1.1",
     "playwright==1.57.0",
@@ -31,7 +31,7 @@ package = false
 [dependency-groups]
 dev = [
     "pre-commit==4.5.1",
-    "ruff==0.14.13",
+    "ruff==0.14.14",
     "mypy==1.19.1",
     "types-defusedxml==0.7.0.20250822",
     "types-psutil==7.2.1.20260116",
@@ -45,7 +45,7 @@ test = [
     "pymupdf==1.26.7",
     "pypdf==6.6.0",
     "httpx==0.28.1",
-    "coverage==7.13.1",
+    "coverage==7.13.2",
 ]
 
 [tool.ruff]

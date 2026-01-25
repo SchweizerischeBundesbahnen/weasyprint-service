@@ -62,6 +62,25 @@ curl -X POST "http://localhost:9080/convert/html?pdf_variant=pdf/a-2b" \
 
 > **Breaking Change (WeasyPrint 67.0):** The `pdf/a-4b` variant is no longer supported. Use `pdf/a-4f` or `pdf/a-4e` instead.
 
+### Font Subsetting
+
+By default, WeasyPrint subsets fonts to include only the glyphs used in the document, reducing PDF size. However, some fonts have invalid OS/2 Unicode range bits that cause subsetting to fail with:
+
+```
+ValueError: expected 0 <= int <= 122, found: 123
+```
+
+Use the `full_fonts=true` query parameter to disable font subsetting and embed complete fonts:
+
+```bash
+curl -X POST "http://localhost:9080/convert/html?full_fonts=true" \
+  -H "Content-Type: text/html" \
+  -d "<html><body>Hello World</body></html>" \
+  --output document.pdf
+```
+
+> **Note:** This increases PDF file size but avoids font subsetting errors.
+
 ### Device Scaling
 
 Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.

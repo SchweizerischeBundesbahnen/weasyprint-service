@@ -173,6 +173,7 @@ grype weasyprint-service:0.0.0
 - `pdf_variant` - PDF profile/variant (see supported variants below)
 - `presentational_hints` - Use HTML presentational hints (default: true)
 - `custom_metadata` - Include custom metadata in PDF (default: false)
+- `full_fonts` - Embed full fonts instead of subsetting (default: false). Use when fonts have invalid OS/2 Unicode range bits causing `ValueError: expected 0 <= int <= 122`
 - `device_scale_factor` - Override default SVG to PNG scale factor
 
 **Supported PDF variants (WeasyPrint 68.0):**

@@ -39,6 +39,7 @@ from app.prometheus_metrics import (
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
+from app.vsdx_processor import VsdxProcessor
 
 
 @contextlib.asynccontextmanager
@@ -461,6 +462,10 @@ async def __generate_pdf_from_parsed_html(
     # Use CDP-based async SVG processing
     svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
     parsed_html = await svg_processor.process_svg(parsed_html)
+
+    # Use LibreOffice-based async VSDX processing
+    vsdx_processor = VsdxProcessor()
+    parsed_html = await vsdx_processor.process_vsdx(parsed_html)
 
     processed_html = html_parser.serialize(parsed_html)
 

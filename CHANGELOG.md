@@ -1,5 +1,18 @@
 # Changelog
 
+## [68.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.0.0...v68.0.1) (2026-01-26)
+
+
+### Features
+
+* add full_fonts parameter to disable font subsetting ([#297](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/297)) ([12682d3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/12682d37992aa568d83713cfcf00b725380111d3)), closes [#298](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/298)
+
+
+### Bug Fixes
+
+* **deps:** update dependency pypdf to v6.6.1 ([1eaf05a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1eaf05a7e3e8325dac305e4ff1a2e231957ae2f1))
+* **deps:** update dependency python-multipart to v0.0.22 ([296741c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/296741cc0c84518758d051b72f7d99accffb8fd5))
+
 ## [68.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v67.0.1...v68.0.0) (2026-01-20)
 
 

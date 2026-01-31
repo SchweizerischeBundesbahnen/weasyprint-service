@@ -1,5 +1,14 @@
 # Changelog
 
+## [68.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.0.1...v68.0.2) (2026-01-31)
+
+
+### Bug Fixes
+
+* **deps:** update dependency playwright to v1.58.0 ([f6e867c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f6e867c6b44744a2566d15cb1416f97268765361))
+* **deps:** update dependency psutil to v7.2.2 ([49741f0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/49741f02d9eafe963b4361e227159b1a048b519a))
+* **deps:** update dependency pypdf to v6.6.2 ([2ef9637](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2ef963797cdd6f3ddbafd7c290876703336cd7d1))
+
 ## [68.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.0.0...v68.0.1) (2026-01-26)
 
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## [68.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.0.1...v68.1.0) (2026-02-08)
+
+
+### Features
+
+* **deps:** update dependency weasyprint to v68.1 ([e952cb6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/e952cb6b09434715dfa9290a24b6cafaa80a3971))
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.128.1 ([7dd6713](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7dd67138ce237eea2619f5b5c2626d0c16946490))
+* **deps:** update dependency fastapi to v0.128.2 ([20be35c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/20be35c67a9f06d0c847a79566681c4e389b8be8))
+* **deps:** update dependency fastapi to v0.128.3 ([cf330e4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/cf330e4f0b24a26da580dff5a48d28dbd93820b2))
+* **deps:** update dependency fastapi to v0.128.4 ([6a77974](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6a77974f73773af1b6b39fb15981b48bfe524ac5))
+* **deps:** update dependency playwright to v1.58.0 ([f6e867c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f6e867c6b44744a2566d15cb1416f97268765361))
+* **deps:** update dependency psutil to v7.2.2 ([49741f0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/49741f02d9eafe963b4361e227159b1a048b519a))
+* **deps:** update dependency pypdf to v6.6.2 ([2ef9637](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2ef963797cdd6f3ddbafd7c290876703336cd7d1))
+
 ## [68.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.0.0...v68.0.1) (2026-01-26)
 
 

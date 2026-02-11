@@ -18,7 +18,7 @@ dependencies = [
     "beautifulsoup4==4.14.3",
     "html5lib==1.1",
     "playwright==1.58.0",
-    "pillow==12.1.0",
+    "pillow==12.1.1",
     "psutil==7.2.2",
     "pypdf==6.7.0",
     "prometheus-fastapi-instrumentator==7.1.0",

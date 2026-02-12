@@ -42,7 +42,7 @@ test = [
     "docker==7.1.0",
     "pytest==9.0.2",
     "pytest-asyncio==1.3.0",
-    "pymupdf==1.26.7",
+    "pymupdf==1.27.1",
     "pypdf==6.7.0",
     "httpx==0.28.1",
     "coverage==7.13.4",

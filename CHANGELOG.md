@@ -1,5 +1,37 @@
 # Changelog
 
+## [68.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.0.1...v68.1.0) (2026-02-24)
+
+
+### Features
+
+* **deps:** update dependency weasyprint to v68.1 ([e952cb6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/e952cb6b09434715dfa9290a24b6cafaa80a3971))
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.128.1 ([7dd6713](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7dd67138ce237eea2619f5b5c2626d0c16946490))
+* **deps:** update dependency fastapi to v0.128.2 ([20be35c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/20be35c67a9f06d0c847a79566681c4e389b8be8))
+* **deps:** update dependency fastapi to v0.128.3 ([cf330e4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/cf330e4f0b24a26da580dff5a48d28dbd93820b2))
+* **deps:** update dependency fastapi to v0.128.4 ([6a77974](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6a77974f73773af1b6b39fb15981b48bfe524ac5))
+* **deps:** update dependency fastapi to v0.128.5 ([7684edd](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/7684eddefec346a79280776237fa20407cf1ec29))
+* **deps:** update dependency fastapi to v0.128.6 ([1166acd](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1166acd6fe8a8b3b1126049bbf9f911ef208fbd8))
+* **deps:** update dependency fastapi to v0.128.7 ([e72954f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/e72954fd3b5d0ba55367bc6e312fb9fd2bd1d86c))
+* **deps:** update dependency fastapi to v0.128.8 ([3afd7e9](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/3afd7e9ed222d68b069a434cfd9bb58741a35fdb))
+* **deps:** update dependency fastapi to v0.129.0 ([11e7a45](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/11e7a454b84970247828e8c0cd5a1a17af731405))
+* **deps:** update dependency fastapi to v0.129.2 ([db2899f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/db2899f8e35783a192a1c61572d959cb92befcfe))
+* **deps:** update dependency fastapi to v0.131.0 ([cb1cd15](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/cb1cd15fa29e40f97458446a1f14b1a225a986cf))
+* **deps:** update dependency fastapi to v0.133.0 ([6785045](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6785045caf8b086e074a9678cc488167b583032f))
+* **deps:** update dependency pillow to v12.1.1 ([61dfaf0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/61dfaf051ad3f62492ea043db712148eb3d6b771))
+* **deps:** update dependency playwright to v1.58.0 ([f6e867c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f6e867c6b44744a2566d15cb1416f97268765361))
+* **deps:** update dependency psutil to v7.2.2 ([49741f0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/49741f02d9eafe963b4361e227159b1a048b519a))
+* **deps:** update dependency pypdf to v6.6.2 ([2ef9637](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2ef963797cdd6f3ddbafd7c290876703336cd7d1))
+* **deps:** update dependency pypdf to v6.7.0 ([efcf2e3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/efcf2e3419339afa2635e8200650869e675655e2))
+* **deps:** update dependency pypdf to v6.7.1 ([be9b35f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/be9b35fd1e6012526491bd69aa097bea5ca8ee7c))
+* **deps:** update dependency pypdf to v6.7.2 ([df6c810](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/df6c8107df38701a92bcd8f06a895b1b49210ab3))
+* **deps:** update dependency pypdf to v6.7.3 ([d5c1876](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d5c1876fb0829ca4f3037437dc2b9a53684b186a))
+* **deps:** update dependency uvicorn to v0.41.0 ([8de1c9a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/8de1c9a3f1f8dc5e92f486033c6c09c7d93dfb3d))
+
 ## [68.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.0.0...v68.0.1) (2026-01-26)
 
 

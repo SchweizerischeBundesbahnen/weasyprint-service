@@ -110,7 +110,7 @@ def sanitize_path_for_logging(path: str | None, show_basename_only: bool = True)
 
             # Not a temp path
             return sanitize_for_logging(str(path), max_length=200)
-        except (ValueError, OSError):
+        except ValueError, OSError:
             # Path is not in temp directory - return sanitized full path
             return sanitize_for_logging(str(path), max_length=200)
     except Exception:

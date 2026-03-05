@@ -3,8 +3,9 @@ from __future__ import annotations
 import ctypes
 import gc
 import logging
-import os
 import platform
+
+from app.constants import get_bool_env
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ def is_enabled() -> bool:
     """Check if post-conversion memory reclamation is enabled via environment variable."""
     global _enabled  # noqa: PLW0603
     if _enabled is None:
-        _enabled = os.environ.get(_ENV_VAR, "false").lower() in ("true", "1", "yes", "on")
+        _enabled = get_bool_env(_ENV_VAR)
         if _enabled:
             logger.info("Post-conversion memory reclamation enabled (%s=true)", _ENV_VAR)
         else:

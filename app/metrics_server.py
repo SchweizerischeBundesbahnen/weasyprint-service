@@ -18,6 +18,7 @@ from fastapi import Depends, FastAPI, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from app.chromium_manager import ChromiumManager, get_chromium_manager
+from app.constants import get_bool_env
 from app.prometheus_metrics import update_gauges_from_chromium_manager
 
 logger = logging.getLogger(__name__)
@@ -84,8 +85,7 @@ def is_metrics_server_enabled() -> bool:
     Returns:
         True if METRICS_SERVER_ENABLED is not set or set to a truthy value.
     """
-    env_value = os.environ.get("METRICS_SERVER_ENABLED", "true")
-    return env_value.lower() in ("true", "1", "yes", "on")
+    return get_bool_env("METRICS_SERVER_ENABLED", default=True)
 
 
 class MetricsServer:

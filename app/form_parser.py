@@ -37,7 +37,7 @@ class FormParser:
         try:
             value = int(os.environ.get(name, str(default)))
             return max(0, value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return default
 
     async def parse(self, request: Request) -> FormData:

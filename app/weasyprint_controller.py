@@ -24,6 +24,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from starlette.staticfiles import StaticFiles
 
+from app import memory_manager
 from app.attachment_manager import AttachmentManager
 from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.constants import API_VERSION
@@ -494,7 +495,9 @@ async def __generate_pdf_from_parsed_html(
     )
 
     logger.info("PDF generated successfully, size: %d bytes", len(output_pdf))
-    return notes_processor.process_pdf_with_notes(output_pdf, notes)
+    result = notes_processor.process_pdf_with_notes(output_pdf, notes)
+    memory_manager.reclaim_memory()
+    return result
 
 
 def __record_conversion_metrics(chromium_manager: ChromiumManager, start_time: float, success: bool) -> None:

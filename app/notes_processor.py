@@ -428,6 +428,6 @@ class NotesProcessor:
             # No timezone info, return without TZ
             return f"D:{base_date}"
 
-        except (ValueError, AttributeError):
+        except ValueError, AttributeError:
             # If ISO format parsing fails, return empty to skip setting the field
             return ""

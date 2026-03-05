@@ -32,10 +32,13 @@ def _wait_for_healthy(container: Container, max_wait: int = 120) -> None:
     raise TimeoutError(f"Container not healthy within {max_wait}s. Logs:\n{logs}")
 
 
-def _convert_html(base_url: str, html: str) -> None:
-    """Send a single HTML-to-PDF conversion request."""
+def _convert_html(base_url: str, html: str) -> float:
+    """Send a single HTML-to-PDF conversion request. Returns elapsed time in ms."""
+    start = time.time()
     response = requests.post(f"{base_url}/convert/html", headers={"Content-Type": "text/html"}, data=html.encode("utf-8"))
+    elapsed_ms = (time.time() - start) * 1000
     assert response.status_code == 200, f"Conversion failed: {response.status_code}: {response.text[:500]}"
+    return elapsed_ms
 
 
 @pytest.fixture(scope="module")
@@ -79,7 +82,7 @@ def container_reclaim_disabled(docker_image):
     try:
         container.stop()
     except Exception:
-        pass
+        logging.warning("Failed to stop container %s", container.id[:12])
 
 
 @pytest.fixture(scope="module")
@@ -102,7 +105,7 @@ def container_reclaim_enabled(docker_image):
     try:
         container.stop()
     except Exception:
-        pass
+        logging.warning("Failed to stop container %s", container.id[:12])
 
 
 def test_memory_stays_high_without_reclaim(container_reclaim_disabled, heavy_html) -> None:
@@ -112,7 +115,8 @@ def test_memory_stays_high_without_reclaim(container_reclaim_disabled, heavy_htm
     baseline_mb = _get_container_memory_mb(container)
     logging.info("Baseline memory (reclaim disabled): %.1f MB", baseline_mb)
 
-    _convert_html(base_url, heavy_html)
+    elapsed_ms = _convert_html(base_url, heavy_html)
+    logging.info("Conversion time (reclaim disabled): %.0f ms", elapsed_ms)
 
     time.sleep(2)
 
@@ -130,7 +134,8 @@ def test_memory_reclaimed_with_reclaim_enabled(container_reclaim_enabled, heavy_
     baseline_mb = _get_container_memory_mb(container)
     logging.info("Baseline memory (reclaim enabled): %.1f MB", baseline_mb)
 
-    _convert_html(base_url, heavy_html)
+    elapsed_ms = _convert_html(base_url, heavy_html)
+    logging.info("Conversion time (reclaim enabled): %.0f ms", elapsed_ms)
 
     time.sleep(2)
 
@@ -143,10 +148,16 @@ def test_memory_reclaimed_with_reclaim_enabled(container_reclaim_enabled, heavy_
     assert growth_ratio < 1.5, f"Memory grew too much despite reclaim: baseline={baseline_mb:.1f} MB, after={after_mb:.1f} MB (ratio={growth_ratio:.2f})"
 
 
-def test_reclaim_enabled_uses_less_memory_than_disabled(container_reclaim_disabled, container_reclaim_enabled) -> None:
+def test_reclaim_enabled_uses_less_memory_than_disabled(container_reclaim_disabled, container_reclaim_enabled, heavy_html) -> None:
     """Container with reclaim enabled should use less memory after conversion than without reclaim."""
-    container_disabled, _ = container_reclaim_disabled
-    container_enabled, _ = container_reclaim_enabled
+    container_disabled, base_url_disabled = container_reclaim_disabled
+    container_enabled, base_url_enabled = container_reclaim_enabled
+
+    # Run conversions to ensure both containers have processed documents regardless of test execution order
+    _convert_html(base_url_disabled, heavy_html)
+    _convert_html(base_url_enabled, heavy_html)
+
+    time.sleep(2)
 
     disabled_mb = _get_container_memory_mb(container_disabled)
     enabled_mb = _get_container_memory_mb(container_enabled)

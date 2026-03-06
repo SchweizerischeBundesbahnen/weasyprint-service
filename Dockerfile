@@ -9,6 +9,7 @@ COPY --from=uv-source /uv /usr/local/bin/uv
 
 # Install dependencies
 # hadolint ignore=DL3008
+ARG ENABLE_VSDX_SUPPORT=false
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
@@ -33,7 +34,8 @@ RUN apt-get update && \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
-    procps && \
+    procps \
+    $(if [ "$ENABLE_VSDX_SUPPORT" = "true" ]; then echo "libreoffice"; fi) && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*

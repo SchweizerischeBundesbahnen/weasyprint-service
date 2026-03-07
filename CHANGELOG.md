@@ -1,5 +1,21 @@
 # Changelog
 
+## [68.1.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.1.0...v68.1.1) (2026-03-07)
+
+
+### Features
+
+* add post conversion memory reclamation option ([#306](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/306)) ([278a826](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/278a826f3e3f0029f99e83a87fd851d4901897f8))
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.133.1 ([db8262b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/db8262b92223b9312752b8e9ca28ae05fa5172e0))
+* **deps:** update dependency fastapi to v0.134.0 ([cc21139](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/cc2113984fee6a3fa37db6fd04c38bdf3295ed04))
+* **deps:** update dependency fastapi to v0.135.0 ([9f75517](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9f75517ac9a85380e80ef16856da8f6f1ac98cd5))
+* **deps:** update dependency fastapi to v0.135.1 ([d508564](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d50856492565b10e1de71988355a0e96307ce187))
+* **deps:** update dependency pypdf to v6.7.5 [security] ([#303](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/303)) ([3192b26](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/3192b266b4a1fd2d46ae5dbce58fa39986a617bf))
+
 ## [68.1.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.0.1...v68.1.0) (2026-02-24)
 
 

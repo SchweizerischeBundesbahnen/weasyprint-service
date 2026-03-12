@@ -9,19 +9,18 @@ license = {text = "Apache-2.0"}
 requires-python = ">=3.14"
 # Standard [project.dependencies] format - now supported by Renovate with uv
 dependencies = [
-    "weasyprint==67.0",
+    "weasyprint==68.1",
     "defusedxml==0.7.1",
-    "fastapi==0.128.0",
-    "uvicorn==0.40.0",
+    "fastapi==0.135.1",
+    "uvicorn==0.41.0",
     "requests==2.32.5",
-    "starlette==0.50.0",
-    "python-multipart==0.0.21",
+    "python-multipart==0.0.22",
     "beautifulsoup4==4.14.3",
     "html5lib==1.1",
-    "playwright==1.57.0",
-    "pillow==12.1.0",
-    "psutil==7.2.1",
-    "pypdf==6.6.0",
+    "playwright==1.58.0",
+    "pillow==12.1.1",
+    "psutil==7.2.2",
+    "pypdf==6.8.0",
     "prometheus-fastapi-instrumentator==7.1.0",
 ]
 
@@ -32,21 +31,21 @@ package = false
 [dependency-groups]
 dev = [
     "pre-commit==4.5.1",
-    "ruff==0.14.13",
+    "ruff==0.15.5",
     "mypy==1.19.1",
     "types-defusedxml==0.7.0.20250822",
-    "types-psutil==7.2.1.20260116",
+    "types-psutil==7.2.2.20260130",
 ]
 test = [
-    "tox==4.34.1",
-    "tox-uv==1.29.0",
+    "tox==4.49.0",
+    "tox-uv==1.33.1",
     "docker==7.1.0",
     "pytest==9.0.2",
     "pytest-asyncio==1.3.0",
-    "pymupdf==1.26.7",
-    "pypdf==6.6.0",
+    "pymupdf==1.27.1",
+    "pypdf==6.8.0",
     "httpx==0.28.1",
-    "coverage==7.13.1",
+    "coverage==7.13.4",
 ]
 
 [tool.ruff]

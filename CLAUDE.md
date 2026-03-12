@@ -157,7 +157,8 @@ grype weasyprint-service:0.0.0
 - `/health` - Health check endpoint with optional detailed metrics
   - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
   - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, health monitoring info, and queue metrics
-- `/version` - Service version information (Python, WeasyPrint, Chromium, service versions)
+- `/version` - Service version information (apiVersion, Python, WeasyPrint, Chromium, service versions)
+  - `apiVersion`: Integer for compatibility checking with pdf-exporter. Increment only on breaking API changes.
 - `/metrics` - Prometheus metrics endpoint (served on dedicated port, default: 9180)
   - **Security**: Exposed on separate port from main API for network-level isolation
   - Returns metrics in Prometheus text format
@@ -172,16 +173,17 @@ grype weasyprint-service:0.0.0
 - `pdf_variant` - PDF profile/variant (see supported variants below)
 - `presentational_hints` - Use HTML presentational hints (default: true)
 - `custom_metadata` - Include custom metadata in PDF (default: false)
+- `full_fonts` - Embed full fonts instead of subsetting (default: false). Use when fonts have invalid OS/2 Unicode range bits causing `ValueError: expected 0 <= int <= 122`
 - `device_scale_factor` - Override default SVG to PNG scale factor
 
-**Supported PDF variants (WeasyPrint 67.0):**
+**Supported PDF variants (WeasyPrint 68.0):**
 - PDF/A basic: `pdf/a-1b`, `pdf/a-2b`, `pdf/a-3b`
 - PDF/A unicode: `pdf/a-2u`, `pdf/a-3u`, `pdf/a-4u`
 - PDF/A accessible: `pdf/a-1a`, `pdf/a-2a`, `pdf/a-3a`
 - PDF/A-4: `pdf/a-4e`, `pdf/a-4f`
 - PDF/UA: `pdf/ua-1`, `pdf/ua-2`
 
-> **Breaking Change (WeasyPrint 67.0):** `pdf/a-4b` is no longer supported. Use `pdf/a-4f` or `pdf/a-4e` instead.
+> **Note:** `pdf/a-4b` is not supported. Use `pdf/a-4f` or `pdf/a-4e` instead.
 
 ### Configuration and Environment Variables
 

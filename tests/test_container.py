@@ -504,6 +504,84 @@ def test_convert_html_with_unicode_symbols(test_parameters: TestParameters) -> N
         pytest.skip(str(e))
 
 
+def test_convert_html_with_bad_font_fails_without_full_fonts(test_parameters: TestParameters) -> None:
+    """Test that HTML with a font containing invalid OS/2 Unicode range bits fails without full_fonts=true.
+
+    This test verifies that font subsetting fails for fonts with invalid Unicode range bits (bit 123 > max 122)
+    when full_fonts is not enabled.
+    """
+    html = __load_test_html("tests/test-data/test-minimal-bad.html")
+    response = __call_convert_html(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=False,
+        parameters="full_fonts=false",
+    )
+    assert response.status_code == 500, f"Expected 500 error for bad font without full_fonts, got {response.status_code}"
+
+
+def test_convert_html_with_bad_font_succeeds_with_full_fonts(test_parameters: TestParameters) -> None:
+    """Test that HTML with a font containing invalid OS/2 Unicode range bits succeeds with full_fonts=true.
+
+    This test verifies that disabling font subsetting (full_fonts=true) allows conversion of fonts
+    with invalid Unicode range bits that would otherwise fail during subsetting.
+    """
+    html = __load_test_html("tests/test-data/test-minimal-bad.html")
+    response = __call_convert_html(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        parameters="full_fonts=true",
+    )
+    assert response.status_code == 200, f"Expected 200 with full_fonts=true, got {response.status_code}"
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+    assert len(pdf_reader.pages) == 1
+    first_page = pdf_reader.pages[0].extract_text()
+    assert "Hello World" in first_page
+
+
+def test_convert_html_with_good_font_succeeds_with_subsetting(test_parameters: TestParameters) -> None:
+    """Test that HTML with a valid font succeeds with default font subsetting (full_fonts=false)."""
+    html = __load_test_html("tests/test-data/test-minimal-good.html")
+    response = __call_convert_html(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        parameters="full_fonts=false",
+    )
+    assert response.status_code == 200
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+    assert len(pdf_reader.pages) == 1
+    first_page = pdf_reader.pages[0].extract_text()
+    assert "Hello World" in first_page
+
+
+def test_convert_html_with_good_font_succeeds_with_full_fonts(test_parameters: TestParameters) -> None:
+    """Test that HTML with a valid font succeeds with full_fonts=true (no subsetting)."""
+    html = __load_test_html("tests/test-data/test-minimal-good.html")
+    response = __call_convert_html(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        parameters="full_fonts=true",
+    )
+    assert response.status_code == 200
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+    assert len(pdf_reader.pages) == 1
+    first_page = pdf_reader.pages[0].extract_text()
+    assert "Hello World" in first_page
+
+
 def __load_test_html(file_path: str) -> str:
     with Path(file_path).open(encoding="utf-8") as html_file:
         html = html_file.read()

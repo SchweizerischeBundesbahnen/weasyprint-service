@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 import psutil
 from playwright.async_api import ViewportSize, async_playwright
 
+from app.constants import get_bool_env
+
 # Import Prometheus metric helpers
 from app.prometheus_metrics import increment_chromium_restart, increment_svg_conversion_failure, increment_svg_conversion_success
 
@@ -219,7 +221,7 @@ class ChromiumMetrics:
             self.total_memory_sum += memory_mb
             self.avg_chromium_memory_mb = self.total_memory_sum / self.total_memory_samples
 
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
+        except psutil.NoSuchProcess, psutil.AccessDenied:
             # Process no longer exists or we don't have access
             pass
 
@@ -734,7 +736,7 @@ class ChromiumManager:
                 did_transition = True  # Successfully transitioned to active
                 async with self._create_and_yield_page(device_scale_factor) as page:
                     yield page
-        except (asyncio.CancelledError, Exception):
+        except asyncio.CancelledError, Exception:
             # Only decrement waiting counter if we never transitioned to active
             # (i.e., exception happened before acquiring semaphore)
             # If we did transition, decrement is handled by _create_and_yield_page's finally block
@@ -1091,19 +1093,14 @@ class ChromiumManager:
         if value is not None:
             return bool(value)
 
-        env_value = os.environ.get("CHROMIUM_HEALTH_CHECK_ENABLED")
-        if env_value is None:
-            return True  # Default to enabled
-
-        # Parse boolean from string (case-insensitive)
-        return env_value.lower() in ("true", "1", "yes", "on")
+        return get_bool_env("CHROMIUM_HEALTH_CHECK_ENABLED", default=True)
 
     @staticmethod
     def _parse_float(value: str | None, default: float) -> float:
         """Parse a string to float with a default fallback."""
         try:
             return float(value) if value is not None else default
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return default
 
     @staticmethod
@@ -1111,7 +1108,7 @@ class ChromiumManager:
         """Parse a string to int with a default fallback."""
         try:
             return int(value) if value is not None else default
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return default
 
 

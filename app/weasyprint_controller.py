@@ -24,8 +24,10 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from starlette.staticfiles import StaticFiles
 
+from app import memory_manager
 from app.attachment_manager import AttachmentManager
 from app.chromium_manager import ChromiumManager, get_chromium_manager
+from app.constants import API_VERSION
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.metrics_server import MetricsServer, get_metrics_port, is_metrics_server_enabled
@@ -227,12 +229,13 @@ async def health(
     operation_id="getVersion",
     tags=["meta"],
 )
-async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | None]:
+async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | int | None]:
     """
     Get version information
     """
     logger.info("Version endpoint called")
     version_info = {
+        "apiVersion": API_VERSION,
         "python": platform.python_version(),
         "weasyprint": weasyprint.__version__,
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),
@@ -271,12 +274,16 @@ class OutputOptions(BaseModel):
         file_name: The filename suggested in the Content-Disposition header.
         pdf_variant: PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b'); None for default.
         custom_metadata: Whether to include custom metadata in the generated PDF.
+        full_fonts: Whether to embed full fonts instead of subsetting them. When True, fonts are
+            embedded completely without optimization. This can help avoid font subsetting errors
+            but results in larger PDF files.
 
     """
 
     file_name: str = "converted-document.pdf"
     pdf_variant: str | None = None
     custom_metadata: bool = False
+    full_fonts: bool = False
 
 
 def get_render_options(
@@ -331,11 +338,17 @@ def get_output_options(
         title="Custom Metadata",
         description="Include custom metadata in the generated PDF.",
     ),
+    full_fonts: bool = Query(
+        False,
+        title="Full Fonts",
+        description="Embed full fonts instead of subsetting. Avoids font subsetting errors but increases PDF size.",
+    ),
 ) -> OutputOptions:
     return OutputOptions(
         file_name=file_name,
         pdf_variant=pdf_variant,
         custom_metadata=custom_metadata,
+        full_fonts=full_fonts,
     )
 
 
@@ -466,14 +479,14 @@ async def __generate_pdf_from_parsed_html(
         string=processed_html,
         base_url=base_url,
         media_type=render.media_type,
-        encoding=render.encoding,
     )
 
     logger.debug(
-        "Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s%s",
+        "Generating PDF with options: pdf_variant=%s, presentational_hints=%s, custom_metadata=%s, full_fonts=%s%s",
         output.pdf_variant,
         render.presentational_hints,
         output.custom_metadata,
+        output.full_fonts,
         f", attachments={len(attachments)}" if attachments else "",
     )
 
@@ -482,11 +495,14 @@ async def __generate_pdf_from_parsed_html(
         pdf_variant=output.pdf_variant,
         presentational_hints=render.presentational_hints,
         custom_metadata=output.custom_metadata,
+        full_fonts=output.full_fonts,
         attachments=attachments,
     )
 
     logger.info("PDF generated successfully, size: %d bytes", len(output_pdf))
-    return notes_processor.process_pdf_with_notes(output_pdf, notes)
+    result = notes_processor.process_pdf_with_notes(output_pdf, notes)
+    memory_manager.reclaim_memory()
+    return result
 
 
 def __record_conversion_metrics(chromium_manager: ChromiumManager, start_time: float, success: bool) -> None:

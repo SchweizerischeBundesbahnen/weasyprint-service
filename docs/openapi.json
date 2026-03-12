@@ -629,6 +629,18 @@
               "default": false
             },
             "description": "Include custom metadata in the generated PDF."
+          },
+          {
+            "name": "full_fonts",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "title": "Full Fonts",
+              "description": "Embed full fonts instead of subsetting. Avoids font subsetting errors but increases PDF size.",
+              "default": false
+            },
+            "description": "Embed full fonts instead of subsetting. Avoids font subsetting errors but increases PDF size."
           }
         ],
         "responses": {
@@ -788,6 +800,18 @@
               "default": false
             },
             "description": "Include custom metadata in the generated PDF."
+          },
+          {
+            "name": "full_fonts",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "title": "Full Fonts",
+              "description": "Embed full fonts instead of subsetting. Avoids font subsetting errors but increases PDF size.",
+              "default": false
+            },
+            "description": "Embed full fonts instead of subsetting. Avoids font subsetting errors but increases PDF size."
           }
         ],
         "responses": {
@@ -893,6 +917,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -905,6 +936,11 @@
       },
       "VersionSchema": {
         "properties": {
+          "apiVersion": {
+            "type": "integer",
+            "title": "API Version",
+            "description": "API version for compatibility checking with pdf-exporter"
+          },
           "python": {
             "type": "string",
             "title": "Python",
@@ -954,6 +990,7 @@
         },
         "type": "object",
         "required": [
+          "apiVersion",
           "python",
           "weasyprint",
           "weasyprintService",

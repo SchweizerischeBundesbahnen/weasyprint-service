@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class VersionSchema(BaseModel):
     """Schema for response /version"""
 
+    apiVersion: int = Field(title="API Version", description="API version for compatibility checking with pdf-exporter")
     python: str = Field(title="Python", description="Python version")
     weasyprint: str = Field(title="WeasyPrint", description="WeasyPrint version")
     weasyprintService: str | None = Field(title="WeasyPrint Service", description="Service version")

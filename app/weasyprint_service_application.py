@@ -7,6 +7,7 @@ from pathlib import Path
 import uvicorn
 
 from app import weasyprint_controller  # type: ignore
+from app.constants import get_bool_env
 
 
 def setup_logging() -> Path:
@@ -103,7 +104,7 @@ def main() -> None:
     setup_logging()
     logging.info("Weasyprint service listening port: %d", args.port)
 
-    if os.environ.get("METRICS_SERVER_ENABLED", "true").lower() in ("true", "1", "yes", "on"):
+    if get_bool_env("METRICS_SERVER_ENABLED", default=True):
         logging.info("Metrics server listening port: %s", os.environ.get("METRICS_PORT", "9180"))
     else:
         logging.info("Metrics server disabled")

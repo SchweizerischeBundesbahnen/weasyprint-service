@@ -59,7 +59,7 @@ repos:
         files: ^(app/.*|scripts/.*|pyproject\.toml)$
         stages: [pre-commit]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.5
+    rev: v0.15.6
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -73,7 +73,7 @@ repos:
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$
   - repo: https://github.com/zricethezav/gitleaks
-    rev: v8.30.0
+    rev: v8.30.1
     hooks:
       - id: gitleaks
   - repo: https://github.com/grigoriev/pre-commit-check-git-user

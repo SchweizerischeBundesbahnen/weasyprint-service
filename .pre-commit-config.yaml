@@ -1,6 +1,22 @@
 ---
 default_install_hook_types: [pre-commit, commit-msg]
 repos:
+  - repo: local
+    hooks:
+      # Run the formatter
+      - id: ruff-format
+        name: ruff formatter
+        entry: uv run ruff format
+        language: system
+        types: [python]
+      # Run the linter (inherits config from pyproject.toml)
+      - id: ruff-check
+        name: ruff linter
+        entry: uv run ruff check
+        language: system
+        types: [python]
+        args: [--fix]
+        exclude: ^tests/
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -58,12 +74,6 @@ repos:
         # This avoids running the generator on unrelated changes (e.g., docs, tests) for faster commits.
         files: ^(app/.*|scripts/.*|pyproject\.toml)$
         stages: [pre-commit]
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.7
-    hooks:
-      - id: ruff-check
-        args: [--fix]
-      - id: ruff-format
   - repo: local
     hooks:
       - id: uv-lock
@@ -97,7 +107,3 @@ repos:
     rev: v1.7.11
     hooks:
       - id: actionlint
-
-# Configuration for different stages
-default_stages: [pre-commit]
-fail_fast: true

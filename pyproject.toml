@@ -5,8 +5,9 @@ description = "Service for https://github.com/Kozea/WeasyPrint"
 authors = [
     {name = "SBB Polarion Team", email = "polarion-opensource@sbb.ch"},
 ]
-license = {text = "Apache-2.0"}
-requires-python = ">=3.14"
+license = "Apache-2.0"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
 # Standard [project.dependencies] format - now supported by Renovate with uv
 dependencies = [
     "weasyprint==68.1",
@@ -24,9 +25,9 @@ dependencies = [
     "prometheus-fastapi-instrumentator==7.1.0",
 ]
 
-[tool.uv]
-# Set to false because this project is an application, not a library
-package = false
+[project.urls]
+Homepage = "https://github.com/SchweizerischeBundesbahnen/weasyprint-service"
+Repository = "https://github.com/SchweizerischeBundesbahnen/weasyprint-service"
 
 [dependency-groups]
 dev = [
@@ -47,6 +48,10 @@ test = [
     "httpx==0.28.1",
     "coverage==7.13.5",
 ]
+
+[tool.uv]
+# Set to false because this project is an application, not a library
+package = false
 
 [tool.ruff]
 line-length = 240

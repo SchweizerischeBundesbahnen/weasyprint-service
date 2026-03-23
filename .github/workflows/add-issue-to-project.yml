@@ -1,0 +1,14 @@
+---
+name: Add issue to project
+on:
+  issues:
+    types: [opened]
+permissions: {}
+jobs:
+  add-to-project:
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-add-issue-to-project.yml@main
+    secrets:
+      POLARION_GITHUB_APP_ID: ${{ secrets.POLARION_GITHUB_APP_ID }}
+      POLARION_GITHUB_APP_PRIVATE_KEY: ${{ secrets.POLARION_GITHUB_APP_PRIVATE_KEY }}
+    with:
+      project-number: ${{ vars.POLARION_GITHUB_PROJECT_NUMBER }}

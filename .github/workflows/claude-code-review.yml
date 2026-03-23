@@ -2,95 +2,18 @@
 name: Claude Code Review
 on:
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - ready_for_review
-      - reopened
-    # Only run on code, config, and infrastructure changes
-    paths:
-      - app/**/*.py
-      - tests/**/*.py
-      - Dockerfile
-      - docker-compose.yml
-      - tox.ini
-      - pyproject.toml
-      - uv.lock
-      - '!**/*.md'
+    types: [opened, synchronize, ready_for_review, reopened]
 concurrency:
   group: claude-review-${{ github.event.pull_request.number }}
   cancel-in-progress: true
+permissions: {}
 jobs:
   claude-review:
-    # Skip Claude review for Renovate, Dependabot PRs, and fork PRs
-    if: |
-      github.event.pull_request.user.login != 'renovate[bot]' &&
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
-      github.event.pull_request.head.repo.fork == false
-    runs-on: ubuntu-latest
+    uses: SchweizerischeBundesbahnen/github-workflows-polarion/.github/workflows/reusable-claude-code-review.yml@main
     permissions:
-      contents: read  # Security: read-only sufficient for reviews
+      contents: read
       pull-requests: write
       issues: write
       id-token: write
-    timeout-minutes: 30
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-        with:
-          fetch-depth: 1
-          persist-credentials: false  # Security: don't persist credentials
-      - name: Run Claude Code Review
-        id: claude-review
-        uses: anthropics/claude-code-action@cd77b50d2b0808657f8e6774085c8bf54484351c  # v1.0.72
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
-            STEP 1: Read CLAUDE.md and any files it references to learn project
-            conventions, architecture decisions, and review standards.
-            STEP 2: Review the PR diff. Report ONLY actual problems in changed lines.
-            CONFIDENCE RULE: For each potential issue, assess confidence 0-100.
-            Only report issues scoring >= 80. If uncertain, do not flag it.
-            False positives waste reviewer time.
-            For CLAUDE.md violations: verify the rule exists and quote it.
-            Pre-existing issues on unchanged lines: ignore.
-            FOCUS ON:
-            - Bugs or logic errors
-            - Security vulnerabilities (SQL injection, XSS, auth bypass, secrets exposure)
-            - Breaking changes not mentioned in PR description
-            - Clear CLAUDE.md violations (cite the specific rule)
-            - Missing null/error handling in new code paths
-            - Missing tests for new functionality
-            - Critical performance issues introduced by changes
-            DO NOT:
-            - Review unchanged code, style/formatting, or optional improvements
-            - Run build tools
-            - Check external dependency versions
-            - Provide praise or summaries of what the code does
-            GUIDELINES:
-            - Use Read/Grep/Glob to search the codebase for context
-            - The PR branch is already checked out
-            - Cite issues using GitHub links: https://github.com/${{ github.repository }}/blob/FULL_GIT_SHA/path/to/file#L1-L2
-            - Post the full review with `gh pr comment --repo ${{ github.repository }} --body "..."`
-            - Only post GitHub comments — don't submit review text as messages
-            FORMAT (be TERSE):
-            If issues found:
-            ## ❌ Issues Found
-            1. [link] - Problem [CLAUDE.md: "rule" if applicable] - Fix: specific solution
-            2. [link] - Issue - Suggestion: specific fix
-            If NO issues found: "## ✅ No issues found. Checked for bugs and CLAUDE.md compliance."
-          settings: |
-            {
-              "permissions": {
-                "allow": [
-                  "Read", "Grep", "Glob", "BatchTool",
-                  "Bash(gh pr comment:*)",
-                  "Bash(gh pr diff:*)",
-                  "Bash(gh pr view:*)",
-                  "Bash(gh api:*)"
-                ]
-              }
-            }
-          claude_args: --max-turns 30
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

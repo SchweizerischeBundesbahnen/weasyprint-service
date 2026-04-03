@@ -38,7 +38,7 @@ dev = [
 ]
 test = [
     "tox==4.52.0",
-    "tox-uv==1.33.4",
+    "tox-uv==1.34.0",
     "docker==7.1.0",
     "pytest==9.0.2",
     "pytest-asyncio==1.3.0",

@@ -1,0 +1,13 @@
+---
+rules:
+  # ci.yml: SONAR_TOKEN used in step-level env: (not a GitHub environment) — zizmor requires job-level environment.
+  # claude-code-review.yml: CLAUDE_CODE_OAUTH_TOKEN passed as secrets: to reusable workflow — cannot be in env:.
+  # Fork-PR workflows are additionally protected by GitHub's approval requirement.
+  secrets-outside-env:
+    ignore: [ci.yml, claude-code-review.yml]
+  # Reusable workflows from our own org — tracking @main intentionally.
+  unpinned-uses:
+    config:
+      policies:
+        '*': hash-pin
+        SchweizerischeBundesbahnen/*: any

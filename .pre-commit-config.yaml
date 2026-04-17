@@ -1,6 +1,22 @@
 ---
 default_install_hook_types: [pre-commit, commit-msg]
 repos:
+  - repo: local
+    hooks:
+      # Run the formatter
+      - id: ruff-format
+        name: ruff formatter
+        entry: uv run ruff format
+        language: system
+        types: [python]
+      # Run the linter (inherits config from pyproject.toml)
+      - id: ruff-check
+        name: ruff linter
+        entry: uv run ruff check
+        language: system
+        types: [python]
+        args: [--fix]
+        exclude: ^tests/
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -58,12 +74,6 @@ repos:
         # This avoids running the generator on unrelated changes (e.g., docs, tests) for faster commits.
         files: ^(app/.*|scripts/.*|pyproject\.toml)$
         stages: [pre-commit]
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.5
-    hooks:
-      - id: ruff-check
-        args: [--fix]
-      - id: ruff-format
   - repo: local
     hooks:
       - id: uv-lock
@@ -73,7 +83,7 @@ repos:
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$
   - repo: https://github.com/zricethezav/gitleaks
-    rev: v8.30.0
+    rev: v8.30.1
     hooks:
       - id: gitleaks
   - repo: https://github.com/grigoriev/pre-commit-check-git-user
@@ -82,7 +92,7 @@ repos:
       - id: check-git-config-user-email
         args: [--templates, ^\S+\.\S+@sbb\.ch$]
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.13.9
+    rev: v4.13.10
     hooks:
       - id: commitizen
   - repo: https://github.com/hadolint/hadolint
@@ -90,14 +100,10 @@ repos:
     hooks:
       - id: hadolint
   - repo: https://github.com/woodruffw/zizmor-pre-commit
-    rev: v1.23.1
+    rev: v1.24.1
     hooks:
       - id: zizmor
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.11
+    rev: v1.7.12
     hooks:
       - id: actionlint
-
-# Configuration for different stages
-default_stages: [pre-commit]
-fail_fast: true

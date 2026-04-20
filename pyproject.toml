@@ -12,7 +12,7 @@ requires-python = ">=3.14,<3.15"
 dependencies = [
     "weasyprint==68.1",
     "defusedxml==0.7.1",
-    "fastapi==0.135.3",
+    "fastapi==0.136.0",
     "uvicorn==0.44.0",
     "python-multipart==0.0.26",
     "beautifulsoup4==4.14.3",
@@ -31,13 +31,13 @@ Repository = "https://github.com/SchweizerischeBundesbahnen/weasyprint-service"
 [dependency-groups]
 dev = [
     "pre-commit==4.5.1",
-    "ruff==0.15.10",
+    "ruff==0.15.11",
     "mypy==1.20.1",
     "types-defusedxml==0.7.0.20260408",
     "types-psutil==7.2.2.20260408",
 ]
 test = [
-    "tox==4.52.1",
+    "tox==4.53.0",
     "tox-uv==1.35.1",
     "docker==7.1.0",
     "pytest==9.0.3",

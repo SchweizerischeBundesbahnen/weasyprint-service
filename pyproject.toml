@@ -45,7 +45,7 @@ test = [
     "pymupdf==1.27.2.2",
     "requests==2.33.1",
     "pytest-mock==3.15.1",
-    "pypdf==6.8.0",
+    "pypdf==6.10.0",
     "httpx==0.28.1",
     "coverage==7.13.5",
 ]

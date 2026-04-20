@@ -163,7 +163,7 @@ class VsdxProcessor:
 
             # Check if VSDX is valid ZIP (VSDX is ZIP format)
             if not vsdx_content.startswith(b"PK"):
-                msg = f"VSDX missing ZIP header: {vsdx_content[:10]}"
+                msg = f"VSDX missing ZIP header: {vsdx_content[:10]!r}"
                 raise VsdxCorruptedError(msg)
 
             temp_dir = tempfile.mkdtemp()

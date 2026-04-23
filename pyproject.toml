@@ -20,7 +20,7 @@ dependencies = [
     "playwright==1.58.0",
     "pillow==12.2.0",
     "psutil==7.2.2",
-    "pypdf==6.10.0",
+    "pypdf==6.10.2",
     "prometheus-fastapi-instrumentator==7.1.0",
 ]
 

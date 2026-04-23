@@ -3,12 +3,12 @@ VSDX processing utilities for WeasyPrint service.
 
 Features:
 - Convert VSDX base64 data URLs to PNG using LibreOffice headless
-- Handle VSDX dimensions and scaling
 - Fallback to original content if conversion fails
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import logging
@@ -23,10 +23,6 @@ from bs4 import BeautifulSoup, Tag
 
 class VsdxConversionError(Exception):
     """Base exception for VSDX conversion errors."""
-
-
-class LibreOfficeNotAvailableError(VsdxConversionError):
-    """LibreOffice is not available or not working."""
 
 
 class VsdxCorruptedError(VsdxConversionError):
@@ -46,6 +42,9 @@ class VsdxProcessor:
     # Configuration from environment
     LIBREOFFICE_TIMEOUT = int(os.environ.get("LIBREOFFICE_TIMEOUT", "30"))
 
+    # Class-level cache for LibreOffice availability (checked once, not per request)
+    _libreoffice_available: bool | None = None
+
     def __init__(
         self,
         logger: logging.Logger | None = None,
@@ -57,7 +56,9 @@ class VsdxProcessor:
             logger: Optional logger; if None, a module-level logger is used.
         """
         self.log = logger or logging.getLogger(__name__)
-        self.libreoffice_available = self._check_libreoffice_availability()
+        if VsdxProcessor._libreoffice_available is None:
+            VsdxProcessor._libreoffice_available = self._check_libreoffice_availability()
+        self.libreoffice_available = VsdxProcessor._libreoffice_available
 
     # ---------------- Public API ----------------
 
@@ -151,6 +152,54 @@ class VsdxProcessor:
         """Check if content type indicates VSDX format."""
         return content_type == self.VSDX_MIME_TYPE
 
+    async def _run_libreoffice(self, temp_path: Path, vsdx_file: Path) -> None:
+        """Run LibreOffice headless conversion, raising VsdxConversionError on failure."""
+        lo_profile = temp_path / "lo-profile"
+        cmd = [
+            "libreoffice",
+            f"-env:UserInstallation=file://{lo_profile}",
+            "--headless",
+            "--invisible",
+            "--convert-to",
+            "png",
+            "--outdir",
+            str(temp_path),
+            str(vsdx_file),
+        ]
+
+        self.log.debug("Running LibreOffice conversion: %s", " ".join(cmd))
+
+        process = await asyncio.create_subprocess_exec(  # noqa: S603
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            _stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self.LIBREOFFICE_TIMEOUT)
+        except TimeoutError as e:
+            process.kill()
+            await process.wait()
+            msg = f"LibreOffice conversion timed out after {self.LIBREOFFICE_TIMEOUT} seconds"
+            raise VsdxConversionError(msg) from e
+
+        if process.returncode != 0:
+            msg = f"LibreOffice conversion failed (exit code {process.returncode}): {stderr.decode().strip()}"
+            raise VsdxConversionError(msg)
+
+    def _find_png_output(self, temp_path: Path) -> Path:
+        """Locate the PNG output file produced by LibreOffice."""
+        png_file = temp_path / "input.png"
+        if png_file.exists():
+            return png_file
+        # LibreOffice may produce "input1.png", "input2.png", … for multi-page VSDX
+        png_files = sorted(temp_path.glob("input*.png"))
+        if not png_files:
+            msg = "LibreOffice did not create PNG output file"
+            raise VsdxConversionError(msg)
+        if len(png_files) > 1:
+            self.log.info("Multi-page VSDX: using first page (%d pages total)", len(png_files))
+        return png_files[0]
+
     async def _convert_vsdx_to_png(self, vsdx_base64: str) -> bytes:
         """
         Convert VSDX base64 content to PNG bytes using LibreOffice headless.
@@ -158,10 +207,8 @@ class VsdxProcessor:
         """
         temp_dir = None
         try:
-            # Decode VSDX content
-            vsdx_content = base64.b64decode(vsdx_base64)
+            vsdx_content = base64.b64decode(vsdx_base64, validate=True)
 
-            # Check if VSDX is valid ZIP (VSDX is ZIP format)
             if not vsdx_content.startswith(b"PK"):
                 msg = f"VSDX missing ZIP header: {vsdx_content[:10]!r}"
                 raise VsdxCorruptedError(msg)
@@ -169,51 +216,25 @@ class VsdxProcessor:
             temp_dir = tempfile.mkdtemp()
             temp_path = Path(temp_dir)
 
-            # Write VSDX file
             vsdx_file = temp_path / "input.vsdx"
             vsdx_file.write_bytes(vsdx_content)
 
-            # Convert to PNG using LibreOffice
-            png_file = temp_path / "input.png"
+            await self._run_libreoffice(temp_path, vsdx_file)
 
-            cmd = ["libreoffice", "--headless", "--invisible", "--convert-to", "png", "--outdir", str(temp_path), str(vsdx_file)]
-
-            self.log.debug("Running LibreOffice conversion: %s", " ".join(cmd))
-
-            result = subprocess.run(  # noqa: S603
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.LIBREOFFICE_TIMEOUT,
-                check=False,
-            )
-
-            if result.returncode != 0:
-                msg = f"LibreOffice conversion failed (exit code {result.returncode}): {result.stderr.strip()}"
-                raise VsdxConversionError(msg)
-
-            if not png_file.exists():
-                msg = "LibreOffice did not create PNG output file"
-                raise VsdxConversionError(msg)
-
+            png_file = self._find_png_output(temp_path)
             png_content = png_file.read_bytes()
             self.log.debug("Successfully converted VSDX to PNG (%d bytes)", len(png_content))
             return png_content
 
-        except subprocess.TimeoutExpired as e:
-            msg = f"LibreOffice conversion timed out after {self.LIBREOFFICE_TIMEOUT} seconds"
-            raise VsdxConversionError(msg) from e
         except binascii.Error as e:
             msg = f"Invalid base64 data: {e}"
             raise VsdxCorruptedError(msg) from e
         except VsdxConversionError:
-            # Re-raise custom exceptions
             raise
         except Exception as e:
             msg = f"Unexpected error in VSDX conversion: {e}"
             raise VsdxConversionError(msg) from e
         finally:
-            # Resource cleanup - ensure temp directory is always cleaned up
             if temp_dir and Path(temp_dir).exists():
                 try:
                     shutil.rmtree(temp_dir)

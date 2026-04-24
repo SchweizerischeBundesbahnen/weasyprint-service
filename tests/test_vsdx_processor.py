@@ -31,11 +31,11 @@ async def test_vsdx_processor_initialization_libreoffice_available(mocker):
 
 
 @pytest.mark.asyncio
-async def test_vsdx_processor_initialization_libreoffice_unavailable(mocker):
-    """Test VsdxProcessor initialization when LibreOffice is not available."""
-    # Mock failed LibreOffice check
+async def test_vsdx_processor_initialization_libreoffice_not_found(mocker):
+    """Test VsdxProcessor initialization when LibreOffice command not found."""
+    # Mock FileNotFoundError
     mock_run = mocker.patch("subprocess.run")
-    mock_run.return_value = Mock(returncode=1, stderr="command not found")
+    mock_run.side_effect = FileNotFoundError("libreoffice not found")
 
     processor = VsdxProcessor()
 
@@ -44,11 +44,11 @@ async def test_vsdx_processor_initialization_libreoffice_unavailable(mocker):
 
 
 @pytest.mark.asyncio
-async def test_vsdx_processor_initialization_libreoffice_not_found(mocker):
-    """Test VsdxProcessor initialization when LibreOffice command not found."""
-    # Mock FileNotFoundError
+async def test_vsdx_processor_initialization_libreoffice_unavailable(mocker):
+    """Test VsdxProcessor initialization when LibreOffice is not available."""
+    # Mock failed LibreOffice check
     mock_run = mocker.patch("subprocess.run")
-    mock_run.side_effect = FileNotFoundError("libreoffice not found")
+    mock_run.return_value = Mock(returncode=1, stderr="command not found")
 
     processor = VsdxProcessor()
 

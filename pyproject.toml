@@ -31,7 +31,7 @@ Repository = "https://github.com/SchweizerischeBundesbahnen/weasyprint-service"
 [dependency-groups]
 dev = [
     "pre-commit==4.6.0",
-    "ruff==0.15.11",
+    "ruff==0.15.12",
     "mypy==1.20.2",
     "types-defusedxml==0.7.0.20260408",
     "types-psutil==7.2.2.20260408",

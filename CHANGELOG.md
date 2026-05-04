@@ -1,5 +1,13 @@
 # Changelog
 
+## [68.1.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.1.1...v68.1.2) (2026-05-04)
+
+
+### Bug Fixes
+
+* **deps:** update dependency playwright to v1.59.0 ([54b9961](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/54b99615c73b40082643128669f6d497077885da))
+* **deps:** update dependency python-multipart to v0.0.27 ([085965f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/085965f45b71639c6eae2fd44dea257d8e5f92c1))
+
 ## [68.1.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.1.0...v68.1.1) (2026-04-28)
 
 

@@ -40,7 +40,7 @@ jobs:
         run: uv run tox
       - name: SonarCloud scan for PR
         uses: sonarsource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432  # v8
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.repository.visibility == 'public'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
       - name: SonarCloud scan for Push
         uses: sonarsource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432  # v8
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.event.repository.visibility == 'public'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

@@ -834,11 +834,11 @@ wheels = [
 
 [[package]]
 name = "pypdf"
-version = "6.13.0"
+version = "6.13.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/70/79/9fd087fbff8300e5c2a9b2bd0200b75c6ef8c1f9a7a2cfe3df0659aa4025/pypdf-6.13.0.tar.gz", hash = "sha256:558683ec9daf6b91c280c322c84c32f5cc216afd3eaa3a37de5ae88ae0c3b787", size = 6476995, upload-time = "2026-06-05T10:12:05.568Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/15/d9/9d12fa0d9660d03320725ff686c961b645a4218940a82296e1272d9e1ff0/pypdf-6.13.1.tar.gz", hash = "sha256:4841d8a4c1589e5833915dc0c7ddfacff80a2e0bcbeb5d1e681fecaa1674b03a", size = 6477811, upload-time = "2026-06-08T11:01:49.344Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/70/16942ec95d32187d8679ce8419cee2d5c0dbe90fa3ac1b307daea4c86da9/pypdf-6.13.0-py3-none-any.whl", hash = "sha256:de1294ae49d6956edb4e5c41527fb9e8716ddd2b120f2185c68aab784d4ffe60", size = 345958, upload-time = "2026-06-05T10:12:03.453Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/dd/8f03e0a5788a5d1feb4550617c3e6db5e9099eaee248a3e482ddaeacbbb0/pypdf-6.13.1-py3-none-any.whl", hash = "sha256:e555e4ce3f561ef069307622f1374136ba964ca6ca24f24158701decaf83ed9b", size = 346259, upload-time = "2026-06-08T11:01:47.741Z" },
 ]
 
 [[package]]
@@ -1280,7 +1280,7 @@ requires-dist = [
     { name = "playwright", specifier = "==1.60.0" },
     { name = "prometheus-fastapi-instrumentator", specifier = "==8.0.0" },
     { name = "psutil", specifier = "==7.2.2" },
-    { name = "pypdf", specifier = "==6.13.0" },
+    { name = "pypdf", specifier = "==6.13.1" },
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "uvicorn", specifier = "==0.49.0" },
     { name = "weasyprint", specifier = "==68.1" },

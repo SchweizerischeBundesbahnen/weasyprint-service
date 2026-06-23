@@ -93,6 +93,10 @@ extend-select = [
     "PLC0415", # import location flexible for optional dependencies
     "C901", # complexity allowed in CLI main function
 ]
+"repro/*" = [
+    "T201", # print is the output of this standalone CLI repro
+    "PLC0415", # the service patch is imported conditionally, only with --patch
+]
 
 [tool.ruff.format]
 line-ending = "lf"
@@ -103,6 +107,6 @@ max-args = 7
 [tool.mypy]
 explicit_package_bases = true
 disallow_untyped_defs = true
-exclude = ["tests/.*", "examples/.*", "scripts/.*"]
+exclude = ["tests/.*", "examples/.*", "scripts/.*", "repro/.*"]
 install_types = true
 non_interactive = true

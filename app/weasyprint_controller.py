@@ -41,6 +41,12 @@ from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
 from app.vsdx_processor import VsdxProcessor
+from app.weasyprint_pdfa_patch import apply_pdfa_colorspace_patch
+
+# WeasyPrint 69.0 writes PDF/A gradient colour spaces as a bare ``/srgb`` name that
+# pdfium/MuPDF and PDFBox cannot resolve, which drops gradients. Apply the fix at
+# import time so every conversion path is covered. See app/weasyprint_pdfa_patch.py.
+apply_pdfa_colorspace_patch()
 
 
 @contextlib.asynccontextmanager

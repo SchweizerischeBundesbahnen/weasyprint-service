@@ -6,7 +6,7 @@ import pytest
 import weasyprint
 from PIL import Image
 
-from app.weasyprint_pdfa_patch import apply_pdfa_colorspace_patch
+from app.weasyprint_pdfa_patch import apply_pdfa_colorspace_patch, is_applied
 from tests import utils_pdf
 
 # Apply the same fix the service applies at import of weasyprint_controller.
@@ -47,6 +47,13 @@ def test_pdfa_gradient_is_rendered(pdf_variant):
     pdf_bytes = weasyprint.HTML(string=GRADIENT_HTML).write_pdf(pdf_variant=pdf_variant)
     pages = utils_pdf.pdf_bytes_to_png_pages(pdf_bytes, zoom=1.5)
     assert _painted_pixels(pages[0]) > 500
+
+
+def test_patch_is_installed():
+    # Without this, the render tests above would pass silently on WeasyPrint versions
+    # that draw the gradient even without the patch (e.g. 68.1), masking a fix that was
+    # never installed. The patch must actually be in place.
+    assert is_applied() is True
 
 
 def test_patch_is_idempotent():

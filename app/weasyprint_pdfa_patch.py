@@ -63,8 +63,11 @@ def apply_pdfa_colorspace_patch() -> bool:
     if getattr(stream_cls, _PATCH_FLAG, False):
         return False
 
-    original_add_shading = stream_cls.add_shading
-    original_add_group = stream_cls.add_group
+    original_add_shading = getattr(stream_cls, "add_shading", None)
+    original_add_group = getattr(stream_cls, "add_group", None)
+    if original_add_shading is None or original_add_group is None:
+        logger.warning("WeasyPrint Stream.add_shading/add_group not found; PDF/A gradient patch skipped")
+        return False
 
     def add_shading(self: Any, shading_type: Any, domain: Any, coords: Any, extend: Any, function: Any, color_space: str | None = None) -> Any:
         shading = original_add_shading(self, shading_type, domain, coords, extend, function, color_space)
@@ -88,3 +91,9 @@ def apply_pdfa_colorspace_patch() -> bool:
     setattr(stream_cls, _PATCH_FLAG, True)
     logger.info("Applied WeasyPrint PDF/A gradient colour-space patch (named /srgb -> direct ICCBased)")
     return True
+
+
+def is_applied() -> bool:
+    """Return whether the PDF/A gradient colour-space patch is currently installed."""
+    stream_cls = getattr(weasyprint_stream, "Stream", None)
+    return stream_cls is not None and bool(getattr(stream_cls, _PATCH_FLAG, False))

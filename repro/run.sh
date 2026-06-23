@@ -21,3 +21,6 @@ fi
 for v in 68.1 69.0; do
   uv run --quiet --with "weasyprint==$v" --with pymupdf repro.py
 done
+
+# Same broken version, but with the weasyprint-service fix applied:
+uv run --quiet --with "weasyprint==69.0" --with pymupdf repro.py --patch

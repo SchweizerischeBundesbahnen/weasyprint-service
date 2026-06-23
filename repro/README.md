@@ -6,7 +6,8 @@ A CSS `linear-gradient` background renders fine in **WeasyPrint 68.1** but
 * `gradient.html` — minimal input: a single `<div>` with a `linear-gradient` background.
 * `repro.py` — renders it with `write_pdf(pdf_variant="pdf/a-2b")`, reports the gradient
   shading's colour space and whether the gradient actually paints, and saves the PDF.
-* `run.sh` — runs `repro.py` with both WeasyPrint versions via `uv`.
+  Pass `--patch` to apply the service workaround (`app/weasyprint_pdfa_patch.py`).
+* `run.sh` — runs `repro.py` with WeasyPrint 68.1, 69.0, and 69.0 + the fix, via `uv`.
 
 ## Run (native, no Docker)
 
@@ -31,13 +32,37 @@ DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib" \
 
 ## Expected output
 
+Each run reports every supported PDF/A variant. On WeasyPrint 69.0:
+
 ```
-weasyprint 68.1 : gradient shading ColorSpace = /DeviceRGB  ->  RENDERED ok
-weasyprint 69.0 : gradient shading ColorSpace = /srgb       ->  BLANK (gradient dropped)
+weasyprint 69.0
+  pdf/a-1b  shading ColorSpace = /srgb              ->  BLANK (gradient dropped)
+  pdf/a-1a  shading ColorSpace = /srgb              ->  BLANK (gradient dropped)
+  ...                                                    (all 11 variants BLANK)
+  pdf/a-4f  shading ColorSpace = /srgb              ->  BLANK (gradient dropped)
+
+weasyprint 69.0+patch
+  pdf/a-1b  shading ColorSpace = [/ICCBased 3 0 R]  ->  RENDERED ok
+  ...                                                    (all 11 variants RENDERED)
+  pdf/a-4f  shading ColorSpace = [/ICCBased 3 0 R]  ->  RENDERED ok
 ```
 
-Open the two saved `gradient_pdfa_*.pdf` files to see it: the gradient box is present
-with 68.1 and blank with 69.0.
+On WeasyPrint 68.1 every variant renders (`ColorSpace = /DeviceRGB`). A representative
+`gradient_pdf-a-2b_*.pdf` is saved per run for visual inspection.
+
+## Validating on a future WeasyPrint version
+
+When bumping WeasyPrint, run the repro on the new version with and without the fix:
+
+```bash
+uv run --with 'weasyprint==<new>' --with pymupdf repro.py            # without the patch
+uv run --with 'weasyprint==<new>' --with pymupdf repro.py --patch    # with the patch
+```
+
+* without `--patch` **RENDERED** → upstream fixed it; the service patch can be removed.
+* without `--patch` **BLANK** but with `--patch` **RENDERED** → keep the patch.
+* with `--patch` **BLANK** → WeasyPrint internals changed; the patch needs updating
+  (it fails safe — never breaks PDF generation — but no longer fixes the gradient).
 
 ## Root cause
 

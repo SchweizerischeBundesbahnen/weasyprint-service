@@ -41,7 +41,7 @@ services:
       - weasyprint-service
 
   grafana:
-    image: grafana/grafana:latest@sha256:b0ae311af06228bcfd4a620504b653db80f5b91e94dc3dc2a5b7dab202bcde20
+    image: grafana/grafana:latest@sha256:121a7a9ece6dc10b969f1f96eed64b4f07dfac0d0b8abc070f7cb83bbde86f63
     ports:
       - "3000:3000"
     environment:

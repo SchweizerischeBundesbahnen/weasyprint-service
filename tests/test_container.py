@@ -504,21 +504,28 @@ def test_convert_html_with_unicode_symbols(test_parameters: TestParameters) -> N
         pytest.skip(str(e))
 
 
-def test_convert_html_with_bad_font_fails_without_full_fonts(test_parameters: TestParameters) -> None:
-    """Test that HTML with a font containing invalid OS/2 Unicode range bits fails without full_fonts=true.
+def test_convert_html_with_bad_font_succeeds_without_full_fonts(test_parameters: TestParameters) -> None:
+    """Test that HTML with a font containing reserved OS/2 Unicode range bits subsets without full_fonts=true.
 
-    This test verifies that font subsetting fails for fonts with invalid Unicode range bits (bit 123 > max 122)
-    when full_fonts is not enabled.
+    The font sets reserved OS/2 ulUnicodeRange bit 123. fontTools < 4.63.0 raised
+    "ValueError: expected 0 <= int <= 122" during subsetting, which required full_fonts=true as a workaround.
+    fontTools 4.63.0 accepts reserved bits 123-127 (fonttools #4087/#4088), so subsetting now succeeds.
     """
     html = __load_test_html("tests/test-data/test-minimal-bad.html")
     response = __call_convert_html(
         base_url=test_parameters.base_url,
         request_session=test_parameters.request_session,
         data=html,
-        print_error=False,
+        print_error=True,
         parameters="full_fonts=false",
     )
-    assert response.status_code == 500, f"Expected 500 error for bad font without full_fonts, got {response.status_code}"
+    assert response.status_code == 200, f"Expected 200 for bad font without full_fonts (fontTools >= 4.63.0), got {response.status_code}"
+
+    stream = io.BytesIO(response.content)
+    pdf_reader = PyPDF.PdfReader(stream)
+    assert len(pdf_reader.pages) == 1
+    first_page = pdf_reader.pages[0].extract_text()
+    assert "Hello World" in first_page
 
 
 def test_convert_html_with_bad_font_succeeds_with_full_fonts(test_parameters: TestParameters) -> None:

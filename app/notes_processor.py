@@ -86,10 +86,10 @@ class NotesProcessor:
         text_tag = node.find("span", class_="sticky-note-text", recursive=False)
         title_tag = node.find("span", class_="sticky-note-title", recursive=False)
 
-        time = time_tag.get_text(strip=True) if time_tag else ""
-        username = username_tag.get_text(strip=True) if username_tag else ""
-        text = text_tag.get_text(strip=True) if text_tag else ""
-        title = title_tag.get_text(strip=True) if title_tag else ""
+        time = time_tag.get_text(strip=True) if time_tag is not None else ""
+        username = username_tag.get_text(strip=True) if username_tag is not None else ""
+        text = text_tag.get_text(strip=True) if text_tag is not None else ""
+        title = title_tag.get_text(strip=True) if title_tag is not None else ""
 
         # Find direct child notes (replies)
         replies: list[Note] = []

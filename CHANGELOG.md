@@ -1,5 +1,20 @@
 # Changelog
 
+## [69.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.0...v69.0.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.138.2 ([2bd8158](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2bd8158a444fa64fa813ca8673a80b5106f69419))
+* **deps:** update dependency fastapi to v0.139.0 ([0de2c98](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/0de2c98f8844e625a0226c3ee33dac001333a76a))
+* **deps:** update dependency fastapi to v0.139.2 ([55eeac5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/55eeac55d590615f66d4eba4def30f1751b4550a))
+* **deps:** update dependency pillow to v12.3.0 ([064bf3b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/064bf3bd7cb1f1ccfc267201bd3880830d96e85f))
+* **deps:** update dependency playwright to v1.61.0 ([fec3a94](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/fec3a94754b22a42459cd421683471488b02f683))
+* **deps:** update dependency uvicorn to v0.50.0 ([451308f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/451308f7ed287b3e42660616df04f93e2d6c8742))
+* **deps:** update dependency uvicorn to v0.50.2 ([58aff32](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/58aff32783608d691130c4fbec9cd6fab62c90f6))
+* **deps:** update dependency uvicorn to v0.51.0 ([306f96b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/306f96b0f80c8384152aff9eeea9fd47b70a6cf2))
+* use explicit None check when reading sticky-note fields ([#340](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/340)) ([76011f0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/76011f04f101d4c831d0752e06a6b8eeaad1c120))
+
 ## [69.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v68.1.1...v69.0.0) (2026-07-02)
 
 

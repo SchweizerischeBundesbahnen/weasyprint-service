@@ -57,54 +57,81 @@ package = false
 line-length = 240
 fix = true
 show-fixes = true
-exclude = [
-    "tests/*"  # Exclude all test files from linting
-]
 
 [tool.ruff.lint]
-# Explicit rule set. Do not use extend-select: ruff 0.16 widened the implicit
-# default selection, so extending it makes the rule set depend on the ruff version.
-select = [
-    # --- Recommended ---
-    "E", "W", # pycodestyle errors and warnings
-    "F",      # Pyflakes
-    "I",      # isort
-    "C4",     # flake8-comprehensions
-    "C90",    # mccabe
-    "B",      # flake8-bugbear
-    "UP",     # pyupgrade
-    "S",      # flake8-bandit
-    "PL",     # Pylint
-    "PTH",    # flake8-pathlib
-    "TCH",    # type-checking imports
-    "SIM",    # flake8-simplify
-    "T20",    # flake8-print
-    "ERA",    # eradicate
+# Shared standard for all SBB Python repositories.
+# Never use extend-select: it inherits ruff's implicit default, which widened in
+# ruff 0.16 and broke CI everywhere. Keep preview off, preview rules churn.
+select = ["ALL"]
+preview = false
+ignore = [
+    # ruff format owns this formatting decision
+    "COM812",  # trailing comma
+    "Q000",    # inline string quotes
+    "Q001",    # multiline string quotes
+    "Q002",    # docstring quotes
+    "Q003",    # escaped quotes
+
+    # Not our convention
+    "D",       # docstrings are optional, we mandate no docstring style
+    "CPY001",  # we ship no copyright headers
+    "FIX002",  # a TODO is a normal marker, not a defect
+    "EM101",   # a literal at the raise site reads better than a temp name
+    "EM102",   # same for an f-string
+    "TRY003",  # we want the full message where the raise happens
+    "TRY400",  # a handled error is logged without a traceback
+    "TRY401",  # the exception text belongs on the log line, not only in the traceback
+    "G004",    # we ingest plain log lines, not templates, so f-strings are fine
+    "ANN401",  # Any is correct at JSON and **kwargs boundaries
+    "FBT001",  # a boolean query parameter is part of the HTTP API
+    "FBT002",  # same, with a default
 ]
 
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.pylint]
+max-args = 10
+
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = [
-    "S101", # No assert rule (bandit)
-    "PLR2004", # No magic values (pylint)
-    "F405", # undefined-local-with-import-star-usage (pyflakes)
-    "F403", # No import * (pyflakes)
+"tests/**" = [
+    "S101",    # assert is how a test states its expectation
+    "S105",    # test credentials are fake by construction
+    "S106",    # same, passed as an argument
+    "S108",    # a temp path in a test is not a shared temp path
+    "S603",    # tests run known helper binaries
+    "S607",    # those binaries come from PATH on purpose
+    "SLF001",  # a test may assert on internal state
+    "PLC0415", # a local import is how a test patches a module
+    "ANN",     # a test signature carries no type information
+    "ARG",     # a fixture argument is used by pytest, not by the body
+    "PLR2004", # a literal is readable test data
+    "PT",      # unittest style is allowed next to pytest style
+    "E402",    # a test may import after patching
+    "TC",      # a test module is imported once, deferring imports buys nothing
+    "S104",    # a host string in test data is not a binding
+    "FBT003",  # mock.patch takes the replacement value positionally
+    "C901",    # a fixture is linear setup, splitting it hides the order
+    "PLR0912", # same, for its branches
+    "PLR0915", # same, for its statements
+]
+
+# Repository-specific ignores belong below this line, each with a reason.
+
+"tests/test_logging.py" = [
+    "LOG015",  # this module tests the root logger that setup_logging configures
 ]
 "scripts/load_test.py" = [
-    "T201", # print statements allowed in CLI scripts
-    "PLR2004", # magic values allowed (HTTP status codes, percentiles)
-    "PLC0415", # import location flexible for optional dependencies
-    "C901", # complexity allowed in CLI main function
+    "T201",    # this script is a CLI, printing is its output
+    "PLC0415", # optional dependencies are imported where they are used
 ]
 "repro/*" = [
-    "T201", # print is the output of this standalone CLI repro
-    "PLC0415", # the service patch is imported conditionally, only with --patch
+    "T201",    # a standalone repro reports through stdout
+    "PLC0415", # the service patch is imported only with --patch
 ]
 
 [tool.ruff.format]
 line-ending = "lf"
-
-[tool.ruff.lint.pylint]
-max-args = 7
 
 [tool.mypy]
 explicit_package_bases = true

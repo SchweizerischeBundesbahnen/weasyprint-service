@@ -122,12 +122,13 @@ class NotesProcessor:
             logger.debug("Processing %d notes for PDF annotation", len(notes))
             processed_pdf = self.process_pdf(pdf_content, notes)
             logger.debug("Notes processed successfully")
-            return processed_pdf
         except Exception as e:
-            logger.error("Failed to process PDF notes: %s", str(e), exc_info=True)
+            logger.exception("Failed to process PDF notes: %s", str(e))
             # Continue with PDF without notes rather than failing completely
             logger.warning("Returning PDF without note annotations due to processing error")
             return pdf_content
+        else:
+            return processed_pdf
 
     def process_pdf(self, pdf_content: bytes, notes: list[Note]) -> bytes:
         """Process PDF to replace fake note links with actual PDF sticky note annotations with nested replies."""
@@ -263,10 +264,10 @@ class NotesProcessor:
             # Note: Using private method _add_object() as pypdf 6.1.1 doesn't provide
             # a public API for adding custom XObject streams. This is the standard
             # approach for advanced PDF manipulation with pypdf.
-            return writer._add_object(xobject)  # type: ignore[attr-defined]
+            return writer._add_object(xobject)  # type: ignore[attr-defined]  # noqa: SLF001 - pypdf exposes no public API for this
 
         except Exception as e:
-            logger.error("Failed to embed PNG icon from %s: %s", png_path, e, exc_info=True)
+            logger.exception("Failed to embed PNG icon from %s: %s", png_path, e)
             return None
 
     def _create_custom_appearance(self, writer: PdfWriter, rect: tuple[float, float, float, float], xobject_ref: object) -> DictionaryObject:
@@ -304,7 +305,7 @@ class NotesProcessor:
         # Add the appearance stream to the PDF
         # Note: Using private method _add_object() as pypdf 6.1.1 doesn't provide
         # a public API for adding custom appearance streams.
-        appearance_ref = writer._add_object(appearance_stream)  # type: ignore[attr-defined]
+        appearance_ref = writer._add_object(appearance_stream)  # type: ignore[attr-defined]  # noqa: SLF001 - pypdf exposes no public API for this
 
         # Create the appearance dictionary
         appearance_dict = DictionaryObject()
@@ -426,8 +427,9 @@ class NotesProcessor:
                     return f"D:{base_date}{tz_str}"
 
             # No timezone info, return without TZ
-            return f"D:{base_date}"
 
         except ValueError, AttributeError:
             # If ISO format parsing fails, return empty to skip setting the field
             return ""
+        else:
+            return f"D:{base_date}"

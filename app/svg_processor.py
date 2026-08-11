@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup, Tag
-from defusedxml import ElementTree as DET
+from defusedxml import ElementTree as det  # noqa: N813 - defusedxml exposes ElementTree as a module
 
 if TYPE_CHECKING:  # used only for type hints
     from xml.etree.ElementTree import Element
@@ -77,10 +77,7 @@ class SvgProcessor:
         Replace only top-level <svg>...</svg> with <img src="data:image/svg+xml;base64,...">.
         Skips nested <svg> (those having an <svg> ancestor). Preserves width/height if present.
         """
-        top_level_svgs: list[Tag] = []
-        for node in parsed_html.find_all("svg"):
-            if isinstance(node, Tag) and node.find_parent("svg") is None:
-                top_level_svgs.append(node)
+        top_level_svgs: list[Tag] = [node for node in parsed_html.find_all("svg") if isinstance(node, Tag) and node.find_parent("svg") is None]
 
         self.log.debug("Found %d top-level SVG tags to replace with img tags", len(top_level_svgs))
         for svg in top_level_svgs:
@@ -158,7 +155,7 @@ class SvgProcessor:
             if style_parts:
                 node["style"] = "; ".join(style_parts)
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - applying dimensions is best effort
             # Log at debug level to avoid noise but prevent silent pass
             logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
@@ -193,7 +190,7 @@ class SvgProcessor:
 
             possible_svg_content = decoded_content.decode("utf-8")
             return self.svg_from_string(possible_svg_content)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - any decode failure means this is not SVG
             self.log.error("Failed to decode base64 content: %s", e)
             return None
 
@@ -217,10 +214,11 @@ class SvgProcessor:
             try:
                 png_bytes = await self.chromium_manager.convert_svg_to_png(svg_content, width, height, self.device_scale_factor)
                 self.log.debug("SVG converted via CDP successfully")
-                return self.IMAGE_PNG, png_bytes
             except Exception as e:  # noqa: BLE001
                 self.log.error("CDP conversion failed: %s", e)
                 return self.without_changes(svg)
+            else:
+                return self.IMAGE_PNG, png_bytes
         else:
             self.log.error("No ChromiumManager available, returning original SVG")
             return self.without_changes(svg)
@@ -238,8 +236,8 @@ class SvgProcessor:
 
     def svg_from_string(self, content: str) -> Element | None:
         try:
-            return DET.fromstring(content)
-        except DET.ParseError as e:
+            return det.fromstring(content)
+        except det.ParseError as e:
             self.log.error("Failed to parse SVG content: %s", e)
             return None
 
@@ -303,9 +301,10 @@ class SvgProcessor:
                 return None, None
             vb_width = float(parts[2])
             vb_height = float(parts[3])
-            return vb_width, vb_height
-        except Exception:
+        except Exception:  # noqa: BLE001 - any parse failure means the dimensions are unknown
             return None, None
+        else:
+            return vb_width, vb_height
 
     def calculate_dimension(
         self,
@@ -354,7 +353,7 @@ class SvgProcessor:
     def convert_to_px(self, value: str | None, unit: str | None) -> int | None:
         try:
             if value is None:
-                raise ValueError()
+                raise ValueError  # noqa: TRY301 - the try converts, this guard rejects a missing value
             value_f64 = float(value)
 
             if unit in self.SPECIAL_UNITS:

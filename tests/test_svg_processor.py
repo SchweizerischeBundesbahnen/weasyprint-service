@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from defusedxml import ElementTree as DET
+from defusedxml import ElementTree as det  # noqa: N813 - defusedxml exposes ElementTree as a module
 
 from app.html_parser import HtmlParser
 from app.svg_processor import SvgProcessor
@@ -70,7 +70,7 @@ def test_parse_svg_dimension(svg_content: str, dimension: str, expected: tuple[s
     Tests extraction of numeric values and units from SVG width/height attributes.
     Verifies handling of different unit types and invalid formats.
     """
-    svg = DET.fromstring(svg_content)
+    svg = det.fromstring(svg_content)
     value, unit = SvgProcessor().get_svg_dimension(svg, dimension)
     assert (value, unit) == expected
 
@@ -98,7 +98,7 @@ def test_parse_viewbox(svg_content: str, expected: tuple[float | None, float | N
     Tests extraction of width and height from viewBox attribute.
     Verifies handling of decimal values and invalid formats.
     """
-    content = DET.fromstring(svg_content)
+    content = det.fromstring(svg_content)
     width, height = SvgProcessor().parse_viewbox(content)
     assert (width, height) == expected
 
@@ -130,8 +130,8 @@ def test_extract_svg_dimensions(svg_content: str, expected_width: int | None, ex
     - ViewBox dimensions
     - Mixed explicit/viewBox dimensions
     """
-    svg = DET.fromstring(svg_content)
-    width, height, updated_svg = SvgProcessor().extract_svg_dimensions_as_px(svg)
+    svg = det.fromstring(svg_content)
+    width, height, _updated_svg = SvgProcessor().extract_svg_dimensions_as_px(svg)
     assert width == expected_width
     assert height == expected_height
 
@@ -151,7 +151,7 @@ def test_extract_svg_dimensions_relative_units_error(svg_content: str, expected_
     without a viewBox to reference.
     """
     with pytest.raises(ValueError, match=expected_error):
-        SvgProcessor().extract_svg_dimensions_as_px(DET.fromstring(svg_content))
+        SvgProcessor().extract_svg_dimensions_as_px(det.fromstring(svg_content))
 
 
 # Test handling of relative units with viewBox
@@ -173,7 +173,7 @@ def test_extract_svg_dimensions_relative_units(svg_content: str, expected_width:
     when a viewBox is present to provide reference dimensions.
     """
     svg_processor = SvgProcessor()
-    width, height, updated_svg = svg_processor.extract_svg_dimensions_as_px(DET.fromstring(svg_content))
+    width, height, updated_svg = svg_processor.extract_svg_dimensions_as_px(det.fromstring(svg_content))
     assert width == expected_width
     assert height == expected_height
     updated_svg_content = svg_processor.svg_to_string(updated_svg)
@@ -303,7 +303,7 @@ def test_replace_svg_size_attributes():
     svg_processor = SvgProcessor()
 
     # Test valid SVG
-    svg = DET.fromstring('<svg width="100" height="100"></svg>')
+    svg = det.fromstring('<svg width="100" height="100"></svg>')
     updated_svg = svg_processor.replace_svg_size_attributes(svg, 200, 300)
     result = svg_processor.svg_to_string(updated_svg)
     assert 'width="200px"' in result
@@ -397,7 +397,7 @@ def test_apply_img_dimensions_from_svg():
     node = soup.find("img")
 
     # Create SVG with known dimensions
-    svg = DET.fromstring('<svg width="100" height="200"></svg>')
+    svg = det.fromstring('<svg width="100" height="200"></svg>')
 
     svg_processor._apply_img_dimensions_from_svg(node, svg)
 

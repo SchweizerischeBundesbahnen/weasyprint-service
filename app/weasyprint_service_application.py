@@ -1,13 +1,15 @@
 import argparse
 import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import uvicorn
 
-from app import weasyprint_controller  # type: ignore
+from app import weasyprint_controller
 from app.constants import get_bool_env
+
+logger = logging.getLogger(__name__)
 
 
 def setup_logging() -> Path:
@@ -37,7 +39,7 @@ def setup_logging() -> Path:
     log_dir.mkdir(parents=True, exist_ok=True)
 
     # Create log filename with timestamp
-    current_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    current_time = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M-%S")
     log_file = log_dir / f"weasyprint-service_{current_time}.log"
 
     # Configure logging format
@@ -102,12 +104,12 @@ def main() -> None:
         os.environ["METRICS_PORT"] = str(args.metrics_port)
 
     setup_logging()
-    logging.info("Weasyprint service listening port: %d", args.port)
+    logger.info("Weasyprint service listening port: %d", args.port)
 
     if get_bool_env("METRICS_SERVER_ENABLED", default=True):
-        logging.info("Metrics server listening port: %s", os.environ.get("METRICS_PORT", "9180"))
+        logger.info("Metrics server listening port: %s", os.environ.get("METRICS_PORT", "9180"))
     else:
-        logging.info("Metrics server disabled")
+        logger.info("Metrics server disabled")
 
     start_server(args.port)
 

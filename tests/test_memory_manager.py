@@ -84,10 +84,9 @@ def test_reclaim_memory_handles_oserror_on_linux(monkeypatch):
     monkeypatch.setenv("RECLAIM_MEMORY_AFTER_CONVERSION", "true")
     monkeypatch.setattr("platform.system", lambda: "Linux")
 
-    with patch("ctypes.CDLL", side_effect=OSError("libc not found")):
-        with patch("gc.collect") as mock_gc:
-            memory_manager.reclaim_memory()
-            mock_gc.assert_called_once()
+    with patch("ctypes.CDLL", side_effect=OSError("libc not found")), patch("gc.collect") as mock_gc:
+        memory_manager.reclaim_memory()
+        mock_gc.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -100,14 +99,14 @@ def test_reclaim_memory_called_after_html_conversion(monkeypatch):
     monkeypatch.setenv("RECLAIM_MEMORY_AFTER_CONVERSION", "true")
     monkeypatch.setenv("WEASYPRINT_SERVICE_VERSION", "test1")
 
-    from app.weasyprint_controller import app  # requires native libs (pango/gobject)
     from fastapi.testclient import TestClient
 
-    with patch("app.memory_manager.reclaim_memory", wraps=memory_manager.reclaim_memory) as mock_reclaim:
-        with TestClient(app) as test_client:
-            result = test_client.post("/convert/html?base_url=/", content="<html><body>hello</body></html>")
-            assert result.status_code == 200
-            mock_reclaim.assert_called_once()
+    from app.weasyprint_controller import app  # requires native libs (pango/gobject)
+
+    with patch("app.memory_manager.reclaim_memory", wraps=memory_manager.reclaim_memory) as mock_reclaim, TestClient(app) as test_client:
+        result = test_client.post("/convert/html?base_url=/", content="<html><body>hello</body></html>")
+        assert result.status_code == 200
+        mock_reclaim.assert_called_once()
 
 
 def test_reclaim_memory_called_after_html_with_attachments_conversion(monkeypatch):
@@ -115,14 +114,14 @@ def test_reclaim_memory_called_after_html_with_attachments_conversion(monkeypatc
     monkeypatch.setenv("RECLAIM_MEMORY_AFTER_CONVERSION", "true")
     monkeypatch.setenv("WEASYPRINT_SERVICE_VERSION", "test1")
 
-    from app.weasyprint_controller import app  # requires native libs (pango/gobject)
     from fastapi.testclient import TestClient
 
-    with patch("app.memory_manager.reclaim_memory", wraps=memory_manager.reclaim_memory) as mock_reclaim:
-        with TestClient(app) as test_client:
-            result = test_client.post("/convert/html-with-attachments?base_url=/", data={"html": "<html><body>hello</body></html>"})
-            assert result.status_code == 200
-            mock_reclaim.assert_called_once()
+    from app.weasyprint_controller import app  # requires native libs (pango/gobject)
+
+    with patch("app.memory_manager.reclaim_memory", wraps=memory_manager.reclaim_memory) as mock_reclaim, TestClient(app) as test_client:
+        result = test_client.post("/convert/html-with-attachments?base_url=/", data={"html": "<html><body>hello</body></html>"})
+        assert result.status_code == 200
+        mock_reclaim.assert_called_once()
 
 
 def test_gc_collect_actually_reclaims_cyclic_references(monkeypatch):

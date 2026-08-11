@@ -72,10 +72,11 @@ def get_metrics_port() -> int:
         if not (MIN_VALID_PORT <= port <= MAX_VALID_PORT):
             logger.warning("METRICS_PORT must be between %d and %d, using default: %d", MIN_VALID_PORT, MAX_VALID_PORT, DEFAULT_METRICS_PORT)
             return DEFAULT_METRICS_PORT
-        return port
     except ValueError:
         logger.warning("Invalid METRICS_PORT value '%s', using default: %d", port_str, DEFAULT_METRICS_PORT)
         return DEFAULT_METRICS_PORT
+    else:
+        return port
 
 
 def is_metrics_server_enabled() -> bool:

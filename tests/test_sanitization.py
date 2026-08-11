@@ -1,7 +1,9 @@
 """Tests for the sanitization module."""
 
-import pytest
 from urllib.parse import urlparse
+
+import pytest
+
 from app.sanitization import sanitize_for_logging, sanitize_path_for_logging, sanitize_url_for_logging
 
 

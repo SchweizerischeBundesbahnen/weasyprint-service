@@ -204,4 +204,4 @@ def update_gauges_from_chromium_manager(chromium_manager: ChromiumManager) -> No
         logger.debug("Prometheus gauges updated from ChromiumManager")
 
     except Exception as e:
-        logger.error("Failed to update Prometheus gauges: %s", e, exc_info=True)
+        logger.exception("Failed to update Prometheus gauges: %s", e)

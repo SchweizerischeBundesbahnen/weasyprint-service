@@ -1,23 +1,22 @@
 from __future__ import annotations
 
+import contextlib
 import os
 from io import BytesIO
 from pathlib import Path
-from typing import Iterator, List, Optional
 
-import contextlib
-import pypdf as PyPDF
 import pymupdf
+import pypdf
 from PIL import Image, ImageChops
 
 
 def pdf_bytes_to_png_pages(
     pdf_bytes: bytes,
     *,
-    zoom: Optional[float] = None,
-    matrix: Optional[pymupdf.Matrix] = None,
+    zoom: float | None = None,
+    matrix: pymupdf.Matrix | None = None,
     alpha: bool = False,
-) -> List[bytes]:
+) -> list[bytes]:
     """
     Convert all pages of a PDF (given as bytes) to PNG images (bytes), in order.
 
@@ -31,12 +30,9 @@ def pdf_bytes_to_png_pages(
         List of PNG bytes, one per page, in page order (0..n-1).
     """
     if matrix is None:
-        if zoom is None:
-            matrix = pymupdf.Matrix(1.0, 1.0)
-        else:
-            matrix = pymupdf.Matrix(zoom, zoom)
+        matrix = pymupdf.Matrix(1.0, 1.0) if zoom is None else pymupdf.Matrix(zoom, zoom)
 
-    png_pages: List[bytes] = []
+    png_pages: list[bytes] = []
     # Use context manager to ensure resources are freed
     with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
         for page_number in range(doc.page_count):
@@ -47,7 +43,7 @@ def pdf_bytes_to_png_pages(
 
 
 def assert_png_pages_equal_to_refs(
-    produced_pages: List[bytes],
+    produced_pages: list[bytes],
     ref_base: Path,
     *,
     update_env_var: str = "UPDATE_EXPECTED_REFS",
@@ -98,9 +94,8 @@ def assert_png_pages_equal_to_refs(
             if pdf_bytes is not None:
                 pdf_ref_path = ref_base.with_suffix(".pdf")
                 pdf_ref_path.write_bytes(pdf_bytes)
-            raise ReferenceGenerated(str(missing))
-        else:
-            raise ReferenceMissing(f"Missing reference images: {', '.join(map(str, missing))}. Set {update_env_var}=1 to generate references.")
+            raise ReferenceGeneratedError(str(missing))
+        raise ReferenceMissingError(f"Missing reference images: {', '.join(map(str, missing))}. Set {update_env_var}=1 to generate references.")
 
     # Compare each page
     for i, png in enumerate(produced_pages):
@@ -110,15 +105,15 @@ def assert_png_pages_equal_to_refs(
         assert ImageChops.difference(produced_img, ref_img).getbbox() is None
 
 
-class ReferenceMissing(AssertionError):
+class ReferenceMissingError(AssertionError):
     pass
 
 
-class ReferenceGenerated(RuntimeError):
+class ReferenceGeneratedError(RuntimeError):
     pass
 
 
-def get_pdf_variant_from_metadata(pdf_reader: PyPDF.PdfReader) -> str:
+def get_pdf_variant_from_metadata(pdf_reader: pypdf.PdfReader) -> str:
     if pdf_reader.xmp_metadata and pdf_reader.xmp_metadata.rdf_root:
         for rdf_node in pdf_reader.xmp_metadata.rdf_root.childNodes:
             # Check for PDF/A metadata
@@ -133,44 +128,44 @@ def get_pdf_variant_from_metadata(pdf_reader: PyPDF.PdfReader) -> str:
     return ""
 
 
-def extract_all_attachments(reader: PyPDF.PdfReader):
-    DictObj = PyPDF.generic.DictionaryObject
-    IndObj  = PyPDF.generic.IndirectObject
-    ArrObj  = PyPDF.generic.ArrayObject
+def extract_all_attachments(reader: pypdf.PdfReader):
+    dict_obj = pypdf.generic.DictionaryObject
+    ind_obj = pypdf.generic.IndirectObject
+    arr_obj = pypdf.generic.ArrayObject
 
     def _as_obj(x):
-        return x.get_object() if isinstance(x, IndObj) else x
+        return x.get_object() if isinstance(x, ind_obj) else x
 
     def _yield_filespec(fs_obj, name_hint: str, source: str):
         fs = _as_obj(fs_obj)
-        if not isinstance(fs, DictObj):
+        if not isinstance(fs, dict_obj):
             return
         name = fs.get("/UF") or fs.get("/F") or name_hint or "unnamed"
         yield (str(name), source)
 
     def _walk_name_tree(node, source: str):
         node = _as_obj(node)
-        if not isinstance(node, DictObj):
+        if not isinstance(node, dict_obj):
             return
         names = node.get("/Names")
-        if isinstance(names, ArrObj):
+        if isinstance(names, arr_obj):
             for i in range(0, len(names), 2):
                 name = names[i]
-                fs   = names[i + 1]
+                fs = names[i + 1]
                 yield from _yield_filespec(fs, str(name), source)
         kids = node.get("/Kids")
-        if isinstance(kids, ArrObj):
+        if isinstance(kids, arr_obj):
             for kid in kids:
                 yield from _walk_name_tree(kid, source)
 
     def _iter_af(holder, source: str):
         holder = _as_obj(holder)
-        if not isinstance(holder, DictObj):
+        if not isinstance(holder, dict_obj):
             return
         af = holder.get("/AF")
         if af is None:
             return
-        items = af if isinstance(af, ArrObj) else [af]
+        items = af if isinstance(af, arr_obj) else [af]
         for item in items:
             yield from _yield_filespec(item, None, source)
 
@@ -180,7 +175,7 @@ def extract_all_attachments(reader: PyPDF.PdfReader):
     # 1) NameTree
     with contextlib.suppress(Exception):
         names = catalog.get("/Names")
-        if isinstance(names, DictObj):
+        if isinstance(names, dict_obj):
             embedded = names.get("/EmbeddedFiles")
             if embedded is not None:
                 out.extend(_walk_name_tree(embedded, "NamesTree"))
@@ -192,10 +187,10 @@ def extract_all_attachments(reader: PyPDF.PdfReader):
     for page_idx, page in enumerate(reader.pages):
         p = _as_obj(page)
         annots = p.get("/Annots")
-        if isinstance(annots, ArrObj):
+        if isinstance(annots, arr_obj):
             for ann in annots:
                 a = _as_obj(ann)
-                if isinstance(a, DictObj) and a.get("/Subtype") == "/FileAttachment":
+                if isinstance(a, dict_obj) and a.get("/Subtype") == "/FileAttachment":
                     fs = a.get("/FS")
                     if fs is not None:
                         out.extend(_yield_filespec(fs, None, f"Annot:p{page_idx}"))

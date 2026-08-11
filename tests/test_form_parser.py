@@ -8,8 +8,8 @@ from starlette.datastructures import FormData, UploadFile
 
 from app.form_parser import FormParser
 
-
 # ---------- Unit: ENV and constructor ----------
+
 
 def test_init_defaults_and_env(monkeypatch: pytest.MonkeyPatch):
     # Environment variables should be respected if provided
@@ -52,6 +52,7 @@ def test_init_invalid_env(monkeypatch: pytest.MonkeyPatch):
 
 # ---------- Unit: html_from_form ----------
 
+
 def test_html_from_form_accepts_str():
     # String input should be returned as-is
     form = FormData([("html", "Hello <b>world</b>")])
@@ -61,7 +62,7 @@ def test_html_from_form_accepts_str():
 
 def test_html_from_form_accepts_bytes_utf8():
     # Bytes input should be decoded using UTF-8 by default
-    form = FormData([("html", "Hello".encode("utf-8"))])
+    form = FormData([("html", b"Hello")])
     got = FormParser.html_from_form(form)
     assert got == "Hello"
 
@@ -76,6 +77,7 @@ def test_html_from_form_missing_raises():
 
 # ---------- Unit: collect_files_from_form ----------
 
+
 def _uf(name: str | None, data: bytes = b"x") -> UploadFile:
     # Helper to construct UploadFile with given name and content
     return UploadFile(
@@ -84,15 +86,18 @@ def _uf(name: str | None, data: bytes = b"x") -> UploadFile:
         headers=None,
     )
 
+
 def test_collect_files_dedup_by_basename_and_default_name():
-    form = FormData([
-        ("files", _uf("A.txt", b"1")),
-        ("files", _uf("A.txt", b"2")),
-        ("files", _uf("B.txt", b"3")),
-        ("files", _uf(None, b"4")), # -> attachment.bin
-        ("files", _uf("B.txt", b"5")),
-        ("files", _uf(None, b"6")),  # -> attachment.bin
-    ])
+    form = FormData(
+        [
+            ("files", _uf("A.txt", b"1")),
+            ("files", _uf("A.txt", b"2")),
+            ("files", _uf("B.txt", b"3")),
+            ("files", _uf(None, b"4")),  # -> attachment.bin
+            ("files", _uf("B.txt", b"5")),
+            ("files", _uf(None, b"6")),  # -> attachment.bin
+        ]
+    )
 
     files = FormParser.collect_files_from_form(form)
     names = [f.filename for f in files]
@@ -101,6 +106,7 @@ def test_collect_files_dedup_by_basename_and_default_name():
 
 
 # ---------- Integration: FastAPI + parse() ----------
+
 
 def build_app(parser: FormParser) -> FastAPI:
     app = FastAPI()
@@ -159,7 +165,7 @@ def test_parse_integration_html_bytes():
 
     resp = client.post(
         "/upload",
-        data={"html": "Hello".encode("utf-8")},
+        data={"html": b"Hello"},
         files=[("files", ("x.bin", b"\x00\x01"))],
     )
     assert resp.status_code == 200

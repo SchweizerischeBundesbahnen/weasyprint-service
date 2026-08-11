@@ -62,7 +62,9 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-extend-select = [
+# Explicit rule set. Do not use extend-select: ruff 0.16 widened the implicit
+# default selection, so extending it makes the rule set depend on the ruff version.
+select = [
     # --- Recommended ---
     "E", "W", # pycodestyle errors and warnings
     "F",      # Pyflakes

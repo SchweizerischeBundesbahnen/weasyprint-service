@@ -409,3 +409,16 @@ def test_apply_img_dimensions_from_svg():
     assert "width: 100px" in style
     assert "height:" not in style.lower()
     assert "color: red" in style
+
+
+def test_apply_img_dimensions_survives_a_broken_svg(mocker):
+    """Applying dimensions is best effort: a failure leaves the node untouched."""
+    from bs4 import BeautifulSoup
+
+    processor = SvgProcessor()
+    node = BeautifulSoup('<img src="x.png">', "html.parser").img
+    mocker.patch.object(processor, "extract_svg_dimensions_as_px", side_effect=RuntimeError("no dims"))
+
+    processor._apply_img_dimensions_from_svg(node, det.fromstring("<svg/>"))
+
+    assert "style" not in node.attrs

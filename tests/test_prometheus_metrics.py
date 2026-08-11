@@ -69,3 +69,17 @@ def test_metrics_endpoint_contains_custom_chromium_metrics():
         assert "uptime_seconds" in content
         assert "chromium_memory_bytes" in content
         assert "system_memory_total_bytes" in content
+
+
+def test_update_gauges_survives_a_broken_manager():
+    """A failure while reading the manager must not propagate to the caller."""
+    from unittest.mock import MagicMock
+
+    from app.prometheus_metrics import update_gauges_from_chromium_manager
+
+    broken = MagicMock()
+    broken.get_metrics.side_effect = RuntimeError("no metrics")
+
+    update_gauges_from_chromium_manager(broken)
+
+    broken.get_metrics.assert_called_once()

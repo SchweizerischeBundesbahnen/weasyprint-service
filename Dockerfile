@@ -93,15 +93,15 @@ ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
 # Verify WeasyPrint is installed and working
 RUN weasyprint --version
 
-# Switch to non-root user
-USER appuser
+# Switch to non-root user (numeric uid:gid of appuser, resolvable by any host)
+USER 1000:1000
 
 EXPOSE ${PORT}
 EXPOSE ${METRICS_PORT}
 
 # Add healthcheck
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/health || exit 1
+    CMD ["/bin/sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
 
 ENTRYPOINT ["./entrypoint.sh"]
 

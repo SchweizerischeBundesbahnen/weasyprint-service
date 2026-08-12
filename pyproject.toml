@@ -62,6 +62,11 @@ show-fixes = true
 # Shared standard for all SBB Python repositories.
 # Never use extend-select: it inherits ruff's implicit default, which widened in
 # ruff 0.16 and broke CI everywhere. Keep preview off, preview rules churn.
+#
+# ALL still means "every stable rule in the installed ruff", so a ruff bump can
+# introduce findings. That is the accepted trade: a clean bump automerges, and a
+# dirty one turns the new rules into a change someone reads. What this config
+# removes is the version dependency we did not choose and could not see.
 select = ["ALL"]
 preview = false
 ignore = [
@@ -75,7 +80,8 @@ ignore = [
     # Not our convention
     "D",       # docstrings are optional, we mandate no docstring style
     "CPY001",  # we ship no copyright headers
-    "FIX002",  # a TODO is a normal marker, not a defect
+    "FIX002",  # a TODO is a normal marker, not a defect; TD002 and TD003 still
+               # require it to name an author and link an issue
     "EM101",   # a literal at the raise site reads better than a temp name
     "EM102",   # same for an f-string
     "TRY003",  # we want the full message where the raise happens
@@ -110,6 +116,7 @@ max-args = 10
     "E402",    # a test may import after patching
     "TC",      # a test module is imported once, deferring imports buys nothing
     "S104",    # a host string in test data is not a binding
+    "S314",    # a test parses the XML fixture it wrote itself
     "FBT003",  # mock.patch takes the replacement value positionally
     "C901",    # a fixture is linear setup, splitting it hides the order
     "PLR0912", # same, for its branches

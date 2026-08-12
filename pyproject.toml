@@ -123,7 +123,13 @@ max-args = 10
     "PLR0915", # same, for its statements
 ]
 
-# Repository-specific ignores belong below this line, each with a reason.
+# Repository-specific per-file ignores belong below this line, each with a
+# reason, and each in the "glob" = ["RULE"] form of the table above.
+#
+# A repository-wide ignore does NOT go here. This is still
+# [tool.ruff.lint.per-file-ignores], so a bare ignore = ["RULE"] parses as a
+# glob named "ignore" that matches no file: it is accepted, it silences
+# nothing, and ruff says nothing. Add such a rule to the ignore list above.
 
 "tests/test_logging.py" = [
     "LOG015",  # this module tests the root logger that setup_logging configures

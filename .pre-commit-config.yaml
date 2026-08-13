@@ -10,13 +10,15 @@ repos:
         language: system
         types: [python]
       # Run the linter (inherits config from pyproject.toml)
+      # The tests are linted through per-file-ignores, not excluded — see the
+      # "tests/**" table in pyproject.toml. An exclude here would put them back
+      # out of scope at commit time and make that table dead config locally.
       - id: ruff-check
         name: ruff linter
         entry: uv run ruff check
         language: system
         types: [python]
         args: [--fix]
-        exclude: ^tests/
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:

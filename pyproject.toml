@@ -70,12 +70,16 @@ show-fixes = true
 select = ["ALL"]
 preview = false
 ignore = [
-    # ruff format owns this formatting decision
+    # ruff format owns this formatting decision. COM812 is the only rule ruff
+    # itself reports as conflicting, so it is the only entry here. The Q00x rules
+    # are deliberately absent rather than ignored: Q000, Q002 and Q003 fire
+    # nowhere across the eight repositories, and Q001 fires in one of them but is
+    # auto-fixable and ruff format runs before ruff check in both tox.ini and
+    # pre-commit, so the formatter resolves it. That ordering is load-bearing:
+    # reverse it — the upstream ruff-pre-commit example puts check first — and
+    # these entries have to come back. The quote decision itself is pinned at the
+    # bottom of this file, on both the format and the lint side.
     "COM812",  # trailing comma
-    "Q000",    # inline string quotes
-    "Q001",    # multiline string quotes
-    "Q002",    # docstring quotes
-    "Q003",    # escaped quotes
 
     # Not our convention
     "D",       # docstrings are optional, we mandate no docstring style
@@ -143,8 +147,22 @@ max-args = 10
     "PLC0415", # the service patch is imported only with --patch
 ]
 
+[tool.ruff.lint.flake8-quotes]
+# The lint half of the quote decision. These are what Q000, Q001 and Q002 read,
+# and with the Q rules enabled they decide a lint result, so they are stated
+# rather than inherited. Keep them equal to format.quote-style below: diverge and
+# Q000 fires on the string the formatter just rewrote.
+inline-quotes = "double"
+multiline-quotes = "double"
+docstring-quotes = "double"
+# The fourth option, and the one that decides whether Q003 runs at all: set it to
+# false and the rule stops reporting with nothing red to show for it.
+avoid-escape = true
+
 [tool.ruff.format]
 line-ending = "lf"
+# The format half. Changing this means changing flake8-quotes above in step.
+quote-style = "double"
 
 [tool.mypy]
 explicit_package_bases = true

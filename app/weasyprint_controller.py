@@ -397,7 +397,8 @@ async def convert_html(
         output_pdf = await __process_html_to_pdf(html, render, output, chromium_manager)
         response = await __create_response(output, output_pdf)
         __record_conversion_metrics(chromium_manager, start_time, success=True)
-    except Exception as e:  # noqa: BLE001 - the HTTP boundary must answer, not leak
+    # The HTTP boundary must answer, not leak.
+    except Exception as e:  # noqa: BLE001
         return __handle_conversion_error(e, chromium_manager, start_time)
     else:
         return response
@@ -639,7 +640,8 @@ async def convert_html_with_attachments(
         output_pdf = await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments)
         response = await __create_response(output, output_pdf)
         __record_conversion_metrics(chromium_manager, start_time, success=True)
-    except Exception as e:  # noqa: BLE001 - same, for the attachments endpoint
+    # Same, for the attachments endpoint.
+    except Exception as e:  # noqa: BLE001
         return __handle_conversion_error(e, chromium_manager, start_time)
     else:
         return response

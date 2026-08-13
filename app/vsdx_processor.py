@@ -106,7 +106,8 @@ class VsdxProcessor:
                 self.log.debug("Successfully converted VSDX to PNG")
             except VsdxConversionError as e:
                 self.log.warning("VSDX conversion failed, keeping original: %s", e)
-            except Exception as e:  # noqa: BLE001 - a conversion failure keeps the original attachment
+            # A conversion failure keeps the original attachment.
+            except Exception as e:  # noqa: BLE001
                 self.log.error("Unexpected error converting VSDX: %s", e)
 
         if converted_count > 0:
@@ -211,7 +212,8 @@ class VsdxProcessor:
 
             if not vsdx_content.startswith(b"PK"):
                 msg = f"VSDX missing ZIP header: {vsdx_content[:10]!r}"
-                raise VsdxCorruptedError(msg)  # noqa: TRY301 - the try wraps the decode, not this guard
+                # The try wraps the decode, not this guard.
+                raise VsdxCorruptedError(msg)  # noqa: TRY301
 
             temp_dir = tempfile.mkdtemp()
             temp_path = Path(temp_dir)
@@ -236,10 +238,12 @@ class VsdxProcessor:
         else:
             return png_content
         finally:
-            if temp_dir and Path(temp_dir).exists():  # noqa: ASYNC240 - a local stat costs far less than a thread hop
+            # A local stat costs far less than a thread hop.
+            if temp_dir and Path(temp_dir).exists():  # noqa: ASYNC240
                 try:
                     shutil.rmtree(temp_dir)
-                except Exception as e:  # noqa: BLE001 - temp directory cleanup is best effort
+                # Temp directory cleanup is best effort.
+                except Exception as e:  # noqa: BLE001
                     self.log.warning("Failed to cleanup temp directory %s: %s", temp_dir, e)
 
     # ---------------- Generic helpers ----------------

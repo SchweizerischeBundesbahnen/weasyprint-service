@@ -58,7 +58,8 @@ def sanitize_url_for_logging(url: str | None) -> str:
             safe_url += f":{parsed.port}"
         safe_url += parsed.path or "/"
         return sanitize_for_logging(safe_url, max_length=200)
-    except Exception:  # noqa: BLE001 - sanitization must never fail, fall back to the generic path
+    # Sanitization must never fail, fall back to the generic path.
+    except Exception:  # noqa: BLE001
         # Fallback to generic sanitization if URL parsing fails
         return sanitize_for_logging(url, max_length=200)
 
@@ -113,5 +114,6 @@ def sanitize_path_for_logging(path: str | None, show_basename_only: bool = True)
         except ValueError, OSError:
             # Path is not in temp directory - return sanitized full path
             return sanitize_for_logging(str(path), max_length=200)
-    except Exception:  # noqa: BLE001 - same, for a path
+    # Same, for a path.
+    except Exception:  # noqa: BLE001
         return sanitize_for_logging(str(path), max_length=200)

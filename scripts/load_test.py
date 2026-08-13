@@ -367,7 +367,8 @@ class LoadTester:
         except httpx.TimeoutException:
             duration_ms = (time.time() - start_time) * 1000
             return RequestStats(status_code=0, duration_ms=duration_ms, success=False, error="Timeout")
-        except Exception as e:  # noqa: BLE001 - any failure is recorded as a failed request
+        # Any failure is recorded as a failed request.
+        except Exception as e:  # noqa: BLE001
             duration_ms = (time.time() - start_time) * 1000
             return RequestStats(status_code=0, duration_ms=duration_ms, success=False, error=str(e))
 
@@ -409,7 +410,8 @@ class LoadTester:
                         )
 
                 queue.task_done()
-            except Exception as e:  # noqa: BLE001 - a worker must survive a single bad request
+            # A worker must survive a single bad request.
+            except Exception as e:  # noqa: BLE001
                 print(f"\nWorker error: {e}", file=sys.stderr)
                 queue.task_done()
 
@@ -676,7 +678,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\n\nLoad test interrupted by user", file=sys.stderr)
         sys.exit(1)
-    except Exception as e:  # noqa: BLE001 - the CLI reports and exits non-zero
+    # The CLI reports and exits non-zero.
+    except Exception as e:  # noqa: BLE001
         print(f"\nError: {e}", file=sys.stderr)
         sys.exit(1)
 

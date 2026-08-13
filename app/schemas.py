@@ -4,10 +4,12 @@ from pydantic import BaseModel, Field
 class VersionSchema(BaseModel):
     """Schema for response /version"""
 
-    apiVersion: int = Field(title="API Version", description="API version for compatibility checking with pdf-exporter")  # noqa: N815 - this is the JSON field name pdf-exporter reads
+    # This is the JSON field name pdf-exporter reads.
+    apiVersion: int = Field(title="API Version", description="API version for compatibility checking with pdf-exporter")  # noqa: N815
     python: str = Field(title="Python", description="Python version")
     weasyprint: str = Field(title="WeasyPrint", description="WeasyPrint version")
-    weasyprintService: str | None = Field(title="WeasyPrint Service", description="Service version")  # noqa: N815 - this is the JSON field name pdf-exporter reads
+    # This is the JSON field name pdf-exporter reads.
+    weasyprintService: str | None = Field(title="WeasyPrint Service", description="Service version")  # noqa: N815
     timestamp: str | None = Field(title="Build Timestamp", description="Build timestamp")
     chromium: str | None = Field(title="Chromium", description="Chromium version")
 

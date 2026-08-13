@@ -580,7 +580,8 @@ class ChromiumManager:
                 last_error = TimeoutError(f"Conversion timed out after {self.conversion_timeout} seconds")
                 self.log.error("SVG conversion timed out (attempt %d/%d): %d seconds", attempt + 1, self.max_conversion_retries, self.conversion_timeout)
                 await self._handle_conversion_retry(attempt, last_error, "timeout")
-            except Exception as e:  # noqa: BLE001 - any conversion failure feeds the retry loop
+            # Any conversion failure feeds the retry loop.
+            except Exception as e:  # noqa: BLE001
                 last_error = e
                 self.log.warning(
                     "SVG conversion failed (attempt %d/%d): %s. Attempting to restart Chromium...",
@@ -617,7 +618,8 @@ class ChromiumManager:
         try:
             await self.restart()
             self.log.info("Chromium restarted successfully after %s", error_type)
-        except Exception as restart_error:  # noqa: BLE001 - a failed restart is re-raised as RuntimeError
+        # A failed restart is re-raised as RuntimeError.
+        except Exception as restart_error:  # noqa: BLE001
             self.log.error("Failed to restart Chromium: %s", restart_error)
             raise RuntimeError(f"Chromium restart failed after {error_type}: {restart_error}") from error
 
@@ -828,7 +830,8 @@ class ChromiumManager:
                             await self.restart()
                             consecutive_failures = 0
                             self.log.info("Chromium restarted successfully after health check failure")
-                        except Exception as e:  # noqa: BLE001 - the health monitor keeps running after a failed restart
+                        # The health monitor keeps running after a failed restart.
+                        except Exception as e:  # noqa: BLE001
                             self.log.error("Failed to restart Chromium after health check failure: %s", e)
                             # Continue monitoring even if restart fails
 

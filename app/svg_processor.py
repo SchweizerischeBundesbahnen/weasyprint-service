@@ -18,7 +18,9 @@ import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup, Tag
-from defusedxml import ElementTree as det  # noqa: N813 - defusedxml exposes ElementTree as a module
+
+# Defusedxml exposes ElementTree as a module.
+from defusedxml import ElementTree as det  # noqa: N813
 
 if TYPE_CHECKING:  # used only for type hints
     from xml.etree.ElementTree import Element
@@ -155,7 +157,8 @@ class SvgProcessor:
             if style_parts:
                 node["style"] = "; ".join(style_parts)
 
-        except Exception as e:  # noqa: BLE001 - applying dimensions is best effort
+        # Applying dimensions is best effort.
+        except Exception as e:  # noqa: BLE001
             # Log at debug level to avoid noise but prevent silent pass
             logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
@@ -190,7 +193,8 @@ class SvgProcessor:
 
             possible_svg_content = decoded_content.decode("utf-8")
             return self.svg_from_string(possible_svg_content)
-        except Exception as e:  # noqa: BLE001 - any decode failure means this is not SVG
+        # Any decode failure means this is not SVG.
+        except Exception as e:  # noqa: BLE001
             self.log.error("Failed to decode base64 content: %s", e)
             return None
 
@@ -301,7 +305,8 @@ class SvgProcessor:
                 return None, None
             vb_width = float(parts[2])
             vb_height = float(parts[3])
-        except Exception:  # noqa: BLE001 - any parse failure means the dimensions are unknown
+        # Any parse failure means the dimensions are unknown.
+        except Exception:  # noqa: BLE001
             return None, None
         else:
             return vb_width, vb_height
@@ -353,7 +358,8 @@ class SvgProcessor:
     def convert_to_px(self, value: str | None, unit: str | None) -> int | None:
         try:
             if value is None:
-                raise ValueError  # noqa: TRY301 - the try converts, this guard rejects a missing value
+                # The try converts, this guard rejects a missing value.
+                raise ValueError  # noqa: TRY301
             value_f64 = float(value)
 
             if unit in self.SPECIAL_UNITS:

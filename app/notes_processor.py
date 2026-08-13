@@ -264,7 +264,8 @@ class NotesProcessor:
             # Note: Using private method _add_object() as pypdf 6.1.1 doesn't provide
             # a public API for adding custom XObject streams. This is the standard
             # approach for advanced PDF manipulation with pypdf.
-            return writer._add_object(xobject)  # type: ignore[attr-defined]  # noqa: SLF001 - pypdf exposes no public API for this
+            # Pypdf exposes no public API for this.
+            return writer._add_object(xobject)  # type: ignore[attr-defined]  # noqa: SLF001
 
         except Exception as e:
             logger.exception("Failed to embed PNG icon from %s: %s", png_path, e)
@@ -305,7 +306,8 @@ class NotesProcessor:
         # Add the appearance stream to the PDF
         # Note: Using private method _add_object() as pypdf 6.1.1 doesn't provide
         # a public API for adding custom appearance streams.
-        appearance_ref = writer._add_object(appearance_stream)  # type: ignore[attr-defined]  # noqa: SLF001 - pypdf exposes no public API for this
+        # Pypdf exposes no public API for this.
+        appearance_ref = writer._add_object(appearance_stream)  # type: ignore[attr-defined]  # noqa: SLF001
 
         # Create the appearance dictionary
         appearance_dict = DictionaryObject()

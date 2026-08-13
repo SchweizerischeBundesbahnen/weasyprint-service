@@ -84,7 +84,8 @@ def container_reclaim_disabled(docker_image):
     yield container, f"http://localhost:{host_port}"
     try:
         container.stop()
-    except Exception:  # noqa: BLE001 - teardown is best effort
+    # Teardown is best effort.
+    except Exception:  # noqa: BLE001
         logger.warning("Failed to stop container %s", container.id[:12])
 
 
@@ -107,7 +108,8 @@ def container_reclaim_enabled(docker_image):
     yield container, f"http://localhost:{host_port}"
     try:
         container.stop()
-    except Exception:  # noqa: BLE001 - teardown is best effort
+    # Teardown is best effort.
+    except Exception:  # noqa: BLE001
         logger.warning("Failed to stop container %s", container.id[:12])
 
 

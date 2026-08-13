@@ -3,7 +3,9 @@
 from pathlib import Path
 
 import pytest
-from defusedxml import ElementTree as det  # noqa: N813 - defusedxml exposes ElementTree as a module
+
+# Defusedxml exposes ElementTree as a module.
+from defusedxml import ElementTree as det  # noqa: N813
 
 from app.html_parser import HtmlParser
 from app.svg_processor import SvgProcessor

@@ -95,6 +95,10 @@ ignore = [
     "ANN401",  # Any is correct at JSON and **kwargs boundaries
     "FBT001",  # a boolean query parameter is part of the HTTP API
     "FBT002",  # same, with a default
+
+    # Repository-specific entries belong below this line, each with a reason, so
+    # the next sync of the shared block above can tell the two apart. Without the
+    # line a local entry looks shared and the sync deletes it silently.
 ]
 
 [tool.ruff.lint.mccabe]
@@ -133,7 +137,8 @@ max-args = 10
 # A repository-wide ignore does NOT go here. This is still
 # [tool.ruff.lint.per-file-ignores], so a bare ignore = ["RULE"] parses as a
 # glob named "ignore" that matches no file: it is accepted, it silences
-# nothing, and ruff says nothing. Add such a rule to the ignore list above.
+# nothing, and ruff says nothing. Add such a rule below the marker inside the
+# ignore list above.
 
 "tests/test_logging.py" = [
     "LOG015",  # this module tests the root logger that setup_logging configures

@@ -134,44 +134,43 @@ def test_health_detailed_healthy():
     )
 
     # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager):
-        with TestClient(app) as test_client:
-            result = test_client.get("/health?detailed=true")
+    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
+        result = test_client.get("/health?detailed=true")
 
-            assert result.status_code == 200
-            assert result.headers["content-type"] == "application/json"
+        assert result.status_code == 200
+        assert result.headers["content-type"] == "application/json"
 
-            data = result.json()
-            assert data["status"] == "healthy"
-            assert data["version"] == "test1"
-            assert data["weasyprint_version"] is not None
-            assert data["chromium_running"] is True
-            assert data["chromium_version"] == "131.0.6778.33"
-            assert data["health_monitoring_enabled"] is True
+        data = result.json()
+        assert data["status"] == "healthy"
+        assert data["version"] == "test1"
+        assert data["weasyprint_version"] is not None
+        assert data["chromium_running"] is True
+        assert data["chromium_version"] == "131.0.6778.33"
+        assert data["health_monitoring_enabled"] is True
 
-            metrics = data["metrics"]
-            assert metrics["pdf_generations"] == 42
-            assert metrics["failed_pdf_generations"] == 3
-            assert metrics["total_svg_conversions"] == 100
-            assert metrics["failed_svg_conversions"] == 5
-            assert metrics["error_pdf_generation_rate_percent"] == 7.14
-            assert metrics["error_svg_conversion_rate_percent"] == 5.0
-            assert metrics["total_chromium_restarts"] == 1
-            assert metrics["avg_pdf_generation_time_ms"] == 123.45
-            assert metrics["avg_svg_conversion_time_ms"] == 50.12
-            assert metrics["last_health_check"] == "12:34:56 01.02.2024"
-            assert metrics["last_health_status"] is True
-            assert metrics["uptime_seconds"] == 3600.0
-            assert metrics["current_cpu_percent"] == 5.5
-            assert metrics["avg_cpu_percent"] == 3.2
-            assert metrics["total_memory_mb"] == 16384.0
-            assert metrics["available_memory_mb"] == 8192.0
-            assert metrics["current_chromium_memory_mb"] == 128.5
-            assert metrics["avg_chromium_memory_mb"] == 120.3
-            assert metrics["queue_size"] == 2
-            assert metrics["active_pdf_generations"] == 5
-            assert metrics["avg_queue_time_ms"] == 15.75
-            assert metrics["max_concurrent_pdf_generations"] == 10
+        metrics = data["metrics"]
+        assert metrics["pdf_generations"] == 42
+        assert metrics["failed_pdf_generations"] == 3
+        assert metrics["total_svg_conversions"] == 100
+        assert metrics["failed_svg_conversions"] == 5
+        assert metrics["error_pdf_generation_rate_percent"] == 7.14
+        assert metrics["error_svg_conversion_rate_percent"] == 5.0
+        assert metrics["total_chromium_restarts"] == 1
+        assert metrics["avg_pdf_generation_time_ms"] == 123.45
+        assert metrics["avg_svg_conversion_time_ms"] == 50.12
+        assert metrics["last_health_check"] == "12:34:56 01.02.2024"
+        assert metrics["last_health_status"] is True
+        assert metrics["uptime_seconds"] == 3600.0
+        assert metrics["current_cpu_percent"] == 5.5
+        assert metrics["avg_cpu_percent"] == 3.2
+        assert metrics["total_memory_mb"] == 16384.0
+        assert metrics["available_memory_mb"] == 8192.0
+        assert metrics["current_chromium_memory_mb"] == 128.5
+        assert metrics["avg_chromium_memory_mb"] == 120.3
+        assert metrics["queue_size"] == 2
+        assert metrics["active_pdf_generations"] == 5
+        assert metrics["avg_queue_time_ms"] == 15.75
+        assert metrics["max_concurrent_pdf_generations"] == 10
 
 
 def test_health_detailed_unhealthy():
@@ -216,31 +215,30 @@ def test_health_detailed_unhealthy():
     )
 
     # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager):
-        with TestClient(app) as test_client:
-            result = test_client.get("/health?detailed=true")
+    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
+        result = test_client.get("/health?detailed=true")
 
-            assert result.status_code == 503
-            assert result.headers["content-type"] == "application/json"
+        assert result.status_code == 503
+        assert result.headers["content-type"] == "application/json"
 
-            data = result.json()
-            assert data["status"] == "unhealthy"
-            assert data["version"] == "test1"
-            assert data["weasyprint_version"] is not None
-            assert data["chromium_running"] is False
-            assert data["chromium_version"] is None
-            assert data["health_monitoring_enabled"] is True
+        data = result.json()
+        assert data["status"] == "unhealthy"
+        assert data["version"] == "test1"
+        assert data["weasyprint_version"] is not None
+        assert data["chromium_running"] is False
+        assert data["chromium_version"] is None
+        assert data["health_monitoring_enabled"] is True
 
-            metrics = data["metrics"]
-            assert metrics["pdf_generations"] == 10
-            assert metrics["failed_pdf_generations"] == 5
-            assert metrics["total_svg_conversions"] == 20
-            assert metrics["failed_svg_conversions"] == 10
-            assert metrics["error_pdf_generation_rate_percent"] == 50.0
-            assert metrics["error_svg_conversion_rate_percent"] == 50.0
-            assert metrics["total_chromium_restarts"] == 3
-            assert metrics["last_health_status"] is False
-            assert metrics["last_health_check"] == ""
+        metrics = data["metrics"]
+        assert metrics["pdf_generations"] == 10
+        assert metrics["failed_pdf_generations"] == 5
+        assert metrics["total_svg_conversions"] == 20
+        assert metrics["failed_svg_conversions"] == 10
+        assert metrics["error_pdf_generation_rate_percent"] == 50.0
+        assert metrics["error_svg_conversion_rate_percent"] == 50.0
+        assert metrics["total_chromium_restarts"] == 3
+        assert metrics["last_health_status"] is False
+        assert metrics["last_health_check"] == ""
 
 
 def test_health_detailed_false():
@@ -256,13 +254,12 @@ def test_health_detailed_false():
     mock_manager.health_check = MagicMock(return_value=True)
 
     # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager):
-        with TestClient(app) as test_client:
-            result = test_client.get("/health?detailed=false")
+    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
+        result = test_client.get("/health?detailed=false")
 
-            assert result.status_code == 200
-            assert result.headers["content-type"] == "text/plain; charset=utf-8"
-            assert result.text == "OK"
+        assert result.status_code == 200
+        assert result.headers["content-type"] == "text/plain; charset=utf-8"
+        assert result.text == "OK"
 
 
 def test_health_default_no_parameter():
@@ -278,13 +275,12 @@ def test_health_default_no_parameter():
     mock_manager.health_check = MagicMock(return_value=True)
 
     # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager):
-        with TestClient(app) as test_client:
-            result = test_client.get("/health")
+    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
+        result = test_client.get("/health")
 
-            assert result.status_code == 200
-            assert result.headers["content-type"] == "text/plain; charset=utf-8"
-            assert result.text == "OK"
+        assert result.status_code == 200
+        assert result.headers["content-type"] == "text/plain; charset=utf-8"
+        assert result.text == "OK"
 
 
 def test_health_detailed_with_health_monitoring_disabled():
@@ -329,18 +325,17 @@ def test_health_detailed_with_health_monitoring_disabled():
     )
 
     # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager):
-        with TestClient(app) as test_client:
-            result = test_client.get("/health?detailed=true")
+    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
+        result = test_client.get("/health?detailed=true")
 
-            assert result.status_code == 200
-            assert result.headers["content-type"] == "application/json"
+        assert result.status_code == 200
+        assert result.headers["content-type"] == "application/json"
 
-            data = result.json()
-            assert data["status"] == "healthy"
-            assert data["version"] == "test1"
-            assert data["weasyprint_version"] is not None
-            assert data["health_monitoring_enabled"] is False
-            assert data["metrics"]["last_health_check"] == ""
-            assert data["metrics"]["pdf_generations"] == 5
-            assert data["metrics"]["total_svg_conversions"] == 15
+        data = result.json()
+        assert data["status"] == "healthy"
+        assert data["version"] == "test1"
+        assert data["weasyprint_version"] is not None
+        assert data["health_monitoring_enabled"] is False
+        assert data["metrics"]["last_health_check"] == ""
+        assert data["metrics"]["pdf_generations"] == 5
+        assert data["metrics"]["total_svg_conversions"] == 15

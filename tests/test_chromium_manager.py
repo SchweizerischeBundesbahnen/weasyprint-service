@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-import time
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
@@ -617,7 +616,7 @@ async def test_chromium_manager_auto_recovery_on_failure():
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise Exception("Simulated Chromium crash")
+                raise RuntimeError("Simulated Chromium crash")
             return await original_perform(*args, **kwargs)
 
         manager._perform_conversion = mock_perform_conversion
@@ -642,7 +641,7 @@ async def test_chromium_manager_auto_recovery_fails_after_retries():
 
         # Mock _perform_conversion to always fail
         async def mock_perform_conversion(*args, **kwargs):
-            raise Exception("Persistent Chromium failure")
+            raise RuntimeError("Persistent Chromium failure")
 
         manager._perform_conversion = mock_perform_conversion
 
@@ -665,7 +664,7 @@ async def test_chromium_manager_auto_recovery_restart_failure():
 
         # Mock _perform_conversion to fail
         async def mock_perform_conversion(*args, **kwargs):
-            raise Exception("Simulated Chromium crash")
+            raise RuntimeError("Simulated Chromium crash")
 
         manager._perform_conversion = mock_perform_conversion
 
@@ -673,7 +672,7 @@ async def test_chromium_manager_auto_recovery_restart_failure():
         original_restart = manager.restart
 
         async def mock_restart():
-            raise Exception("Restart failed")
+            raise RuntimeError("Restart failed")
 
         manager.restart = mock_restart
 
@@ -993,7 +992,7 @@ async def test_chromium_manager_browser_crash_simulation():
             crash_count += 1
             if crash_count == 1:
                 # Simulate browser crash
-                raise Exception("Browser process crashed")
+                raise RuntimeError("Browser process crashed")
             # Subsequent calls succeed with original method
             return await original_perform(*args, **kwargs)
 
@@ -1228,7 +1227,7 @@ async def test_chromium_manager_metrics_after_failure():
 
         # Mock _perform_conversion to always fail
         async def mock_perform_conversion(*args, **kwargs):
-            raise Exception("Simulated failure")
+            raise RuntimeError("Simulated failure")
 
         manager._perform_conversion = mock_perform_conversion
 
@@ -1489,7 +1488,7 @@ async def test_chromium_manager_error_rate_calculation():
         original_perform = manager._perform_conversion
 
         async def mock_perform_failure(*args, **kwargs):
-            raise Exception("Simulated failure")
+            raise RuntimeError("Simulated failure")
 
         manager._perform_conversion = mock_perform_failure
 
@@ -1536,7 +1535,7 @@ async def test_chromium_manager_consecutive_failures_reset():
             nonlocal fail_next
             if fail_next:
                 fail_next = False
-                raise Exception("Simulated failure")
+                raise RuntimeError("Simulated failure")
             return await original_perform(*args, **kwargs)
 
         manager._perform_conversion = mock_perform_sometimes_fail

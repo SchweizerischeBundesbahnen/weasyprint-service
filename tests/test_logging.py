@@ -46,7 +46,7 @@ def wait_for_log_file(log_dir: Path, timeout: float = 1.0) -> Path:
             log_file = next(log_dir.glob("weasyprint-service_*.log"))
             if log_file.stat().st_size > 0:
                 return log_file
-        except (StopIteration, FileNotFoundError):
+        except StopIteration, FileNotFoundError:
             pass
         time.sleep(0.1)
     raise TimeoutError("Log file not found or empty within timeout")

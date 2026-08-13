@@ -147,7 +147,7 @@ def test_process_pdf_with_notes(save_test_outputs: bool):
 
     # Load the test PDF
     test_pdf_path = Path(__file__).parent / "test-data" / "notes_link_to_replace.pdf"
-    with open(test_pdf_path, "rb") as f:
+    with Path(test_pdf_path).open("rb") as f:
         pdf_bytes = f.read()
 
     # Process the PDF with notes
@@ -160,7 +160,7 @@ def test_process_pdf_with_notes(save_test_outputs: bool):
     # Save the updated PDF for manual inspection (only if --save-test-outputs flag is used)
     if save_test_outputs:
         output_path = test_pdf_path.parent / "notes_link_to_replace_output.pdf"
-        with open(output_path, "wb") as f:
+        with Path(output_path).open("wb") as f:
             f.write(updated_pdf)
 
 
@@ -283,14 +283,15 @@ def test_process_pdf_with_notes_error_handling():
 
 def test_extract_note_from_annotation_edge_cases():
     """Test _extract_note_from_annotation with various edge cases."""
-    from pypdf import PdfReader
     from io import BytesIO
+
+    from pypdf import PdfReader
 
     processor = NotesProcessor()
 
     # Create a minimal PDF with no annotations
     test_pdf_path = Path(__file__).parent / "test-data" / "notes_link_to_replace.pdf"
-    with open(test_pdf_path, "rb") as f:
+    with Path(test_pdf_path).open("rb") as f:
         pdf_bytes = f.read()
 
     reader = PdfReader(BytesIO(pdf_bytes))

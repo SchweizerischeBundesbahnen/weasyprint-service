@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from bs4 import BeautifulSoup
@@ -82,7 +82,7 @@ class TestFormParserLogging:
     def test_parser_initialization_logs_limits(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that FormParser initialization logs configuration."""
         with caplog.at_level(logging.DEBUG):
-            parser = FormParser(max_files=100, max_fields=200, max_part_size=5000000)
+            FormParser(max_files=100, max_fields=200, max_part_size=5000000)
 
         debug_logs = [record for record in caplog.records if record.levelname == "DEBUG"]
         assert any("FormParser initialized" in record.message for record in debug_logs)
@@ -94,9 +94,8 @@ class TestFormParserLogging:
 
         form = FormData()  # Empty form without 'html' field
 
-        with caplog.at_level(logging.ERROR):
-            with pytest.raises(AssertionError):
-                FormParser.html_from_form(form)
+        with caplog.at_level(logging.ERROR), pytest.raises(AssertionError):
+            FormParser.html_from_form(form)
 
         error_logs = [record for record in caplog.records if record.levelname == "ERROR"]
         assert any('Required form field "html" is missing' in record.message for record in error_logs)
@@ -111,7 +110,7 @@ class TestHtmlParserLogging:
         html = "<!DOCTYPE html><html><head><title>Test</title></head><body><p>Content</p></body></html>"
 
         with caplog.at_level(logging.DEBUG):
-            result = parser.parse(html)
+            parser.parse(html)
 
         debug_logs = [record for record in caplog.records if record.levelname == "DEBUG"]
         assert any("Document type: full document" in record.message for record in debug_logs)
@@ -122,7 +121,7 @@ class TestHtmlParserLogging:
         html = "<div>Fragment content</div>"
 
         with caplog.at_level(logging.DEBUG):
-            result = parser.parse(html)
+            parser.parse(html)
 
         debug_logs = [record for record in caplog.records if record.levelname == "DEBUG"]
         assert any("Document type: fragment" in record.message for record in debug_logs)
@@ -134,7 +133,7 @@ class TestHtmlParserLogging:
         html = xml_decl + "<html><body>Content</body></html>"
 
         with caplog.at_level(logging.DEBUG):
-            result = parser.parse(html)
+            parser.parse(html)
 
         debug_logs = [record for record in caplog.records if record.levelname == "DEBUG"]
         xml_logs = [log for log in debug_logs if "XML declaration" in log.message]
@@ -151,7 +150,7 @@ class TestHtmlParserLogging:
         parsed = parser.parse(html)
 
         with caplog.at_level(logging.INFO):
-            result = parser.serialize(parsed)
+            parser.serialize(parsed)
 
         info_logs = [record for record in caplog.records if record.levelname == "INFO"]
         assert any("Serialized" in record.message and "size:" in record.message for record in info_logs)
@@ -168,7 +167,6 @@ class TestLoggingSanitization:
         test_path = tmp_path / safe_name
         test_path.write_text("test")
 
-        name_to_path = {safe_name: test_path}
         soup = BeautifulSoup(f'<html><body><a rel="attachment" href="{safe_name}">Link</a></body></html>', "html.parser")
 
         with caplog.at_level(logging.WARNING):

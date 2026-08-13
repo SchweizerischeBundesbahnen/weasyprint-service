@@ -1,7 +1,10 @@
 """Tests for the sanitization module."""
 
-import pytest
 from urllib.parse import urlparse
+
+import pytest
+from pytest_mock import MockerFixture
+
 from app.sanitization import sanitize_for_logging, sanitize_path_for_logging, sanitize_url_for_logging
 
 
@@ -221,3 +224,21 @@ class TestSanitizePathForLogging:
         assert result is not None
         assert "\x00" not in result
         assert "\x01" not in result
+
+
+class TestSanitizationNeverRaises:
+    """The sanitizers guard logging, so they must return a string whatever happens."""
+
+    def test_url_falls_back_when_parsing_raises(self, mocker: MockerFixture) -> None:
+        """A urlparse failure returns the generically sanitized input."""
+        mocker.patch("app.sanitization.urlparse", side_effect=ValueError("broken"))
+        result = sanitize_url_for_logging("https://example.com/report?token=secret")
+        assert isinstance(result, str)
+        assert result
+
+    def test_path_falls_back_when_path_raises(self, mocker: MockerFixture) -> None:
+        """A Path failure returns the generically sanitized input."""
+        mocker.patch("app.sanitization.Path", side_effect=RuntimeError("broken"))
+        result = sanitize_path_for_logging("/tmp/weasyprint/report.pdf")
+        assert isinstance(result, str)
+        assert result

@@ -1,3 +1,4 @@
+import contextlib
 import io
 import logging
 import time
@@ -6,13 +7,15 @@ from pathlib import Path
 from typing import NamedTuple
 
 import docker
-import pypdf as PyPDF
+import pypdf
 import pytest
 import requests
 from docker.models.containers import Container
 from PIL import Image, ImageChops
 
 from tests import utils_pdf
+
+logger = logging.getLogger(__name__)
 
 
 class TestParameters(NamedTuple):
@@ -72,10 +75,9 @@ def weasyprint_container():
 
     yield container
 
-    try:
+    # Teardown is best effort: auto_remove may already have taken the container.
+    with contextlib.suppress(Exception):
         container.stop()
-    except Exception:
-        pass  # container may already be stopped/removed due to auto_remove=True
 
 
 @pytest.fixture(scope="module")
@@ -142,7 +144,7 @@ def test_convert_simple_html(test_parameters: TestParameters) -> None:
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=simple_html, print_error=True)
     assert response.status_code == 200
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
     total_pages = len(pdf_reader.pages)
     assert total_pages == 1
     first_page = pdf_reader.pages[0].extract_text()
@@ -156,7 +158,7 @@ def test_convert_complex_html(test_parameters: TestParameters) -> None:
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
     total_pages = len(pdf_reader.pages)
     assert total_pages == 4
     page = pdf_reader.pages[1].extract_text()
@@ -174,9 +176,9 @@ def test_convert_html_with_svg_and_png_in_tables(test_parameters: TestParameters
     ref_base = Path("tests/test-data/expected/html-with-svg-and-png-in-tables.png")
     try:
         utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
-    except utils_pdf.ReferenceGenerated:
+    except utils_pdf.ReferenceGeneratedError:
         pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
-    except utils_pdf.ReferenceMissing as e:
+    except utils_pdf.ReferenceMissingError as e:
         pytest.skip(str(e))
 
 
@@ -185,7 +187,7 @@ def test_convert_complex_html_without_embedded_attachments(test_parameters: Test
     response = __call_convert_html_with_attachments(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
     total_pages = len(pdf_reader.pages)
     assert total_pages == 4
     page = pdf_reader.pages[1].extract_text()
@@ -218,7 +220,7 @@ def test_convert_complex_html_with_embedded_attachments(test_parameters: TestPar
     assert response.status_code == 200
 
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
 
     # Basic PDF validation
     assert len(pdf_reader.pages) == 4
@@ -262,7 +264,7 @@ def test_convert_html_with_embedded_attachments(test_parameters: TestParameters)
     assert response.status_code == 200
 
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
 
     # Basic PDF validation
     assert len(pdf_reader.pages) == 1
@@ -294,9 +296,9 @@ def test_convert_svg(test_parameters: TestParameters) -> None:
     ref_base = Path("tests/test-data/expected/svg-image-ref.png")
     try:
         utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
-    except utils_pdf.ReferenceGenerated:
+    except utils_pdf.ReferenceGeneratedError:
         pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
-    except utils_pdf.ReferenceMissing as e:
+    except utils_pdf.ReferenceMissingError as e:
         pytest.skip(str(e))
 
 
@@ -311,9 +313,9 @@ def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
     ref_base = Path("tests/test-data/expected/svg-image-as-base64-ref.png")
     try:
         utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
-    except utils_pdf.ReferenceGenerated:
+    except utils_pdf.ReferenceGeneratedError:
         pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
-    except utils_pdf.ReferenceMissing as e:
+    except utils_pdf.ReferenceMissingError as e:
         pytest.skip(str(e))
 
 
@@ -328,9 +330,9 @@ def test_convert_svg_without_xmlns(test_parameters: TestParameters) -> None:
     ref_base = Path("tests/test-data/expected/svg-image-ref.png")
     try:
         utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
-    except utils_pdf.ReferenceGenerated:
+    except utils_pdf.ReferenceGeneratedError:
         pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
-    except utils_pdf.ReferenceMissing as e:
+    except utils_pdf.ReferenceMissingError as e:
         pytest.skip(str(e))
 
 
@@ -362,7 +364,7 @@ def test_convert_svg_with_scale_factor(scale: float, test_parameters: TestParame
 
     # Determine reference path
     # Use a stable string format for floating point values in filenames
-    scale_str = ("%g" % scale).rstrip("0").rstrip(".") if "." in f"{scale}" else f"{scale}"
+    scale_str = (f"{scale:g}").rstrip("0").rstrip(".") if "." in f"{scale}" else f"{scale}"
     # Ensure we keep at least one decimal for integer-like floats (e.g., 1.0 -> 1.0)
     if scale.is_integer():
         scale_str = f"{int(scale)}.0"
@@ -437,7 +439,7 @@ def test_supported_pdf_variants(variant: str, is_supported: bool, test_parameter
     if is_supported:
         assert response.status_code == 200
         stream = io.BytesIO(response.content)
-        pdf_reader = PyPDF.PdfReader(stream)
+        pdf_reader = pypdf.PdfReader(stream)
         total_pages = len(pdf_reader.pages)
         assert total_pages == 1
         first_page = pdf_reader.pages[0].extract_text()
@@ -462,7 +464,7 @@ def test_convert_html_with_custom_metadata(test_parameters: TestParameters) -> N
     assert response.status_code == 200
 
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
 
     # Basic PDF validation
     assert len(pdf_reader.pages) == 1
@@ -498,9 +500,9 @@ def test_convert_html_with_unicode_symbols(test_parameters: TestParameters) -> N
     ref_base = Path("tests/test-data/expected/html-with-unicode-symbols-ref.png")
     try:
         utils_pdf.assert_png_pages_equal_to_refs(pages_png, ref_base, pdf_bytes=response.content)
-    except utils_pdf.ReferenceGenerated:
+    except utils_pdf.ReferenceGeneratedError:
         pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
-    except utils_pdf.ReferenceMissing as e:
+    except utils_pdf.ReferenceMissingError as e:
         pytest.skip(str(e))
 
 
@@ -522,7 +524,7 @@ def test_convert_html_with_bad_font_succeeds_without_full_fonts(test_parameters:
     assert response.status_code == 200, f"Expected 200 for bad font without full_fonts (fontTools >= 4.63.0), got {response.status_code}"
 
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
     assert len(pdf_reader.pages) == 1
     first_page = pdf_reader.pages[0].extract_text()
     assert "Hello World" in first_page
@@ -545,7 +547,7 @@ def test_convert_html_with_bad_font_succeeds_with_full_fonts(test_parameters: Te
     assert response.status_code == 200, f"Expected 200 with full_fonts=true, got {response.status_code}"
 
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
     assert len(pdf_reader.pages) == 1
     first_page = pdf_reader.pages[0].extract_text()
     assert "Hello World" in first_page
@@ -564,7 +566,7 @@ def test_convert_html_with_good_font_succeeds_with_subsetting(test_parameters: T
     assert response.status_code == 200
 
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
     assert len(pdf_reader.pages) == 1
     first_page = pdf_reader.pages[0].extract_text()
     assert "Hello World" in first_page
@@ -583,7 +585,7 @@ def test_convert_html_with_good_font_succeeds_with_full_fonts(test_parameters: T
     assert response.status_code == 200
 
     stream = io.BytesIO(response.content)
-    pdf_reader = PyPDF.PdfReader(stream)
+    pdf_reader = pypdf.PdfReader(stream)
     assert len(pdf_reader.pages) == 1
     first_page = pdf_reader.pages[0].extract_text()
     assert "Hello World" in first_page
@@ -591,8 +593,7 @@ def test_convert_html_with_good_font_succeeds_with_full_fonts(test_parameters: T
 
 def __load_test_html(file_path: str) -> str:
     with Path(file_path).open(encoding="utf-8") as html_file:
-        html = html_file.read()
-        return html
+        return html_file.read()
 
 
 def __call_convert_html_with_attachments(base_url: str, request_session: requests.Session, data, print_error, parameters=None, files: list[tuple[str, tuple[str, bytes, str | None]]] | None = None) -> requests.Response:
@@ -602,12 +603,13 @@ def __call_convert_html_with_attachments(base_url: str, request_session: request
     try:
         response = request_session.request(method="POST", url=url, headers=headers, data=payload, files=files, verify=True, params=parameters)
         if response.status_code // 100 != 2 and print_error:
-            logging.error(f"Error: Unexpected response: '{response}'")
-            logging.error(f"Error: Response content: '{response.content}'")
-        return response
+            logger.error(f"Error: Unexpected response: '{response}'")
+            logger.error(f"Error: Response content: '{response.content}'")
     except requests.exceptions.RequestException as e:
-        logging.exception(f"Error: {e}")
+        logger.exception(f"Error: {e}")
         raise
+    else:
+        return response
 
 
 def __call_convert_html(base_url: str, request_session: requests.Session, data, print_error, parameters=None) -> requests.Response:
@@ -616,9 +618,10 @@ def __call_convert_html(base_url: str, request_session: requests.Session, data, 
     try:
         response = request_session.request(method="POST", url=url, headers=headers, data=data, verify=True, params=parameters)
         if response.status_code // 100 != 2 and print_error:
-            logging.error(f"Error: Unexpected response: '{response}'")
-            logging.error(f"Error: Response content: '{response.content}'")
-        return response
+            logger.error(f"Error: Unexpected response: '{response}'")
+            logger.error(f"Error: Response content: '{response.content}'")
     except requests.exceptions.RequestException as e:
-        logging.exception(f"Error: {e}")
+        logger.exception(f"Error: {e}")
         raise
+    else:
+        return response

@@ -2,30 +2,21 @@ import asyncio
 import io
 from pathlib import Path
 
+import weasyprint  # type: ignore[import-untyped]
 from fastapi import UploadFile
-import weasyprint  # type: ignore
 
 from app.attachment_manager import AttachmentManager
 from app.html_parser import HtmlParser
 
 
 def test_extracts_basenames_and_decodes():
-    html = (
-        '<a rel="attachment" href="/files/report%20final.pdf">Report</a>'
-        "<link REL='attachment' href='images/photo.png'>"
-        '<a href="nope.txt">ignore</a>'
-        '<a rel="attachment">missing</a>'
-    )
+    html = '<a rel="attachment" href="/files/report%20final.pdf">Report</a><link REL=\'attachment\' href=\'images/photo.png\'><a href="nope.txt">ignore</a><a rel="attachment">missing</a>'
     names = AttachmentManager().find_referenced_attachment_names(HtmlParser().parse(html))
     assert names == {"report final.pdf", "photo.png"}
 
 
 def test_ignores_non_attachment_and_other_tags():
-    html = (
-        '<a rel="stylesheet" href="/x.css">X</a>'
-        "<link rel='preload' href='a.bin'>"
-        '<p rel="attachment" href="weird">text</p>'
-    )
+    html = '<a rel="stylesheet" href="/x.css">X</a><link rel=\'preload\' href=\'a.bin\'><p rel="attachment" href="weird">text</p>'
     assert AttachmentManager().find_referenced_attachment_names(HtmlParser().parse(html)) == set()
 
 
@@ -35,12 +26,7 @@ def test_rewrites_only_attachment_links_matching_name(tmp_path: Path):
     a.write_bytes(b"PDF")
     b.write_text("hello")
 
-    html = (
-        f"<a rel=\"attachment\" href=\"{a.name}\">A</a>"
-        f"<a REL='attachment' href='sub/dir/{b.name}'>B</a>"
-        f"<a rel=\"attachment\" href=\"missing.bin\">M</a>"
-        f"<a rel=\"stylesheet\" href=\"{a.name}\">CSS</a>"
-    )
+    html = f'<a rel="attachment" href="{a.name}">A</a><a REL=\'attachment\' href=\'sub/dir/{b.name}\'>B</a><a rel="attachment" href="missing.bin">M</a><a rel="stylesheet" href="{a.name}">CSS</a>'
     html_parser = HtmlParser()
     parsed_html = AttachmentManager().rewrite_attachment_links_to_file_uri(html_parser.parse(html), {a.name: a, b.name: b})
     out = html_parser.serialize(parsed_html)
@@ -115,7 +101,7 @@ def test_builds_for_unreferenced_and_avoids_duplicates(tmp_path: Path):
     # In WeasyPrint 68.0, source context manager returns tuple (file_obj, url, None, None)
     with atts[0].source as (file_obj, url, _, _):
         assert isinstance(file_obj, io.BufferedReader)
-        assert url.startswith('file://')
+        assert url.startswith("file://")
 
 
 def test_all_referenced_results_empty(tmp_path: Path):

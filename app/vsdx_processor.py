@@ -106,7 +106,7 @@ class VsdxProcessor:
                 self.log.debug("Successfully converted VSDX to PNG")
             except VsdxConversionError as e:
                 self.log.warning("VSDX conversion failed, keeping original: %s", e)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - a conversion failure keeps the original attachment
                 self.log.error("Unexpected error converting VSDX: %s", e)
 
         if converted_count > 0:
@@ -119,7 +119,7 @@ class VsdxProcessor:
         """Check if LibreOffice is available. Returns True if available."""
         try:
             result = subprocess.run(
-                ["libreoffice", "--version"],  # noqa: S603, S607
+                ["libreoffice", "--version"],  # noqa: S607
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -128,11 +128,11 @@ class VsdxProcessor:
             if result.returncode == 0:
                 self.log.info("LibreOffice available: %s", result.stdout.strip())
                 return True
-            else:
-                self.log.warning("LibreOffice not available, VSDX conversion will be disabled")
-                return False
+            self.log.warning("LibreOffice not available, VSDX conversion will be disabled")
         except (subprocess.TimeoutExpired, FileNotFoundError) as e:
             self.log.warning("LibreOffice not found: %s, VSDX conversion will be disabled", e)
+            return False
+        else:
             return False
 
     def _parse_data_url_base64(self, src: str | None) -> tuple[str, str] | None:
@@ -169,7 +169,7 @@ class VsdxProcessor:
 
         self.log.debug("Running LibreOffice conversion: %s", " ".join(cmd))
 
-        process = await asyncio.create_subprocess_exec(  # noqa: S603
+        process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -211,7 +211,7 @@ class VsdxProcessor:
 
             if not vsdx_content.startswith(b"PK"):
                 msg = f"VSDX missing ZIP header: {vsdx_content[:10]!r}"
-                raise VsdxCorruptedError(msg)
+                raise VsdxCorruptedError(msg)  # noqa: TRY301 - the try wraps the decode, not this guard
 
             temp_dir = tempfile.mkdtemp()
             temp_path = Path(temp_dir)
@@ -224,7 +224,6 @@ class VsdxProcessor:
             png_file = self._find_png_output(temp_path)
             png_content = png_file.read_bytes()
             self.log.debug("Successfully converted VSDX to PNG (%d bytes)", len(png_content))
-            return png_content
 
         except binascii.Error as e:
             msg = f"Invalid base64 data: {e}"
@@ -234,11 +233,13 @@ class VsdxProcessor:
         except Exception as e:
             msg = f"Unexpected error in VSDX conversion: {e}"
             raise VsdxConversionError(msg) from e
+        else:
+            return png_content
         finally:
-            if temp_dir and Path(temp_dir).exists():
+            if temp_dir and Path(temp_dir).exists():  # noqa: ASYNC240 - a local stat costs far less than a thread hop
                 try:
                     shutil.rmtree(temp_dir)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - temp directory cleanup is best effort
                     self.log.warning("Failed to cleanup temp directory %s: %s", temp_dir, e)
 
     # ---------------- Generic helpers ----------------

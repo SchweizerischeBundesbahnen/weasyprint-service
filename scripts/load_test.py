@@ -39,7 +39,8 @@ import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
@@ -96,7 +97,7 @@ class LoadTestResults:
 class LoadTester:
     """Async load tester for WeasyPrint service."""
 
-    def __init__(self, base_url: str, scenario: str, concurrency: int, timeout: float, pages: int, svgs_per_page: int, verbose: bool = False):
+    def __init__(self, base_url: str, scenario: str, concurrency: int, timeout: float, pages: int, svgs_per_page: int, verbose: bool = False) -> None:
         """
         Initialize load tester.
 
@@ -129,12 +130,11 @@ class LoadTester:
         """
         if self.scenario == "simple":
             return self._generate_simple_html()
-        elif self.scenario == "complex":
+        if self.scenario == "complex":
             return self._generate_complex_html()
-        elif self.scenario == "svg":
+        if self.scenario == "svg":
             return self._generate_svg_html()
-        else:
-            raise ValueError(f"Unknown scenario: {self.scenario}")
+        raise ValueError(f"Unknown scenario: {self.scenario}")
 
     def _generate_svg_element(self, index: int, color: str) -> str:
         """Generate a single SVG element with varied content."""
@@ -233,7 +233,7 @@ class LoadTester:
 
                 <div class="stats">
                     <strong>Document Statistics:</strong> Page {page_num + 1} of {self.pages} |
-                    SVG Elements: {self.svgs_per_page} | Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+                    SVG Elements: {self.svgs_per_page} | Generated: {datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S")}
                 </div>
 
                 <h2>Data Table Section</h2>
@@ -361,13 +361,13 @@ class LoadTester:
                 timeout=self.timeout,
             )
             duration_ms = (time.time() - start_time) * 1000
-            success = 200 <= response.status_code < 300
+            success = HTTPStatus.OK <= response.status_code < HTTPStatus.MULTIPLE_CHOICES
 
             return RequestStats(status_code=response.status_code, duration_ms=duration_ms, success=success, error=None if success else f"HTTP {response.status_code}")
         except httpx.TimeoutException:
             duration_ms = (time.time() - start_time) * 1000
             return RequestStats(status_code=0, duration_ms=duration_ms, success=False, error="Timeout")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - any failure is recorded as a failed request
             duration_ms = (time.time() - start_time) * 1000
             return RequestStats(status_code=0, duration_ms=duration_ms, success=False, error=str(e))
 
@@ -409,7 +409,7 @@ class LoadTester:
                         )
 
                 queue.task_done()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - a worker must survive a single bad request
                 print(f"\nWorker error: {e}", file=sys.stderr)
                 queue.task_done()
 
@@ -552,7 +552,7 @@ def print_results_console(results: LoadTestResults) -> None:
 def save_results_json(results: LoadTestResults, output_file: Path) -> None:
     """Save results to JSON file."""
     output_data = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(tz=UTC).isoformat(),
         "results": results.to_dict(),
     }
 
@@ -571,7 +571,7 @@ def save_results_csv(results: LoadTestResults, output_file: Path) -> None:
 
         # Write summary
         writer.writerow(["Metric", "Value"])
-        writer.writerow(["Timestamp", datetime.now().isoformat()])
+        writer.writerow(["Timestamp", datetime.now(tz=UTC).isoformat()])
         writer.writerow(["Total Requests", results.total_requests])
         writer.writerow(["Successful Requests", results.successful_requests])
         writer.writerow(["Failed Requests", results.failed_requests])
@@ -676,7 +676,7 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\n\nLoad test interrupted by user", file=sys.stderr)
         sys.exit(1)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - the CLI reports and exits non-zero
         print(f"\nError: {e}", file=sys.stderr)
         sys.exit(1)
 

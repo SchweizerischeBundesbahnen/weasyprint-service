@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import unquote
 
-import weasyprint  # type: ignore
+import weasyprint  # type: ignore[import-untyped]
 from bs4 import BeautifulSoup, Tag
 
 from app.sanitization import sanitize_for_logging

@@ -29,8 +29,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import pydyf  # type: ignore
-from weasyprint.pdf import stream as weasyprint_stream  # type: ignore
+import pydyf  # type: ignore[import-untyped]
+from weasyprint.pdf import stream as weasyprint_stream  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 

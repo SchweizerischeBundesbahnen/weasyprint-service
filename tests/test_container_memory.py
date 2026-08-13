@@ -8,6 +8,8 @@ import pytest
 import requests
 from docker.models.containers import Container
 
+logger = logging.getLogger(__name__)
+
 IMAGE_TAG = "weasyprint_service_memory_test"
 HEAVY_HTML_PATH = Path("tests/test-data/html-with-svg-and-png-in-tables.html")
 
@@ -35,7 +37,7 @@ def _wait_for_healthy(container: Container, max_wait: int = 120) -> None:
 def _convert_html(base_url: str, html: str) -> float:
     """Send a single HTML-to-PDF conversion request. Returns elapsed time in ms."""
     start = time.time()
-    response = requests.post(f"{base_url}/convert/html", headers={"Content-Type": "text/html"}, data=html.encode("utf-8"))
+    response = requests.post(f"{base_url}/convert/html", headers={"Content-Type": "text/html"}, data=html.encode("utf-8"), timeout=120)
     elapsed_ms = (time.time() - start) * 1000
     assert response.status_code == 200, f"Conversion failed: {response.status_code}: {response.text[:500]}"
     return elapsed_ms
@@ -50,6 +52,7 @@ def docker_image():
         capture_output=True,
         text=True,
         timeout=600,
+        check=False,
     )
     if result.returncode != 0:
         pytest.fail(f"Docker build failed:\n{result.stderr}")
@@ -81,8 +84,8 @@ def container_reclaim_disabled(docker_image):
     yield container, f"http://localhost:{host_port}"
     try:
         container.stop()
-    except Exception:
-        logging.warning("Failed to stop container %s", container.id[:12])
+    except Exception:  # noqa: BLE001 - teardown is best effort
+        logger.warning("Failed to stop container %s", container.id[:12])
 
 
 @pytest.fixture(scope="module")
@@ -104,8 +107,8 @@ def container_reclaim_enabled(docker_image):
     yield container, f"http://localhost:{host_port}"
     try:
         container.stop()
-    except Exception:
-        logging.warning("Failed to stop container %s", container.id[:12])
+    except Exception:  # noqa: BLE001 - teardown is best effort
+        logger.warning("Failed to stop container %s", container.id[:12])
 
 
 def test_memory_stays_high_without_reclaim(container_reclaim_disabled, heavy_html) -> None:
@@ -113,16 +116,16 @@ def test_memory_stays_high_without_reclaim(container_reclaim_disabled, heavy_htm
     container, base_url = container_reclaim_disabled
 
     baseline_mb = _get_container_memory_mb(container)
-    logging.info("Baseline memory (reclaim disabled): %.1f MB", baseline_mb)
+    logger.info("Baseline memory (reclaim disabled): %.1f MB", baseline_mb)
 
     elapsed_ms = _convert_html(base_url, heavy_html)
-    logging.info("Conversion time (reclaim disabled): %.0f ms", elapsed_ms)
+    logger.info("Conversion time (reclaim disabled): %.0f ms", elapsed_ms)
 
     time.sleep(2)
 
     after_mb = _get_container_memory_mb(container)
     growth_mb = after_mb - baseline_mb
-    logging.info("After conversion (reclaim disabled): %.1f MB (growth: +%.1f MB)", after_mb, growth_mb)
+    logger.info("After conversion (reclaim disabled): %.1f MB (growth: +%.1f MB)", after_mb, growth_mb)
 
     assert after_mb > baseline_mb, f"Expected memory to grow: baseline={baseline_mb:.1f} MB, after={after_mb:.1f} MB"
 
@@ -132,17 +135,17 @@ def test_memory_reclaimed_with_reclaim_enabled(container_reclaim_enabled, heavy_
     container, base_url = container_reclaim_enabled
 
     baseline_mb = _get_container_memory_mb(container)
-    logging.info("Baseline memory (reclaim enabled): %.1f MB", baseline_mb)
+    logger.info("Baseline memory (reclaim enabled): %.1f MB", baseline_mb)
 
     elapsed_ms = _convert_html(base_url, heavy_html)
-    logging.info("Conversion time (reclaim enabled): %.0f ms", elapsed_ms)
+    logger.info("Conversion time (reclaim enabled): %.0f ms", elapsed_ms)
 
     time.sleep(2)
 
     after_mb = _get_container_memory_mb(container)
     growth_mb = after_mb - baseline_mb
     growth_ratio = after_mb / baseline_mb
-    logging.info("After conversion (reclaim enabled): %.1f MB (growth: +%.1f MB, ratio: %.2f)", after_mb, growth_mb, growth_ratio)
+    logger.info("After conversion (reclaim enabled): %.1f MB (growth: +%.1f MB, ratio: %.2f)", after_mb, growth_mb, growth_ratio)
 
     # Memory may grow somewhat but should stay within 50% of baseline thanks to gc.collect + malloc_trim
     assert growth_ratio < 1.5, f"Memory grew too much despite reclaim: baseline={baseline_mb:.1f} MB, after={after_mb:.1f} MB (ratio={growth_ratio:.2f})"
@@ -162,6 +165,6 @@ def test_reclaim_enabled_uses_less_memory_than_disabled(container_reclaim_disabl
     disabled_mb = _get_container_memory_mb(container_disabled)
     enabled_mb = _get_container_memory_mb(container_enabled)
 
-    logging.info("Memory comparison: disabled=%.1f MB, enabled=%.1f MB (saved: %.1f MB)", disabled_mb, enabled_mb, disabled_mb - enabled_mb)
+    logger.info("Memory comparison: disabled=%.1f MB, enabled=%.1f MB (saved: %.1f MB)", disabled_mb, enabled_mb, disabled_mb - enabled_mb)
 
     assert enabled_mb < disabled_mb, f"Reclaim-enabled container should use less memory: disabled={disabled_mb:.1f} MB, enabled={enabled_mb:.1f} MB"

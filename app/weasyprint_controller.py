@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 from urllib.parse import unquote
 
-import weasyprint  # type: ignore
+import weasyprint  # type: ignore[import-untyped]
 from fastapi import Depends, FastAPI, Query, Request, Response
 
 if TYPE_CHECKING:
@@ -184,7 +184,7 @@ async def dashboard() -> HTMLResponse:
 )
 async def health(
     chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
-    detailed: bool = Query(False, description="Return detailed JSON response with metrics"),
+    detailed: Annotated[bool, Query(description="Return detailed JSON response with metrics")] = False,
 ) -> Response:
     """
     Health check endpoint that verifies service and Chromium browser status.
@@ -303,11 +303,13 @@ def get_render_options(
         title="CSS Media Type",
         description="CSS media type to apply when rendering (e.g., 'print' or 'screen').",
     ),
-    presentational_hints: bool = Query(
-        False,
-        title="Presentational Hints",
-        description="Honor presentational HTML attributes as CSS hints.",
-    ),
+    presentational_hints: Annotated[
+        bool,
+        Query(
+            title="Presentational Hints",
+            description="Honor presentational HTML attributes as CSS hints.",
+        ),
+    ] = False,
     base_url: str | None = Query(
         None,
         title="Base URL",
@@ -339,16 +341,20 @@ def get_output_options(
         title="PDF Variant",
         description="PDF profile/variant passed to WeasyPrint (e.g., 'pdf/a-2b').",
     ),
-    custom_metadata: bool = Query(
-        False,
-        title="Custom Metadata",
-        description="Include custom metadata in the generated PDF.",
-    ),
-    full_fonts: bool = Query(
-        False,
-        title="Full Fonts",
-        description="Embed full fonts instead of subsetting. Avoids font subsetting errors but increases PDF size.",
-    ),
+    custom_metadata: Annotated[
+        bool,
+        Query(
+            title="Custom Metadata",
+            description="Include custom metadata in the generated PDF.",
+        ),
+    ] = False,
+    full_fonts: Annotated[
+        bool,
+        Query(
+            title="Full Fonts",
+            description="Embed full fonts instead of subsetting. Avoids font subsetting errors but increases PDF size.",
+        ),
+    ] = False,
 ) -> OutputOptions:
     return OutputOptions(
         file_name=file_name,
@@ -391,9 +397,10 @@ async def convert_html(
         output_pdf = await __process_html_to_pdf(html, render, output, chromium_manager)
         response = await __create_response(output, output_pdf)
         __record_conversion_metrics(chromium_manager, start_time, success=True)
-        return response
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - the HTTP boundary must answer, not leak
         return __handle_conversion_error(e, chromium_manager, start_time)
+    else:
+        return response
 
 
 async def __get_encoding(request: Request, encoding: str | None) -> str:
@@ -523,10 +530,10 @@ def __record_conversion_metrics(chromium_manager: ChromiumManager, start_time: f
     duration_ms = (time.time() - start_time) * 1000
 
     if success:
-        chromium_manager._metrics.record_success(duration_ms)
+        chromium_manager.metrics.record_success(duration_ms)
         increment_pdf_generation_success(duration_ms / 1000.0)  # Convert ms to seconds
     else:
-        chromium_manager._metrics.record_failure()
+        chromium_manager.metrics.record_failure()
         increment_pdf_generation_failure()
 
 
@@ -543,18 +550,18 @@ def __handle_conversion_error(e: Exception, chromium_manager: ChromiumManager, s
         Error response with appropriate status code
     """
     duration_ms = (time.time() - start_time) * 1000
-    chromium_manager._metrics.record_failure()
+    chromium_manager.metrics.record_failure()
     increment_pdf_generation_failure()
     pdf_generation_duration_seconds.observe(duration_ms / 1000.0)
 
     if isinstance(e, AssertionError):
-        logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=True)
+        logger.warning("Assertion error in HTML conversion: %s", str(e), exc_info=e)
         return __process_error(e, "Assertion error, check the request body html", 400)
     if isinstance(e, (UnicodeDecodeError, LookupError)):
-        logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=True)
+        logger.warning("Encoding error in HTML conversion: %s", str(e), exc_info=e)
         return __process_error(e, "Cannot decode request html body", 400)
 
-    logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=True)
+    logger.error("Unexpected error in HTML conversion: %s", str(e), exc_info=e)
     return __process_error(e, "Unexpected error due converting to PDF", 500)
 
 
@@ -632,9 +639,10 @@ async def convert_html_with_attachments(
         output_pdf = await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments)
         response = await __create_response(output, output_pdf)
         __record_conversion_metrics(chromium_manager, start_time, success=True)
-        return response
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - same, for the attachments endpoint
         return __handle_conversion_error(e, chromium_manager, start_time)
+    else:
+        return response
     finally:
         logger.debug("Cleaning up temporary directory: %s", sanitize_path_for_logging(tmpdir, show_basename_only=False))
         shutil.rmtree(tmpdir, ignore_errors=True)
@@ -651,5 +659,5 @@ async def __create_response(output: OutputOptions, output_pdf: bytes | None) -> 
 
 
 def __process_error(e: Exception, err_msg: str, status: int) -> Response:
-    logger.exception("%s: %s", err_msg, str(e))
+    logger.error("%s: %s", err_msg, str(e), exc_info=e)
     return Response(err_msg + ": " + getattr(e, "message", repr(e)), media_type="plain/text", status_code=status)

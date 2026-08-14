@@ -26,6 +26,7 @@ from starlette.staticfiles import StaticFiles
 
 from app import memory_manager
 from app.attachment_manager import AttachmentManager
+from app.auth import require_api_key
 from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.constants import API_VERSION
 from app.form_parser import FormParser
@@ -369,12 +370,14 @@ def get_output_options(
     responses={
         200: {"content": {"application/pdf": {}}, "description": "PDF file generated from the provided HTML"},
         400: {"content": {"text/plain": {}}, "description": "Invalid Input"},
+        401: {"content": {"application/json": {}}, "description": "Missing or invalid API key (only when API_KEY is configured)"},
         500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"},
     },
     summary="Convert HTML to PDF",
     description="Accepts raw HTML in the request body and returns a generated PDF.",
     operation_id="convert_html_post",
     tags=["convert"],
+    dependencies=[Depends(require_api_key)],
 )
 async def convert_html(
     request: Request,
@@ -571,12 +574,14 @@ def __handle_conversion_error(e: Exception, chromium_manager: ChromiumManager, s
     responses={
         200: {"content": {"application/pdf": {}}, "description": "PDF file generated from the provided HTML (with optional attachments)"},
         400: {"content": {"text/plain": {}}, "description": "Invalid Input"},
+        401: {"content": {"application/json": {}}, "description": "Missing or invalid API key (only when API_KEY is configured)"},
         500: {"content": {"text/plain": {}}, "description": "Internal PDF Conversion Error"},
     },
     summary="Convert HTML to PDF with attachments",
     description="Accepts HTML as a form field and optional files to be embedded as PDF attachments.",
     operation_id="convert_html_with_attachments_post",
     tags=["convert"],
+    dependencies=[Depends(require_api_key)],
     openapi_extra={
         "requestBody": {
             "required": True,

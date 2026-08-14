@@ -7,6 +7,7 @@ from pathlib import Path
 import uvicorn
 
 from app import weasyprint_controller
+from app.auth import get_api_keys
 from app.constants import get_bool_env
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,12 @@ def main() -> None:
 
     setup_logging()
     logger.info("Weasyprint service listening port: %d", args.port)
+
+    api_keys = get_api_keys()
+    if api_keys:
+        logger.info("API key authentication enabled for conversion endpoints (%d key(s) configured)", len(api_keys))
+    else:
+        logger.info("API key authentication disabled")
 
     if get_bool_env("METRICS_SERVER_ENABLED", default=True):
         logger.info("Metrics server listening port: %s", os.environ.get("METRICS_PORT", "9180"))

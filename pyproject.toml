@@ -13,7 +13,7 @@ dependencies = [
     "weasyprint==69.0",
     "defusedxml==0.7.1",
     "fastapi==0.141.1",
-    "uvicorn==0.52.1",
+    "uvicorn==0.52.2",
     "python-multipart==0.0.32",
     "beautifulsoup4==4.15.0",
     "html5lib==1.1",
@@ -30,14 +30,14 @@ Repository = "https://github.com/SchweizerischeBundesbahnen/weasyprint-service"
 
 [dependency-groups]
 dev = [
-    "pre-commit==4.6.1",
+    "pre-commit==4.6.2",
     "ruff==0.16.2",
     "mypy==2.3.0",
     "types-defusedxml==0.7.0.20260504",
     "types-psutil==7.2.2.20260518",
 ]
 test = [
-    "tox==4.58.0",
+    "tox==4.59.0",
     "tox-uv==1.36.0",
     "docker==7.2.0",
     "pytest==9.1.1",

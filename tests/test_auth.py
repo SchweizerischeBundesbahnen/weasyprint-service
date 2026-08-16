@@ -104,10 +104,29 @@ def test_non_bearer_authorization_is_rejected(monkeypatch: pytest.MonkeyPatch, p
     assert protected_client.get("/protected", headers={"Authorization": "Basic secret"}).status_code == 401
 
 
-def test_api_key_header_wins_over_bearer(monkeypatch: pytest.MonkeyPatch, protected_client: TestClient) -> None:
+def test_either_credential_is_enough(monkeypatch: pytest.MonkeyPatch, protected_client: TestClient) -> None:
+    """Both schemes are alternatives, so a stale credential next to a valid one does not reject."""
     monkeypatch.setenv(API_KEY_ENV_VAR, "secret")
-    response = protected_client.get("/protected", headers={"X-API-Key": "wrong", "Authorization": "Bearer secret"})
-    assert response.status_code == 401
+    assert protected_client.get("/protected", headers={"X-API-Key": "wrong", "Authorization": "Bearer secret"}).status_code == 200
+    assert protected_client.get("/protected", headers={"X-API-Key": "secret", "Authorization": "Bearer wrong"}).status_code == 200
+
+
+def test_both_credentials_invalid_is_rejected(monkeypatch: pytest.MonkeyPatch, protected_client: TestClient) -> None:
+    monkeypatch.setenv(API_KEY_ENV_VAR, "secret")
+    assert protected_client.get("/protected", headers={"X-API-Key": "wrong", "Authorization": "Bearer also-wrong"}).status_code == 401
+
+
+def test_non_ascii_key_header_is_rejected(monkeypatch: pytest.MonkeyPatch, protected_client: TestClient) -> None:
+    """A header byte above 0x7F must answer 401, not fail the comparison."""
+    monkeypatch.setenv(API_KEY_ENV_VAR, "secret")
+    assert protected_client.get("/protected", headers={"X-API-Key": "sécret".encode()}).status_code == 401
+
+
+def test_non_ascii_configured_key_is_accepted(monkeypatch: pytest.MonkeyPatch, protected_client: TestClient) -> None:
+    """A configured key holding a non-ASCII character still matches the bytes the client sends."""
+    monkeypatch.setenv(API_KEY_ENV_VAR, "sécret")
+    assert protected_client.get("/protected", headers={"X-API-Key": "sécret".encode()}).status_code == 200
+    assert protected_client.get("/protected", headers={"X-API-Key": "secret"}).status_code == 401
 
 
 def test_convert_endpoints_require_key(monkeypatch: pytest.MonkeyPatch) -> None:

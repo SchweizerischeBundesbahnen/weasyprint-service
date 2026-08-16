@@ -60,6 +60,11 @@ def _matches_any(candidate: str, api_keys: tuple[str, ...]) -> bool:
     """
     Compare a candidate key against all configured keys in constant time.
 
+    The comparison runs on bytes: secrets.compare_digest raises TypeError for a
+    str holding a character above U+007F, and a header may carry such a byte.
+    Starlette decodes header bytes as latin-1, so encoding back to latin-1
+    restores the bytes the client sent, and it cannot fail for such a value.
+
     Every key is checked without an early exit, so the comparison time does not
     depend on which key matches.
 
@@ -70,9 +75,10 @@ def _matches_any(candidate: str, api_keys: tuple[str, ...]) -> bool:
     Returns:
         True if the candidate matches one of the configured keys.
     """
+    presented = candidate.encode("latin-1", errors="replace")
     matched = False
     for api_key in api_keys:
-        if secrets.compare_digest(candidate, api_key):
+        if secrets.compare_digest(presented, api_key.encode()):
             matched = True
     return matched
 
@@ -100,12 +106,18 @@ async def require_api_key(
     if not api_keys:
         return
 
-    candidate = header_key or (bearer.credentials if bearer else None)
-    if candidate and _matches_any(candidate, api_keys):
+    # Both schemes are advertised as alternatives, so either credential admits
+    # the request. A stale header next to a valid bearer token must not reject.
+    presented = [candidate for candidate in (header_key, bearer.credentials if bearer else None) if candidate]
+    matched = False
+    for candidate in presented:
+        if _matches_any(candidate, api_keys):
+            matched = True
+    if matched:
         return
 
     # Never log the presented value, only the reason and the target path.
-    logger.warning("Rejected unauthenticated request to %s: %s", request.url.path, "missing API key" if not candidate else "invalid API key")
+    logger.warning("Rejected unauthenticated request to %s: %s", request.url.path, "invalid API key" if presented else "missing API key")
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=_UNAUTHORIZED_MESSAGE,

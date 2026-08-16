@@ -83,7 +83,7 @@ def _matches_any(candidate: str, api_keys: tuple[str, ...]) -> bool:
     return matched
 
 
-async def require_api_key(
+def require_api_key(
     request: Request,
     header_key: Annotated[str | None, Depends(_api_key_header)] = None,
     bearer: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer_scheme)] = None,

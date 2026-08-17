@@ -21,6 +21,7 @@ from app.external_resources import (
     get_allowed_origins,
     get_max_size_bytes,
     get_policy,
+    host_header,
     is_public_address,
     tls_context,
 )
@@ -393,3 +394,26 @@ def test_the_tls_context_refuses_the_old_protocol_versions() -> None:
     assert context.minimum_version >= ssl.TLSVersion.TLSv1_2
     assert context.verify_mode == ssl.CERT_REQUIRED
     assert context.check_hostname is True
+
+
+@pytest.mark.parametrize(
+    ("host", "port", "scheme", "expected"),
+    [
+        ("cdn.intranet", 80, "http", "cdn.intranet"),
+        ("cdn.intranet", 8080, "http", "cdn.intranet:8080"),
+        ("cdn.intranet", 443, "https", "cdn.intranet"),
+        ("::1", 80, "http", "[::1]"),
+        ("2001:db8::1", 8443, "https", "[2001:db8::1]:8443"),
+    ],
+)
+def test_the_host_header_carries_the_name(host: str, port: int, scheme: str, expected: str) -> None:
+    """An IPv6 literal needs its brackets, or the header names something else."""
+    assert host_header(host, port, scheme) == expected
+
+
+def test_a_plain_connection_is_bound_to_the_vetted_address() -> None:
+    """The pinning itself: the socket goes to the address, the name only travels in the header."""
+    connection = PolicyUrlFetcher()._direct("http", "cdn.intranet", 80, "93.184.216.34")
+
+    assert connection.host == "93.184.216.34"
+    assert connection.port == 80

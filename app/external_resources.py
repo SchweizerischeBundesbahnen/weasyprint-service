@@ -200,6 +200,12 @@ def tls_context() -> ssl.SSLContext:
     return context
 
 
+def host_header(host: str, port: int, scheme: str) -> str:
+    """The Host header of a request, with an IPv6 literal in the brackets it needs."""
+    literal = f"[{host}]" if ":" in host else host
+    return literal if port == DEFAULT_PORTS[scheme] else f"{literal}:{port}"
+
+
 def resolve(host: str, port: int) -> tuple[str, ...]:
     """Resolve a host to every address it answers with."""
     try:
@@ -330,7 +336,7 @@ class PolicyUrlFetcher(URLFetcher):
                 connection = self._direct(scheme, host, port, address)
 
             request_headers = {"User-Agent": "weasyprint-service", **(headers or {})}
-            request_headers["Host"] = f"{host}:{port}" if port != DEFAULT_PORTS[scheme] else host
+            request_headers["Host"] = host_header(host, port, scheme)
             connection.request("GET", target, headers=request_headers)
             return connection.getresponse()
         except ExternalResourceError:

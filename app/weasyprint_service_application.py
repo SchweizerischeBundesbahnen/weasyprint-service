@@ -9,6 +9,7 @@ import uvicorn
 from app import weasyprint_controller
 from app.auth import get_api_keys
 from app.constants import get_bool_env
+from app.tls import API_TLS_PREFIX, METRICS_TLS_PREFIX, get_scheme, get_tls_options
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ def setup_logging() -> Path:
 
 
 def start_server(port: int) -> None:
-    uvicorn.run(app=weasyprint_controller.app, host="", port=port)
+    uvicorn.run(app=weasyprint_controller.app, host="", port=port, **get_tls_options())
 
 
 def main() -> None:
@@ -107,6 +108,10 @@ def main() -> None:
     setup_logging()
     logger.info("Weasyprint service listening port: %d", args.port)
 
+    # Read the TLS configuration before the server starts, so a broken one is
+    # reported here instead of deep inside uvicorn.
+    logger.info("Weasyprint service scheme: %s", get_scheme(get_tls_options(API_TLS_PREFIX)))
+
     api_keys = get_api_keys()
     if api_keys:
         logger.info("API key authentication enabled for conversion endpoints (%d key(s) configured)", len(api_keys))
@@ -115,6 +120,7 @@ def main() -> None:
 
     if get_bool_env("METRICS_SERVER_ENABLED", default=True):
         logger.info("Metrics server listening port: %s", os.environ.get("METRICS_PORT", "9180"))
+        logger.info("Metrics server scheme: %s", get_scheme(get_tls_options(METRICS_TLS_PREFIX)))
     else:
         logger.info("Metrics server disabled")
 

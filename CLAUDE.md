@@ -195,6 +195,11 @@ grype weasyprint-service:0.0.0
 - `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
 - `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
 
+**TLS (see `app/tls.py`):**
+- `TLS_CERT_FILE`, `TLS_KEY_FILE`, `TLS_KEY_PASSWORD`, `TLS_CLIENT_CA_FILE`, `TLS_CLIENT_AUTH` (none/optional/required): serve the API over HTTPS. Unset means plain HTTP (default).
+- `METRICS_TLS_*`: the same five for the metrics server, configured independently. Neither set inherits from the other.
+- Incomplete configuration fails at startup, it never falls back to plain HTTP. The container healthcheck (`healthcheck.sh`) follows the configured scheme.
+
 **Authentication:**
 - `API_KEY`: API key(s) protecting the `/convert/*` endpoints. Unset or empty disables authentication (default). Comma-separated list allows key rotation. Clients send `X-API-Key: <key>` or `Authorization: Bearer <key>`. Invalid or missing keys return 401.
 

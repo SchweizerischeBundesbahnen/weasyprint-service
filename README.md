@@ -408,6 +408,55 @@ docker run --detach \
 --volume /path/to/logs:/opt/weasyprint/logs
 ```
 
+### HTTPS
+
+Both servers speak plain HTTP by default, which is what a deployment behind a reverse proxy or an ingress expects: TLS terminates there and nothing has to be configured here. That remains the recommended setup where such a component is already in place.
+
+Where the service is reached directly across a network, each server can serve TLS itself.
+
+**The API server:**
+
+| Variable | Purpose |
+|---|---|
+| `TLS_CERT_FILE` | Certificate chain in PEM format |
+| `TLS_KEY_FILE` | Private key in PEM format |
+| `TLS_KEY_PASSWORD` | Password of the key, where it has one |
+| `TLS_CLIENT_CA_FILE` | CA that client certificates are verified against |
+| `TLS_CLIENT_AUTH` | `none` (default), `optional` or `required` |
+
+**The metrics server, configured on its own:**
+
+| Variable | Purpose |
+|---|---|
+| `METRICS_TLS_CERT_FILE` | Certificate chain in PEM format |
+| `METRICS_TLS_KEY_FILE` | Private key in PEM format |
+| `METRICS_TLS_KEY_PASSWORD` | Password of the key, where it has one |
+| `METRICS_TLS_CLIENT_CA_FILE` | CA that client certificates are verified against |
+| `METRICS_TLS_CLIENT_AUTH` | `none` (default), `optional` or `required` |
+
+The two sets are independent and neither inherits from the other. The metrics port can stay plain behind a network rule while the API serves TLS, or the other way round.
+
+```bash
+docker run --detach \
+  --init \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --volume /path/to/tls:/opt/weasyprint/tls:ro \
+  -e TLS_CERT_FILE=/opt/weasyprint/tls/server.pem \
+  -e TLS_KEY_FILE=/opt/weasyprint/tls/server.key \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+An incomplete configuration stops the start with a message naming the variable. The service never falls back to plain HTTP, because serving in the clear while an operator believes otherwise is worse than not starting.
+
+**Mutual TLS.** With `TLS_CLIENT_AUTH=required` the service accepts only clients presenting a certificate signed by `TLS_CLIENT_CA_FILE`. That authenticates the caller, which the API key below does not: the certificate says who connected, the key says who may convert. The two combine.
+
+**The healthcheck of the container** follows the configured scheme. It talks to its own process over loopback, so it does not verify the certificate. Where client certificates are required, give the probe one with `TLS_HEALTHCHECK_CERT_FILE` and `TLS_HEALTHCHECK_KEY_FILE`, otherwise the container reports itself unhealthy.
+
+**Certificate renewal.** The certificate is read once, at startup. A renewed certificate takes effect when the container restarts.
+
+**Prometheus.** Once the metrics port serves TLS, its scrape configuration needs `scheme: https` next to the target.
+
 ### API Key Authentication
 
 The conversion endpoints can be protected with an API key. The feature is optional and disabled by default.

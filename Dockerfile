@@ -84,7 +84,8 @@ COPY --chown=appuser:appuser ./app/*.py ${WORKING_DIR}/app/
 COPY --chown=appuser:appuser ./app/static/ ${WORKING_DIR}/app/static/
 COPY --chown=appuser:appuser ./app/resources/ ${WORKING_DIR}/app/resources/
 COPY --chown=appuser:appuser ./entrypoint.sh ${WORKING_DIR}/entrypoint.sh
-RUN chmod +x ${WORKING_DIR}/entrypoint.sh
+COPY --chown=appuser:appuser ./healthcheck.sh ${WORKING_DIR}/healthcheck.sh
+RUN chmod +x ${WORKING_DIR}/entrypoint.sh ${WORKING_DIR}/healthcheck.sh
 
 # Add venv to PATH
 ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
@@ -101,7 +102,7 @@ EXPOSE ${METRICS_PORT}
 
 # Add healthcheck
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
-    CMD ["/bin/sh", "-c", "curl -f http://localhost:${PORT}/health || exit 1"]
+    CMD ["/bin/sh", "-c", "./healthcheck.sh || exit 1"]
 
 ENTRYPOINT ["./entrypoint.sh"]
 

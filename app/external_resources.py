@@ -272,7 +272,7 @@ class PolicyUrlFetcher(URLFetcher):
             if not is_public_address(address):
                 raise ExternalResourceError(f"'{host}' resolves to {address}, which is not an address on the internet")
 
-    def _vet(self, url: str) -> tuple[str, str, int, tuple[str, ...]]:
+    def _vet(self, url: str, deadline: float) -> tuple[str, str, int, tuple[str, ...]]:
         """Vet an address and return what a request to it needs.
 
         Returns:
@@ -300,6 +300,11 @@ class PolicyUrlFetcher(URLFetcher):
                 raise ExternalResourceError(f"'{host}' is reached through a proxy, so it has to be listed in {ALLOWED_ORIGINS_VAR}")
             return scheme, host, port, ()
 
+        # A name is looked up only while the load still has time. The lookup
+        # itself is bounded by the resolver of this host rather than by us,
+        # since getaddrinfo takes no timeout, so a chain of redirects is what
+        # would otherwise turn one stalling nameserver into a long wait.
+        self._remaining(deadline, url)
         addresses = resolve(host, port)
         if self.policy is ResourcePolicy.BLOCK_INTERNAL and not allowlisted:
             self._check_addresses(addresses, host)
@@ -317,14 +322,16 @@ class PolicyUrlFetcher(URLFetcher):
         deadline = time.monotonic() + self.timeout_seconds
         seen = url
         for _ in range(MAX_REDIRECTS + 1):
-            scheme, host, port, addresses = self._vet(seen)
+            scheme, host, port, addresses = self._vet(seen, deadline)
             connection, response = self._send(scheme, host, port, addresses, seen, headers, deadline)
             location = response.getheader("Location") if response.status in HTTP_REDIRECT_RANGE else None
             if location is None:
                 return self._read_response(seen, response, connection, deadline)
-            # A hop carries no resource, and its body is bounded like any other.
-            response.read(self.max_size_bytes)
-            response.close()
+            # A hop carries no resource, and its body is bounded like any other,
+            # in time as well as in size: a server which drips a redirect body
+            # holds the load open exactly as one dripping an image would.
+            with response:
+                self._read_body(seen, response, connection, deadline)
             seen = urljoin(seen, location)
         raise ExternalResourceError(f"'{url}' redirects more than {MAX_REDIRECTS} times")
 

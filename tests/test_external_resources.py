@@ -72,6 +72,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if path == "/dripping.png":
             self._drip()
             return
+        if path == "/redirect-dripping":
+            self._drip(status=302, location="/image.png")
+            return
         if path == "/redirect-query-only" and query:
             path = "/image.png"
         elif path in REDIRECT_TARGETS:
@@ -84,9 +87,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _drip(self) -> None:
+    def _drip(self, status: int = 200, location: str | None = None) -> None:
         """Answer a byte at a time, the shape which outlasts a timer each byte resets."""
-        self.send_response(200)
+        self.send_response(status)
+        if location is not None:
+            self.send_header("Location", location)
         self.send_header("Content-Type", "image/png")
         self.send_header("Content-Length", str(DRIP_BYTES))
         self.end_headers()
@@ -508,3 +513,30 @@ def test_a_body_which_arrives_too_slowly_is_given_up(monkeypatch: pytest.MonkeyP
     elapsed = time.monotonic() - started
 
     assert elapsed < 3, f"the fetch spent {elapsed:.1f}s on a body it should have given up on"
+
+
+def test_a_redirect_body_which_arrives_too_slowly_is_given_up(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """A hop is read under the deadline of the load, or a dripping redirect holds it open."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    monkeypatch.setenv("EXTERNAL_RESOURCES_TIMEOUT_SECONDS", "0.5")
+    fetcher = PolicyUrlFetcher()
+
+    started = time.monotonic()
+    with pytest.raises(ExternalResourceError, match="took longer than"):
+        fetcher.fetch(f"{local_server}/redirect-dripping")
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 3, f"the fetch spent {elapsed:.1f}s on a hop it should have given up on"
+
+
+def test_a_name_is_not_looked_up_once_the_deadline_has_passed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A lookup is bounded by the resolver, so a chain of hops may not start another."""
+    fetcher = PolicyUrlFetcher()
+
+    def unreachable(host: str, port: int) -> tuple[str, ...]:
+        raise AssertionError("the name was looked up after the load ran out of time")
+
+    monkeypatch.setattr("app.external_resources.resolve", unreachable)
+
+    with pytest.raises(ExternalResourceError, match="took longer than"):
+        fetcher._vet("http://cdn.example/image.png", time.monotonic() - 1)

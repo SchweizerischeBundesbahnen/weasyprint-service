@@ -408,6 +408,52 @@ docker run --detach \
 --volume /path/to/logs:/opt/weasyprint/logs
 ```
 
+### API Key Authentication
+
+The conversion endpoints can be protected with an API key. The feature is optional and disabled by default.
+
+**Configuration:**
+- `API_KEY`: One or more API keys. Authentication is disabled when the variable is unset or empty.
+- Several keys are configured as a comma-separated list, for example `API_KEY=key-a,key-b`. This allows key rotation without downtime.
+
+**Protected endpoints:**
+- `POST /convert/html`
+- `POST /convert/html-with-attachments`
+
+`/health`, `/version`, `/dashboard`, `/static` and `/api/docs` stay open. This keeps the Docker healthcheck and the monitoring dashboard working. The Prometheus endpoint on port 9180 is not affected; isolate it at the network level as described in [Prometheus & Grafana Integration](#prometheus--grafana-integration).
+
+**Start the service with authentication:**
+```bash
+docker run --detach \
+  --init \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  -e API_KEY=your-secret-key \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+**Send the key in the `X-API-Key` header:**
+```bash
+export API_KEY=your-secret-key
+
+curl -X POST http://localhost:9080/convert/html \
+  -H "X-API-Key: ${API_KEY}" \
+  -H "Content-Type: text/html" \
+  --data-binary @index.html \
+  --output document.pdf
+```
+
+**Or as a bearer token:**
+```bash
+curl -X POST http://localhost:9080/convert/html \
+  -H "Authorization: Bearer ${API_KEY}" \
+  -H "Content-Type: text/html" \
+  --data-binary @index.html \
+  --output document.pdf
+```
+
+Requests with a missing or invalid key return `401 Unauthorized` with the header `WWW-Authenticate: Bearer`. The key value is never written to the log.
+
 ### Using as a Base Image
 
 To extend or customize the service, use it as a base image in the Dockerfile:

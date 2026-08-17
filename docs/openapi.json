@@ -515,6 +515,14 @@
         "summary": "Convert HTML to PDF",
         "description": "Accepts raw HTML in the request body and returns a generated PDF.",
         "operationId": "convert_html_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "encoding",
@@ -659,6 +667,12 @@
             },
             "description": "Invalid Input"
           },
+          "401": {
+            "content": {
+              "application/json": {}
+            },
+            "description": "Missing or invalid API key (only when API_KEY is configured)"
+          },
           "500": {
             "content": {
               "text/plain": {}
@@ -686,6 +700,14 @@
         "summary": "Convert HTML to PDF with attachments",
         "description": "Accepts HTML as a form field and optional files to be embedded as PDF attachments.",
         "operationId": "convert_html_with_attachments_post",
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "encoding",
@@ -829,6 +851,12 @@
               "text/plain": {}
             },
             "description": "Invalid Input"
+          },
+          "401": {
+            "content": {
+              "application/json": {}
+            },
+            "description": "Missing or invalid API key (only when API_KEY is configured)"
           },
           "500": {
             "content": {
@@ -999,6 +1027,19 @@
         ],
         "title": "VersionSchema",
         "description": "Schema for response /version"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "description": "API key, required when the service is started with API_KEY configured.",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "HTTPBearer": {
+        "type": "http",
+        "description": "API key sent as a bearer token, required when the service is started with API_KEY configured.",
+        "scheme": "bearer"
       }
     }
   }

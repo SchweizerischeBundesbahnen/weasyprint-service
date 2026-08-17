@@ -169,6 +169,8 @@ grype weasyprint-service:0.0.0
 - `/convert/html` - Basic HTML to PDF conversion (accepts HTML string, returns PDF binary)
 - `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data, for embedded resources)
 
+**Authentication:** Both `/convert/*` endpoints require an API key when `API_KEY` is configured (see `app/auth.py`). All other endpoints stay open, which keeps the Docker healthcheck and the dashboard working.
+
 **Query Parameters for PDF conversion:**
 - `pdf_variant` - PDF profile/variant (see supported variants below)
 - `presentational_hints` - Use HTML presentational hints (default: true)
@@ -192,6 +194,9 @@ grype weasyprint-service:0.0.0
 - `LOG_DIR`: Directory for log files (defaults to `/opt/weasyprint/logs`)
 - `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
 - `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
+
+**Authentication:**
+- `API_KEY`: API key(s) protecting the `/convert/*` endpoints. Unset or empty disables authentication (default). Comma-separated list allows key rotation. Clients send `X-API-Key: <key>` or `Authorization: Bearer <key>`. Invalid or missing keys return 401.
 
 **Form Processing:**
 - `FORM_MAX_FIELDS`: Maximum number of form fields (default: 1000)

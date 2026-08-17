@@ -33,8 +33,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlsplit, urlunsplit
-from urllib.request import getproxies, proxy_bypass
+from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.request import getproxies, proxy_bypass, url2pathname
 
 from weasyprint.urls import URLFetcher, URLFetcherResponse  # type: ignore[import-untyped]
 
@@ -193,6 +193,13 @@ def is_public_address(address: str) -> bool:
     return parsed.is_global and not parsed.is_multicast
 
 
+def tls_context() -> ssl.SSLContext:
+    """The context a request is made with: certificates verified, TLS 1.2 at least."""
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
+
+
 def resolve(host: str, port: int) -> tuple[str, ...]:
     """Resolve a host to every address it answers with."""
     try:
@@ -219,17 +226,17 @@ class PolicyUrlFetcher(URLFetcher):
         self.max_size_bytes = get_max_size_bytes()
         self.timeout_seconds = get_timeout_seconds()
 
-    def fetch(self, url: str, headers: dict[str, str] | None = None) -> Any:  # noqa: ARG002 - the base signature
+    def fetch(self, url: str, headers: dict[str, str] | None = None) -> Any:
         """Load a resource, or explain why it may not be loaded."""
         scheme = urlsplit(url).scheme.lower()
 
         if scheme == "data":
-            return super().fetch(url)
+            return super().fetch(url, headers)
         if scheme == "file":
             self._check_file(url)
-            return super().fetch(url)
+            return super().fetch(url, headers)
         if scheme in DEFAULT_PORTS:
-            return self._fetch_remote(url)
+            return self._fetch_remote(url, headers)
 
         raise ExternalResourceError(f"'{scheme}:' is not a scheme a document may load from")
 
@@ -237,7 +244,9 @@ class PolicyUrlFetcher(URLFetcher):
         """A file is readable only under the temporary directory of the request."""
         if self.allowed_file_root is None:
             raise ExternalResourceError("a document may not load a file of this container")
-        path = Path(url.split("?", maxsplit=1)[0].removeprefix("file://")).resolve()
+        # Decoded first: the check has to read the path the loader reads, or
+        # '%2e%2e' walks out of the directory as an ordinary looking component.
+        path = Path(url2pathname(urlsplit(url).path)).resolve()
         if not path.is_relative_to(self.allowed_file_root):
             raise ExternalResourceError("a document may only load the files uploaded with it")
 
@@ -260,6 +269,8 @@ class PolicyUrlFetcher(URLFetcher):
         """
         parts = urlsplit(url)
         scheme = parts.scheme.lower()
+        if scheme not in DEFAULT_PORTS:
+            raise ExternalResourceError(f"'{scheme}:' is not a scheme a document may load from")
         host = parts.hostname or ""
         port = parts.port or DEFAULT_PORTS[scheme]
         if not host:
@@ -289,31 +300,22 @@ class PolicyUrlFetcher(URLFetcher):
             return None
         return proxy
 
-    def _fetch_remote(self, url: str) -> URLFetcherResponse:
+    def _fetch_remote(self, url: str, headers: dict[str, str] | None = None) -> URLFetcherResponse:
         """Load a resource over http, following redirects hop by hop."""
         seen = url
         for _ in range(MAX_REDIRECTS + 1):
             scheme, host, port, address = self._vet(seen)
-            response = self._send(scheme, host, port, address, seen)
+            response = self._send(scheme, host, port, address, seen, headers)
             location = response.getheader("Location") if response.status in HTTP_REDIRECT_RANGE else None
             if location is None:
                 return self._read_response(seen, response)
-            response.read()
+            # A hop carries no resource, and its body is bounded like any other.
+            response.read(self.max_size_bytes)
             response.close()
-            seen = self._absolute(seen, location)
+            seen = urljoin(seen, location)
         raise ExternalResourceError(f"'{url}' redirects more than {MAX_REDIRECTS} times")
 
-    @staticmethod
-    def _absolute(current: str, location: str) -> str:
-        """Resolve a redirect target against the address it came from."""
-        parts = urlsplit(location)
-        if parts.scheme:
-            return location
-        base = urlsplit(current)
-        path = location if location.startswith("/") else f"{base.path.rsplit('/', 1)[0]}/{location}"
-        return urlunsplit((base.scheme, base.netloc, path, "", ""))
-
-    def _send(self, scheme: str, host: str, port: int, address: str | None, url: str) -> http.client.HTTPResponse:
+    def _send(self, scheme: str, host: str, port: int, address: str | None, url: str, headers: dict[str, str] | None = None) -> http.client.HTTPResponse:
         """Send the request, bound to the address which was vetted."""
         parts = urlsplit(url)
         target = urlunsplit(("", "", parts.path or "/", parts.query, ""))
@@ -321,29 +323,43 @@ class PolicyUrlFetcher(URLFetcher):
 
         try:
             if proxy:
-                proxy_parts = urlsplit(proxy if "//" in proxy else f"//{proxy}")
-                connection: http.client.HTTPConnection = http.client.HTTPConnection(proxy_parts.hostname or "", proxy_parts.port or 80, timeout=self.timeout_seconds)
-                if scheme == "https":
-                    connection.set_tunnel(host, port)
-                else:
+                connection = self._through_proxy(proxy, scheme, host, port)
+                if scheme != "https":
                     target = url
-            elif scheme == "https":
-                # The name is what the certificate is checked against, the
-                # address is what the socket connects to.
-                context = ssl.create_default_context()
-                connection = http.client.HTTPSConnection(host, port, timeout=self.timeout_seconds, context=context)
-                plain_socket = socket.create_connection((address, port), timeout=self.timeout_seconds)
-                connection.sock = context.wrap_socket(plain_socket, server_hostname=host)
             else:
-                connection = http.client.HTTPConnection(address or host, port, timeout=self.timeout_seconds)
-                connection.host = host
+                connection = self._direct(scheme, host, port, address)
 
-            connection.request("GET", target, headers={"Host": f"{host}:{port}" if port != DEFAULT_PORTS[scheme] else host, "User-Agent": "weasyprint-service"})
+            request_headers = {"User-Agent": "weasyprint-service", **(headers or {})}
+            request_headers["Host"] = f"{host}:{port}" if port != DEFAULT_PORTS[scheme] else host
+            connection.request("GET", target, headers=request_headers)
             return connection.getresponse()
         except ExternalResourceError:
             raise
         except OSError as e:
             raise ExternalResourceError(f"'{url}' could not be loaded: {e}") from e
+
+    def _through_proxy(self, proxy: str, scheme: str, host: str, port: int) -> http.client.HTTPConnection:
+        """Open the connection a proxy carries, which resolves the name itself."""
+        proxy_parts = urlsplit(proxy if "//" in proxy else f"//{proxy}")
+        connection = http.client.HTTPConnection(proxy_parts.hostname or "", proxy_parts.port or DEFAULT_PORTS["http"], timeout=self.timeout_seconds)
+        if scheme == "https":
+            connection.set_tunnel(host, port)
+        return connection
+
+    def _direct(self, scheme: str, host: str, port: int, address: str | None) -> http.client.HTTPConnection:
+        """Open the connection to the address which was vetted."""
+        if scheme != "https":
+            # The name travels in the Host header, never in the address the
+            # socket connects to, which is what keeps the request pinned.
+            return http.client.HTTPConnection(address or host, port, timeout=self.timeout_seconds)
+
+        # The name is what the certificate is checked against, the address is
+        # what the socket connects to.
+        context = tls_context()
+        connection = http.client.HTTPSConnection(host, port, timeout=self.timeout_seconds, context=context)
+        plain_socket = socket.create_connection((address, port), timeout=self.timeout_seconds)
+        connection.sock = context.wrap_socket(plain_socket, server_hostname=host)
+        return connection
 
     def _read_response(self, url: str, response: http.client.HTTPResponse) -> URLFetcherResponse:
         """Read a body which is of an allowed kind and within the size limit."""

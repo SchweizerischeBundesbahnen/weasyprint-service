@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import http.server
+import ssl
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -21,11 +22,21 @@ from app.external_resources import (
     get_max_size_bytes,
     get_policy,
     is_public_address,
+    tls_context,
 )
 
 POLICY_VARIABLES = (POLICY_VAR, ALLOWED_ORIGINS_VAR, MAX_SIZE_MB_VAR, "EXTERNAL_RESOURCES_TIMEOUT_SECONDS")
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+REDIRECT_TARGETS = {
+    "/redirect-to-image": "/image.png",
+    "/redirect-to-internal": "http://169.254.169.254/latest/meta-data/",
+    "/redirect-loop": "/redirect-loop",
+    "/redirect-to-ftp": "ftp://example.org/font.ttf",
+    "/nested/redirect-relative": "../image.png",
+    "/redirect-query-only": "?ignored=1",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -50,25 +61,23 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             "/huge.png": (200, "image/png", PNG + b"\x00" * (2 * 1024 * 1024)),
             "/missing": (404, "text/plain", b"gone"),
         }
-        if self.path.startswith("/redirect"):
-            self._redirect()
+        path, _, query = self.path.partition("?")
+        if path == "/redirect-query-only" and query:
+            path = "/image.png"
+        elif path in REDIRECT_TARGETS:
+            self._redirect(path)
             return
-        status, content_type, body = routes.get(self.path, (404, "text/plain", b"gone"))
+        status, content_type, body = routes.get(path, (404, "text/plain", b"gone"))
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
-    def _redirect(self) -> None:
+    def _redirect(self, path: str) -> None:
         """Answer the redirects the tests follow."""
-        targets = {
-            "/redirect-to-image": "/image.png",
-            "/redirect-to-internal": "http://169.254.169.254/latest/meta-data/",
-            "/redirect-loop": "/redirect-loop",
-        }
         self.send_response(302)
-        self.send_header("Location", targets.get(self.path, "/image.png"))
+        self.send_header("Location", REDIRECT_TARGETS[path])
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -336,3 +345,51 @@ def test_a_redirect_loop_ends(monkeypatch: pytest.MonkeyPatch, local_server: str
 
     with pytest.raises(ExternalResourceError, match="redirects more than"):
         fetcher.fetch(f"{local_server}/redirect-loop")
+
+
+def test_a_redirect_to_another_scheme_is_refused(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """A hop names its own scheme, and it is gated like the address the document named."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    fetcher = PolicyUrlFetcher()
+
+    with pytest.raises(ExternalResourceError, match="scheme"):
+        fetcher.fetch(f"{local_server}/redirect-to-ftp")
+
+
+def test_a_relative_redirect_is_resolved_by_the_standard_rules(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+
+    response = PolicyUrlFetcher().fetch(f"{local_server}/nested/redirect-relative")
+
+    assert response.content_type == "image/png"
+
+
+def test_a_query_only_redirect_stays_on_the_same_path(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """Such a Location keeps the path, which a hand written resolver gets wrong."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+
+    response = PolicyUrlFetcher().fetch(f"{local_server}/redirect-query-only")
+
+    assert response.content_type == "image/png"
+
+
+def test_a_percent_encoded_traversal_is_refused(tmp_path: Path) -> None:
+    """The check reads the path the loader reads, decoded."""
+    uploads = tmp_path / "uploads"
+    uploads.mkdir()
+    secret = tmp_path / "secret.txt"
+    secret.write_text("top secret", encoding="utf-8")
+
+    fetcher = PolicyUrlFetcher(allowed_file_root=uploads)
+    url = f"{uploads.as_uri()}/%2e%2e/secret.txt"
+
+    with pytest.raises(ExternalResourceError, match="uploaded with it"):
+        fetcher.fetch(url)
+
+
+def test_the_tls_context_refuses_the_old_protocol_versions() -> None:
+    context = tls_context()
+
+    assert context.minimum_version >= ssl.TLSVersion.TLSv1_2
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True

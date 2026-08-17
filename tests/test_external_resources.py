@@ -6,6 +6,7 @@ import http.client
 import http.server
 import ssl
 import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -437,6 +438,7 @@ def test_a_plain_resource_through_a_proxy_needs_no_tunnel() -> None:
     assert connection._tunnel_host is None
 
 
+@pytest.mark.filterwarnings("error::ResourceWarning")
 def test_the_next_vetted_address_is_tried(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
     """A dual stack host answers with an address this container may have no route to."""
     monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
@@ -448,3 +450,27 @@ def test_the_next_vetted_address_is_tried(monkeypatch: pytest.MonkeyPatch, local
     response = PolicyUrlFetcher().fetch(f"http://127.0.0.1:{port}/image.png")
 
     assert response.content_type == "image/png"
+
+
+def test_the_timeout_bounds_the_whole_fetch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Otherwise the ceiling would be hops times addresses times the configured seconds."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    monkeypatch.setenv("EXTERNAL_RESOURCES_TIMEOUT_SECONDS", "0.4")
+    # Addresses of the documentation range: reserved, and no route leads there.
+    monkeypatch.setattr("app.external_resources.resolve", lambda host, port: ("192.0.2.1", "192.0.2.2", "192.0.2.3"))
+    fetcher = PolicyUrlFetcher()
+
+    started = time.monotonic()
+    with pytest.raises(ExternalResourceError):
+        fetcher.fetch("http://cdn.example/image.png")
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 2, f"the fetch spent {elapsed:.1f}s, the limit is 0.4s per resource"
+
+
+def test_a_request_is_never_made_to_a_name() -> None:
+    """Without an address there is nothing which was vetted, so there is nothing to ask."""
+    fetcher = PolicyUrlFetcher()
+
+    with pytest.raises(ExternalResourceError, match="no address which may be connected to"):
+        fetcher._send("http", "cdn.example", 80, (), "http://cdn.example/image.png")

@@ -29,6 +29,7 @@ import os
 import re
 import socket
 import ssl
+import time
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -312,10 +313,11 @@ class PolicyUrlFetcher(URLFetcher):
 
     def _fetch_remote(self, url: str, headers: dict[str, str] | None = None) -> URLFetcherResponse:
         """Load a resource over http, following redirects hop by hop."""
+        deadline = time.monotonic() + self.timeout_seconds
         seen = url
         for _ in range(MAX_REDIRECTS + 1):
             scheme, host, port, addresses = self._vet(seen)
-            response = self._send(scheme, host, port, addresses, seen, headers)
+            response = self._send(scheme, host, port, addresses, seen, headers, deadline)
             location = response.getheader("Location") if response.status in HTTP_REDIRECT_RANGE else None
             if location is None:
                 return self._read_response(seen, response)
@@ -325,63 +327,95 @@ class PolicyUrlFetcher(URLFetcher):
             seen = urljoin(seen, location)
         raise ExternalResourceError(f"'{url}' redirects more than {MAX_REDIRECTS} times")
 
-    def _send(self, scheme: str, host: str, port: int, addresses: tuple[str, ...], url: str, headers: dict[str, str] | None = None) -> http.client.HTTPResponse:
+    def _remaining(self, deadline: float, url: str) -> float:
+        """The time left for a request, or a refusal when there is none."""
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ExternalResourceError(f"'{url}' took longer than the {self.timeout_seconds} seconds a resource may take")
+        return remaining
+
+    def _send(self, scheme: str, host: str, port: int, addresses: tuple[str, ...], url: str, headers: dict[str, str] | None = None, deadline: float | None = None) -> http.client.HTTPResponse:
         """Send the request, bound to an address which was vetted."""
         parts = urlsplit(url)
         target = urlunsplit(("", "", parts.path or "/", parts.query, ""))
         proxy = self._proxy_for(scheme, host)
         request_headers = {"User-Agent": "weasyprint-service", **(headers or {})}
         request_headers["Host"] = host_header(host, port, scheme)
+        deadline = deadline if deadline is not None else time.monotonic() + self.timeout_seconds
 
         if proxy:
-            try:
-                connection = self._through_proxy(proxy, scheme, host, port)
-                connection.request("GET", url if scheme != "https" else target, headers=request_headers)
-                return connection.getresponse()
-            except OSError as e:
-                raise ExternalResourceError(f"'{url}' could not be loaded: {e}") from e
+            connection = self._through_proxy(proxy, scheme, host, port, self._remaining(deadline, url))
+            return self._ask(connection, url if scheme != "https" else target, request_headers, url)
+
+        # A request is made to an address which was vetted, never to a name: the
+        # name would be resolved again, by whoever answers next.
+        if not addresses:
+            raise ExternalResourceError(f"'{url}' resolved to no address which may be connected to")
 
         # Every address was vetted, so the next one may be tried when a route to
         # the first is missing, which is the common case for a dual stack host.
         last_error: OSError | None = None
-        for address in addresses or (host,):
+        for index, address in enumerate(addresses):
+            # The time left is shared out, so a dead address does not spend the
+            # budget of the one which would have answered.
+            timeout = self._remaining(deadline, url) / (len(addresses) - index)
             try:
-                connection = self._direct(scheme, host, port, address)
-                connection.request("GET", target, headers=request_headers)
-                return connection.getresponse()
+                connection = self._direct(scheme, host, port, address, timeout)
             except OSError as e:
                 last_error = e
+                continue
+            try:
+                return self._ask(connection, target, request_headers, url)
+            except ExternalResourceError as e:
+                last_error = OSError(str(e))
         raise ExternalResourceError(f"'{url}' could not be loaded: {last_error}")
 
-    def _through_proxy(self, proxy: str, scheme: str, host: str, port: int) -> http.client.HTTPConnection:
+    @staticmethod
+    def _ask(connection: http.client.HTTPConnection, target: str, request_headers: dict[str, str], url: str) -> http.client.HTTPResponse:
+        """Send the request, closing the connection when it does not answer."""
+        try:
+            connection.request("GET", target, headers=request_headers)
+            return connection.getresponse()
+        except OSError as e:
+            connection.close()
+            raise ExternalResourceError(f"'{url}' could not be loaded: {e}") from e
+
+    def _through_proxy(self, proxy: str, scheme: str, host: str, port: int, timeout: float | None = None) -> http.client.HTTPConnection:
         """Open the connection a proxy carries, which resolves the name itself."""
         proxy_parts = urlsplit(proxy if "//" in proxy else f"//{proxy}")
         proxy_host = proxy_parts.hostname or ""
         proxy_port = proxy_parts.port or DEFAULT_PORTS["http"]
+        timeout = timeout if timeout is not None else self.timeout_seconds
 
         if scheme != "https":
-            return http.client.HTTPConnection(proxy_host, proxy_port, timeout=self.timeout_seconds)
+            return http.client.HTTPConnection(proxy_host, proxy_port, timeout=timeout)
 
         # An HTTPSConnection wraps the socket after the CONNECT, so the request
         # travels encrypted inside the tunnel. A plain connection with a tunnel
         # would put it there in the clear.
-        connection = http.client.HTTPSConnection(proxy_host, proxy_port, timeout=self.timeout_seconds, context=tls_context())
+        connection = http.client.HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=tls_context())
         connection.set_tunnel(host, port)
         return connection
 
-    def _direct(self, scheme: str, host: str, port: int, address: str | None) -> http.client.HTTPConnection:
+    def _direct(self, scheme: str, host: str, port: int, address: str, timeout: float | None = None) -> http.client.HTTPConnection:
         """Open the connection to the address which was vetted."""
+        timeout = timeout if timeout is not None else self.timeout_seconds
+
         if scheme != "https":
             # The name travels in the Host header, never in the address the
             # socket connects to, which is what keeps the request pinned.
-            return http.client.HTTPConnection(address or host, port, timeout=self.timeout_seconds)
+            return http.client.HTTPConnection(address, port, timeout=timeout)
 
         # The name is what the certificate is checked against, the address is
         # what the socket connects to.
         context = tls_context()
-        connection = http.client.HTTPSConnection(host, port, timeout=self.timeout_seconds, context=context)
-        plain_socket = socket.create_connection((address, port), timeout=self.timeout_seconds)
-        connection.sock = context.wrap_socket(plain_socket, server_hostname=host)
+        connection = http.client.HTTPSConnection(host, port, timeout=timeout, context=context)
+        plain_socket = socket.create_connection((address, port), timeout=timeout)
+        try:
+            connection.sock = context.wrap_socket(plain_socket, server_hostname=host)
+        except OSError:
+            plain_socket.close()
+            raise
         return connection
 
     def _read_response(self, url: str, response: http.client.HTTPResponse) -> URLFetcherResponse:

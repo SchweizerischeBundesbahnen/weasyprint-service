@@ -419,7 +419,7 @@ Every load therefore goes through a policy. By default the service refuses every
 | `EXTERNAL_RESOURCES_POLICY` | `BLOCK_INTERNAL` | `BLOCK_INTERNAL`, `ALLOWLIST_ONLY` or `ALLOW_ALL` |
 | `EXTERNAL_RESOURCES_ALLOWED_ORIGINS` | empty | Comma separated origins which are allowed whatever they resolve to |
 | `EXTERNAL_RESOURCES_MAX_SIZE_MB` | `16` | Size a single resource may reach |
-| `EXTERNAL_RESOURCES_TIMEOUT_SECONDS` | `10` | Time the whole load of one resource may take, its redirects and its address attempts included |
+| `EXTERNAL_RESOURCES_TIMEOUT_SECONDS` | `10` | Time the whole load of one resource may take, its redirects and its address attempts included. Resolving a name is bounded by the resolver of the host rather than by this value, so one lookup may outlast it. No further lookup starts once it has passed |
 
 To load resources from an internal host, list its origin:
 

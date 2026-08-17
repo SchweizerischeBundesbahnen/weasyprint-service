@@ -13,14 +13,14 @@ dependencies = [
     "weasyprint==69.0",
     "defusedxml==0.7.1",
     "fastapi==0.141.1",
-    "uvicorn==0.52.2",
+    "uvicorn==0.52.3",
     "python-multipart==0.0.32",
     "beautifulsoup4==4.15.0",
     "html5lib==1.1",
     "playwright==1.62.0",
     "pillow==12.3.0",
     "psutil==7.2.2",
-    "pypdf==6.15.0",
+    "pypdf==6.16.0",
     "prometheus-fastapi-instrumentator==8.1.0",
 ]
 

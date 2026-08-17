@@ -207,9 +207,13 @@ def host_header(host: str, port: int, scheme: str) -> str:
 
 
 def resolve(host: str, port: int) -> tuple[str, ...]:
-    """Resolve a host to every address it answers with."""
+    """Resolve a host to every address it answers with.
+
+    AI_ADDRCONFIG leaves out the families this host has no route for, so a
+    container without IPv6 is not handed an AAAA record to connect to.
+    """
     try:
-        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, flags=socket.AI_ADDRCONFIG)
     except OSError as e:
         raise ExternalResourceError(f"'{host}' does not resolve: {e}") from e
     return tuple(dict.fromkeys(str(info[4][0]) for info in infos))
@@ -266,12 +270,12 @@ class PolicyUrlFetcher(URLFetcher):
             if not is_public_address(address):
                 raise ExternalResourceError(f"'{host}' resolves to {address}, which is not an address on the internet")
 
-    def _vet(self, url: str) -> tuple[str, str, int, str | None]:
+    def _vet(self, url: str) -> tuple[str, str, int, tuple[str, ...]]:
         """Vet an address and return what a request to it needs.
 
         Returns:
-            The scheme, host, port, and the address to connect to, which is
-            ``None`` when a proxy carries the request and resolves the name.
+            The scheme, host, port, and the addresses which may be connected to,
+            empty when a proxy carries the request and resolves the name itself.
         """
         parts = urlsplit(url)
         scheme = parts.scheme.lower()
@@ -292,12 +296,12 @@ class PolicyUrlFetcher(URLFetcher):
             # configuration trusts by name.
             if self.policy is not ResourcePolicy.ALLOW_ALL and not allowlisted:
                 raise ExternalResourceError(f"'{host}' is reached through a proxy, so it has to be listed in {ALLOWED_ORIGINS_VAR}")
-            return scheme, host, port, None
+            return scheme, host, port, ()
 
         addresses = resolve(host, port)
         if self.policy is ResourcePolicy.BLOCK_INTERNAL and not allowlisted:
             self._check_addresses(addresses, host)
-        return scheme, host, port, addresses[0]
+        return scheme, host, port, addresses
 
     def _proxy_for(self, scheme: str, host: str) -> str | None:
         """The proxy configured for this destination, if any."""
@@ -310,8 +314,8 @@ class PolicyUrlFetcher(URLFetcher):
         """Load a resource over http, following redirects hop by hop."""
         seen = url
         for _ in range(MAX_REDIRECTS + 1):
-            scheme, host, port, address = self._vet(seen)
-            response = self._send(scheme, host, port, address, seen, headers)
+            scheme, host, port, addresses = self._vet(seen)
+            response = self._send(scheme, host, port, addresses, seen, headers)
             location = response.getheader("Location") if response.status in HTTP_REDIRECT_RANGE else None
             if location is None:
                 return self._read_response(seen, response)
@@ -321,35 +325,48 @@ class PolicyUrlFetcher(URLFetcher):
             seen = urljoin(seen, location)
         raise ExternalResourceError(f"'{url}' redirects more than {MAX_REDIRECTS} times")
 
-    def _send(self, scheme: str, host: str, port: int, address: str | None, url: str, headers: dict[str, str] | None = None) -> http.client.HTTPResponse:
-        """Send the request, bound to the address which was vetted."""
+    def _send(self, scheme: str, host: str, port: int, addresses: tuple[str, ...], url: str, headers: dict[str, str] | None = None) -> http.client.HTTPResponse:
+        """Send the request, bound to an address which was vetted."""
         parts = urlsplit(url)
         target = urlunsplit(("", "", parts.path or "/", parts.query, ""))
         proxy = self._proxy_for(scheme, host)
+        request_headers = {"User-Agent": "weasyprint-service", **(headers or {})}
+        request_headers["Host"] = host_header(host, port, scheme)
 
-        try:
-            if proxy:
+        if proxy:
+            try:
                 connection = self._through_proxy(proxy, scheme, host, port)
-                if scheme != "https":
-                    target = url
-            else:
-                connection = self._direct(scheme, host, port, address)
+                connection.request("GET", url if scheme != "https" else target, headers=request_headers)
+                return connection.getresponse()
+            except OSError as e:
+                raise ExternalResourceError(f"'{url}' could not be loaded: {e}") from e
 
-            request_headers = {"User-Agent": "weasyprint-service", **(headers or {})}
-            request_headers["Host"] = host_header(host, port, scheme)
-            connection.request("GET", target, headers=request_headers)
-            return connection.getresponse()
-        except ExternalResourceError:
-            raise
-        except OSError as e:
-            raise ExternalResourceError(f"'{url}' could not be loaded: {e}") from e
+        # Every address was vetted, so the next one may be tried when a route to
+        # the first is missing, which is the common case for a dual stack host.
+        last_error: OSError | None = None
+        for address in addresses or (host,):
+            try:
+                connection = self._direct(scheme, host, port, address)
+                connection.request("GET", target, headers=request_headers)
+                return connection.getresponse()
+            except OSError as e:
+                last_error = e
+        raise ExternalResourceError(f"'{url}' could not be loaded: {last_error}")
 
     def _through_proxy(self, proxy: str, scheme: str, host: str, port: int) -> http.client.HTTPConnection:
         """Open the connection a proxy carries, which resolves the name itself."""
         proxy_parts = urlsplit(proxy if "//" in proxy else f"//{proxy}")
-        connection = http.client.HTTPConnection(proxy_parts.hostname or "", proxy_parts.port or DEFAULT_PORTS["http"], timeout=self.timeout_seconds)
-        if scheme == "https":
-            connection.set_tunnel(host, port)
+        proxy_host = proxy_parts.hostname or ""
+        proxy_port = proxy_parts.port or DEFAULT_PORTS["http"]
+
+        if scheme != "https":
+            return http.client.HTTPConnection(proxy_host, proxy_port, timeout=self.timeout_seconds)
+
+        # An HTTPSConnection wraps the socket after the CONNECT, so the request
+        # travels encrypted inside the tunnel. A plain connection with a tunnel
+        # would put it there in the clear.
+        connection = http.client.HTTPSConnection(proxy_host, proxy_port, timeout=self.timeout_seconds, context=tls_context())
+        connection.set_tunnel(host, port)
         return connection
 
     def _direct(self, scheme: str, host: str, port: int, address: str | None) -> http.client.HTTPConnection:

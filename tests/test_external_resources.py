@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import http.server
 import ssl
 import threading
@@ -417,3 +418,33 @@ def test_a_plain_connection_is_bound_to_the_vetted_address() -> None:
 
     assert connection.host == "93.184.216.34"
     assert connection.port == 80
+
+
+def test_an_https_resource_through_a_proxy_is_tunnelled_with_tls() -> None:
+    """A plain connection with a tunnel would put the request into it in the clear."""
+    connection = PolicyUrlFetcher()._through_proxy("http://proxy.intranet:3128", "https", "cdn.example", 443)
+
+    assert isinstance(connection, http.client.HTTPSConnection)
+    assert connection.host == "proxy.intranet"
+    assert connection.port == 3128
+    assert connection._tunnel_host == "cdn.example"
+
+
+def test_a_plain_resource_through_a_proxy_needs_no_tunnel() -> None:
+    connection = PolicyUrlFetcher()._through_proxy("http://proxy.intranet:3128", "http", "cdn.example", 80)
+
+    assert not isinstance(connection, http.client.HTTPSConnection)
+    assert connection._tunnel_host is None
+
+
+def test_the_next_vetted_address_is_tried(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """A dual stack host answers with an address this container may have no route to."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    monkeypatch.setenv("EXTERNAL_RESOURCES_TIMEOUT_SECONDS", "0.3")
+    port = int(local_server.rsplit(":", 1)[1])
+    # 192.0.2.1 is the documentation range: reserved, and no route leads there.
+    monkeypatch.setattr("app.external_resources.resolve", lambda host, port_number: ("192.0.2.1", "127.0.0.1"))
+
+    response = PolicyUrlFetcher().fetch(f"http://127.0.0.1:{port}/image.png")
+
+    assert response.content_type == "image/png"

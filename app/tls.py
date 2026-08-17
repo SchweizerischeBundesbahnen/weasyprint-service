@@ -126,6 +126,51 @@ def get_tls_options(prefix: str = API_TLS_PREFIX) -> dict[str, Any]:
     return options
 
 
+def verify_tls_material(options: dict[str, Any], prefix: str = API_TLS_PREFIX) -> None:
+    """
+    Load the configured certificate, key and CA once, before a server needs them.
+
+    Naming a readable file is not the same as holding usable material: a key
+    which does not match its certificate, or a wrong password, would otherwise
+    surface at the first connection, or be swallowed by a caller which tolerates
+    a server failing to start.
+
+    Args:
+        options: Result of get_tls_options, empty for plain HTTP.
+        prefix: Variable prefix the options were read with, for the message.
+
+    Raises:
+        TlsConfigurationError: When the material does not load.
+    """
+    if not options:
+        return
+
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    try:
+        context.load_cert_chain(options["ssl_certfile"], options["ssl_keyfile"], options.get("ssl_keyfile_password"))
+    except OSError as e:  # ssl.SSLError derives from it
+        raise TlsConfigurationError(f"{prefix + CERT_FILE} and {prefix + KEY_FILE} do not load together: {e}") from e
+
+    client_ca_file = options.get("ssl_ca_certs")
+    if client_ca_file:
+        try:
+            context.load_verify_locations(cafile=client_ca_file)
+        except OSError as e:  # ssl.SSLError derives from it
+            raise TlsConfigurationError(f"{prefix + CLIENT_CA_FILE} does not load: {e}") from e
+
+
+def load_tls_options(prefix: str = API_TLS_PREFIX) -> dict[str, Any]:
+    """
+    Read the configuration and prove the material loads.
+
+    This is what a server start uses. get_tls_options alone reads the rules,
+    which is what the configuration is checked against in tests.
+    """
+    options = get_tls_options(prefix)
+    verify_tls_material(options, prefix)
+    return options
+
+
 def get_scheme(tls_options: dict[str, Any]) -> str:
     """Return the URL scheme the given options serve."""
     return "https" if tls_options else "http"

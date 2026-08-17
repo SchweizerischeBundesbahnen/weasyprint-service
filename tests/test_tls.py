@@ -1,7 +1,9 @@
 """Tests for the optional TLS configuration."""
 
 import asyncio
+import shutil
 import ssl
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,8 @@ from app.tls import (
     TlsConfigurationError,
     get_scheme,
     get_tls_options,
+    load_tls_options,
+    verify_tls_material,
 )
 
 TLS_VARIABLES = [prefix + suffix for prefix in (API_TLS_PREFIX, METRICS_TLS_PREFIX) for suffix in ("CERT_FILE", "KEY_FILE", "KEY_PASSWORD", "CLIENT_CA_FILE", "CLIENT_AUTH")]
@@ -168,10 +172,44 @@ def test_client_rules_without_a_certificate_are_rejected(monkeypatch: pytest.Mon
         get_tls_options()
 
 
+def test_material_which_does_not_load_is_reported(monkeypatch: pytest.MonkeyPatch, pem_files: tuple[str, str, str]) -> None:
+    """A readable file is not usable material: the key has to match its certificate."""
+    cert, key, _ = pem_files
+    monkeypatch.setenv("TLS_CERT_FILE", cert)
+    monkeypatch.setenv("TLS_KEY_FILE", key)
+
+    with pytest.raises(TlsConfigurationError, match="do not load together"):
+        load_tls_options()
+
+
+def test_nothing_is_loaded_without_a_configuration() -> None:
+    assert load_tls_options() == {}
+    verify_tls_material({})
+
+
+def test_real_material_loads(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    openssl = shutil.which("openssl")
+    if not openssl:
+        pytest.skip("openssl is not available to produce a certificate")
+
+    cert = tmp_path / "server.pem"
+    key = tmp_path / "server.key"
+    subprocess.run(
+        [openssl, "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", str(key), "-out", str(cert), "-days", "1", "-subj", "/CN=localhost"],
+        check=True,
+        capture_output=True,
+    )
+    monkeypatch.setenv("TLS_CERT_FILE", str(cert))
+    monkeypatch.setenv("TLS_KEY_FILE", str(key))
+
+    assert load_tls_options() == {"ssl_certfile": str(cert), "ssl_keyfile": str(key)}
+
+
 def test_api_server_is_started_with_the_configured_options(monkeypatch: pytest.MonkeyPatch, pem_files: tuple[str, str, str]) -> None:
     cert, key, _ = pem_files
     monkeypatch.setenv("TLS_CERT_FILE", cert)
     monkeypatch.setenv("TLS_KEY_FILE", key)
+    monkeypatch.setattr(weasyprint_service_application, "load_tls_options", lambda: {"ssl_certfile": cert, "ssl_keyfile": key})
     captured: dict[str, object] = {}
 
     def fake_run(**kwargs: object) -> None:
@@ -188,6 +226,7 @@ def test_metrics_server_is_configured_with_its_own_options(monkeypatch: pytest.M
     cert, key, _ = pem_files
     monkeypatch.setenv("METRICS_TLS_CERT_FILE", cert)
     monkeypatch.setenv("METRICS_TLS_KEY_FILE", key)
+    monkeypatch.setattr(metrics_server, "load_tls_options", lambda prefix: {"ssl_certfile": cert, "ssl_keyfile": key})
     captured: dict[str, object] = {}
 
     class FakeConfig:

@@ -9,7 +9,7 @@ import uvicorn
 from app import weasyprint_controller
 from app.auth import get_api_keys
 from app.constants import get_bool_env
-from app.tls import API_TLS_PREFIX, METRICS_TLS_PREFIX, get_scheme, get_tls_options
+from app.tls import API_TLS_PREFIX, METRICS_TLS_PREFIX, get_scheme, get_tls_options, load_tls_options
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ def setup_logging() -> Path:
 
 
 def start_server(port: int) -> None:
-    uvicorn.run(app=weasyprint_controller.app, host="", port=port, **get_tls_options())
+    uvicorn.run(app=weasyprint_controller.app, host="", port=port, **load_tls_options())
 
 
 def main() -> None:

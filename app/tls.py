@@ -49,11 +49,8 @@ def _readable_file(value: str, name: str) -> str:
     path = Path(value)
     if not path.is_file():
         raise TlsConfigurationError(f"{name} points to '{value}', which is not a file")
-    try:
-        with path.open("rb"):
-            pass
-    except OSError as e:
-        raise TlsConfigurationError(f"{name} points to '{value}', which cannot be read: {e}") from e
+    if not os.access(path, os.R_OK):
+        raise TlsConfigurationError(f"{name} points to '{value}', which cannot be read")
     return value
 
 
@@ -64,6 +61,30 @@ def _client_auth_mode(prefix: str) -> tuple[str, int]:
         allowed = ", ".join(sorted(CLIENT_AUTH_MODES))
         raise TlsConfigurationError(f"{prefix + CLIENT_AUTH} is '{configured}', expected one of: {allowed}")
     return configured, CLIENT_AUTH_MODES[configured]
+
+
+def _reject_client_rules_without_certificate(prefix: str) -> None:
+    """A client rule without a certificate would never take effect."""
+    if _read(prefix + CLIENT_AUTH).lower() not in ("", "none") or _read(prefix + CLIENT_CA_FILE):
+        raise TlsConfigurationError(f"{prefix + CLIENT_AUTH} or {prefix + CLIENT_CA_FILE} is configured without {prefix + CERT_FILE} and {prefix + KEY_FILE}")
+
+
+def _client_options(prefix: str) -> dict[str, Any]:
+    """Build the client certificate arguments, empty when no client is verified."""
+    mode_name, mode = _client_auth_mode(prefix)
+    client_ca_file = _read(prefix + CLIENT_CA_FILE)
+
+    if mode_name == "none":
+        if client_ca_file:
+            raise TlsConfigurationError(f"{prefix + CLIENT_CA_FILE} is configured while {prefix + CLIENT_AUTH} is 'none', so no client certificate would ever be verified")
+        return {}
+
+    if not client_ca_file:
+        raise TlsConfigurationError(f"{prefix + CLIENT_CA_FILE} is required when {prefix + CLIENT_AUTH} is '{mode_name}'")
+    return {
+        "ssl_ca_certs": _readable_file(client_ca_file, prefix + CLIENT_CA_FILE),
+        "ssl_cert_reqs": mode,
+    }
 
 
 def get_tls_options(prefix: str = API_TLS_PREFIX) -> dict[str, Any]:
@@ -84,10 +105,7 @@ def get_tls_options(prefix: str = API_TLS_PREFIX) -> dict[str, Any]:
     key_file = _read(prefix + KEY_FILE)
 
     if not cert_file and not key_file:
-        # A client rule without a certificate would never take effect, so it is
-        # reported rather than ignored.
-        if _read(prefix + CLIENT_AUTH).lower() not in ("", "none") or _read(prefix + CLIENT_CA_FILE):
-            raise TlsConfigurationError(f"{prefix + CLIENT_AUTH} or {prefix + CLIENT_CA_FILE} is configured without {prefix + CERT_FILE} and {prefix + KEY_FILE}")
+        _reject_client_rules_without_certificate(prefix)
         return {}
 
     if not cert_file or not key_file:
@@ -104,17 +122,7 @@ def get_tls_options(prefix: str = API_TLS_PREFIX) -> dict[str, Any]:
     if key_password:
         options["ssl_keyfile_password"] = key_password
 
-    mode_name, mode = _client_auth_mode(prefix)
-    client_ca_file = _read(prefix + CLIENT_CA_FILE)
-    if mode_name == "none":
-        if client_ca_file:
-            raise TlsConfigurationError(f"{prefix + CLIENT_CA_FILE} is configured while {prefix + CLIENT_AUTH} is 'none', so no client certificate would ever be verified")
-    else:
-        if not client_ca_file:
-            raise TlsConfigurationError(f"{prefix + CLIENT_CA_FILE} is required when {prefix + CLIENT_AUTH} is '{mode_name}'")
-        options["ssl_ca_certs"] = _readable_file(client_ca_file, prefix + CLIENT_CA_FILE)
-        options["ssl_cert_reqs"] = mode
-
+    options.update(_client_options(prefix))
     return options
 
 

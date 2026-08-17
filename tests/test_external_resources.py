@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import http.client
 import http.server
 import ssl
@@ -31,6 +32,9 @@ from app.external_resources import (
 POLICY_VARIABLES = (POLICY_VAR, ALLOWED_ORIGINS_VAR, MAX_SIZE_MB_VAR, "EXTERNAL_RESOURCES_TIMEOUT_SECONDS")
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+# A body announced far larger than it arrives, a byte every 50 ms.
+DRIP_BYTES = 200
 
 REDIRECT_TARGETS = {
     "/redirect-to-image": "/image.png",
@@ -65,6 +69,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             "/missing": (404, "text/plain", b"gone"),
         }
         path, _, query = self.path.partition("?")
+        if path == "/dripping.png":
+            self._drip()
+            return
         if path == "/redirect-query-only" and query:
             path = "/image.png"
         elif path in REDIRECT_TARGETS:
@@ -76,6 +83,18 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _drip(self) -> None:
+        """Answer a byte at a time, the shape which outlasts a timer each byte resets."""
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(DRIP_BYTES))
+        self.end_headers()
+        with contextlib.suppress(OSError):
+            for _ in range(DRIP_BYTES):
+                self.wfile.write(b"\x00")
+                self.wfile.flush()
+                time.sleep(0.05)
 
     def _redirect(self, path: str) -> None:
         """Answer the redirects the tests follow."""
@@ -91,7 +110,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 @pytest.fixture
 def local_server() -> Iterator[str]:
     """A server on the loopback interface, which the policy treats as internal."""
-    server = http.server.HTTPServer(("127.0.0.1", 0), _Handler)
+    # Threading: a handler which answers slowly must not hold the others.
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -474,3 +494,17 @@ def test_a_request_is_never_made_to_a_name() -> None:
 
     with pytest.raises(ExternalResourceError, match="no address which may be connected to"):
         fetcher._send("http", "cdn.example", 80, (), "http://cdn.example/image.png")
+
+
+def test_a_body_which_arrives_too_slowly_is_given_up(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """A server dripping a byte holds the connection past the deadline of the load otherwise."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    monkeypatch.setenv("EXTERNAL_RESOURCES_TIMEOUT_SECONDS", "0.5")
+    fetcher = PolicyUrlFetcher()
+
+    started = time.monotonic()
+    with pytest.raises(ExternalResourceError, match="took longer than"):
+        fetcher.fetch(f"{local_server}/dripping.png")
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 3, f"the fetch spent {elapsed:.1f}s on a body it should have given up on"

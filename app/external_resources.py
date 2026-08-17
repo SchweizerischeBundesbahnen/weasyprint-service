@@ -52,6 +52,7 @@ TIMEOUT_VAR = "EXTERNAL_RESOURCES_TIMEOUT_SECONDS"
 DEFAULT_MAX_SIZE_MB = 16
 DEFAULT_TIMEOUT_SECONDS = 10
 MAX_REDIRECTS = 5
+READ_CHUNK_BYTES = 64 * 1024
 HTTP_OK = 200
 HTTP_REDIRECT_RANGE = range(300, 400)
 DEFAULT_PORTS = {"http": 80, "https": 443}
@@ -317,10 +318,10 @@ class PolicyUrlFetcher(URLFetcher):
         seen = url
         for _ in range(MAX_REDIRECTS + 1):
             scheme, host, port, addresses = self._vet(seen)
-            response = self._send(scheme, host, port, addresses, seen, headers, deadline)
+            connection, response = self._send(scheme, host, port, addresses, seen, headers, deadline)
             location = response.getheader("Location") if response.status in HTTP_REDIRECT_RANGE else None
             if location is None:
-                return self._read_response(seen, response)
+                return self._read_response(seen, response, connection, deadline)
             # A hop carries no resource, and its body is bounded like any other.
             response.read(self.max_size_bytes)
             response.close()
@@ -334,7 +335,7 @@ class PolicyUrlFetcher(URLFetcher):
             raise ExternalResourceError(f"'{url}' took longer than the {self.timeout_seconds} seconds a resource may take")
         return remaining
 
-    def _send(self, scheme: str, host: str, port: int, addresses: tuple[str, ...], url: str, headers: dict[str, str] | None = None, deadline: float | None = None) -> http.client.HTTPResponse:
+    def _send(self, scheme: str, host: str, port: int, addresses: tuple[str, ...], url: str, headers: dict[str, str] | None = None, deadline: float | None = None) -> tuple[http.client.HTTPConnection, http.client.HTTPResponse]:
         """Send the request, bound to an address which was vetted."""
         parts = urlsplit(url)
         target = urlunsplit(("", "", parts.path or "/", parts.query, ""))
@@ -371,11 +372,11 @@ class PolicyUrlFetcher(URLFetcher):
         raise ExternalResourceError(f"'{url}' could not be loaded: {last_error}")
 
     @staticmethod
-    def _ask(connection: http.client.HTTPConnection, target: str, request_headers: dict[str, str], url: str) -> http.client.HTTPResponse:
+    def _ask(connection: http.client.HTTPConnection, target: str, request_headers: dict[str, str], url: str) -> tuple[http.client.HTTPConnection, http.client.HTTPResponse]:
         """Send the request, closing the connection when it does not answer."""
         try:
             connection.request("GET", target, headers=request_headers)
-            return connection.getresponse()
+            return connection, connection.getresponse()
         except OSError as e:
             connection.close()
             raise ExternalResourceError(f"'{url}' could not be loaded: {e}") from e
@@ -418,7 +419,24 @@ class PolicyUrlFetcher(URLFetcher):
             raise
         return connection
 
-    def _read_response(self, url: str, response: http.client.HTTPResponse) -> URLFetcherResponse:
+    def _read_body(self, url: str, response: http.client.HTTPResponse, connection: http.client.HTTPConnection, deadline: float) -> bytes:
+        """Read a body under the deadline of the load, not under a timer each byte resets."""
+        chunks: list[bytes] = []
+        size = 0
+        while size <= self.max_size_bytes:
+            remaining = self._remaining(deadline, url)
+            if connection.sock is not None:
+                connection.sock.settimeout(remaining)
+            # read1 returns what one read of the socket gave, so the deadline is
+            # looked at again for every piece rather than once a buffer is full.
+            chunk = response.read1(min(READ_CHUNK_BYTES, self.max_size_bytes + 1 - size))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+        return b"".join(chunks)
+
+    def _read_response(self, url: str, response: http.client.HTTPResponse, connection: http.client.HTTPConnection, deadline: float) -> URLFetcherResponse:
         """Read a body which is of an allowed kind and within the size limit."""
         with response:
             if response.status != HTTP_OK:
@@ -428,7 +446,7 @@ class PolicyUrlFetcher(URLFetcher):
             if declared and not declared.startswith(ALLOWED_CONTENT_TYPES) and declared not in UNDECLARED_CONTENT_TYPES:
                 raise ExternalResourceError(f"'{url}' is served as '{declared}', which is not an image, a font or a stylesheet")
 
-            body = response.read(self.max_size_bytes + 1)
+            body = self._read_body(url, response, connection, deadline)
             if len(body) > self.max_size_bytes:
                 raise ExternalResourceError(f"'{url}' is larger than the {self.max_size_bytes // (1024 * 1024)} MB a resource may reach")
 

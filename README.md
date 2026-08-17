@@ -449,9 +449,11 @@ docker run --detach \
 
 An incomplete configuration stops the start with a message naming the variable. The service never falls back to plain HTTP, because serving in the clear while an operator believes otherwise is worse than not starting.
 
+The material is loaded before either server listens, so a key which does not match its certificate, a wrong `TLS_KEY_PASSWORD` or an unusable CA also stop the start, rather than surfacing at the first connection.
+
 **Mutual TLS.** With `TLS_CLIENT_AUTH=required` the service accepts only clients presenting a certificate signed by `TLS_CLIENT_CA_FILE`. That authenticates the caller, which the API key below does not: the certificate says who connected, the key says who may convert. The two combine.
 
-**The healthcheck of the container** follows the configured scheme. It talks to its own process over loopback, so it does not verify the certificate. Where client certificates are required, give the probe one with `TLS_HEALTHCHECK_CERT_FILE` and `TLS_HEALTHCHECK_KEY_FILE`, otherwise the container reports itself unhealthy.
+**The healthcheck of the container** follows the configured scheme. It talks to its own process over loopback, so it does not verify the certificate. Where client certificates are required, give the probe one with `TLS_HEALTHCHECK_CERT_FILE` and `TLS_HEALTHCHECK_KEY_FILE`, otherwise the container reports itself unhealthy. The two go together: one without the other fails the probe with a message naming them, rather than an opaque handshake error.
 
 **Certificate renewal.** The certificate is read once, at startup. A renewed certificate takes effect when the container restarts.
 

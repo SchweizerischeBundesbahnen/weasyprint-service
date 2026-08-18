@@ -195,6 +195,10 @@ grype weasyprint-service:0.0.0
 - `WEASYPRINT_SERVICE_VERSION`: Service version (set during build)
 - `WEASYPRINT_SERVICE_BUILD_TIMESTAMP`: Build timestamp (set during build)
 
+**External resources (see `app/external_resources.py`):**
+- `EXTERNAL_RESOURCES_POLICY` (BLOCK_INTERNAL default / ALLOWLIST_ONLY / ALLOW_ALL), `EXTERNAL_RESOURCES_ALLOWED_ORIGINS` (`[scheme://]host[:port]`, comma separated), `EXTERNAL_RESOURCES_MAX_SIZE_MB` (16), `EXTERNAL_RESOURCES_TIMEOUT_SECONDS` (10).
+- `PolicyUrlFetcher` is passed to every `weasyprint.HTML(...)` call: addresses are vetted and pinned, redirects re-vetted, bodies capped and restricted to images, fonts and stylesheets. `file:` is refused outside the request temporary directory, which is what makes `/convert/html-with-attachments` keep working.
+
 **TLS (see `app/tls.py`):**
 - `TLS_CERT_FILE`, `TLS_KEY_FILE`, `TLS_KEY_PASSWORD`, `TLS_CLIENT_CA_FILE`, `TLS_CLIENT_AUTH` (none/optional/required): serve the API over HTTPS. Unset means plain HTTP (default).
 - `METRICS_TLS_*`: the same five for the metrics server, configured independently. Neither set inherits from the other.

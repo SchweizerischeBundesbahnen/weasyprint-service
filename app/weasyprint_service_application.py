@@ -9,6 +9,7 @@ import uvicorn
 from app import weasyprint_controller
 from app.auth import get_api_keys
 from app.constants import get_bool_env
+from app.external_resources import load_policy
 from app.tls import API_TLS_PREFIX, METRICS_TLS_PREFIX, get_scheme, get_tls_options, load_tls_options
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,10 @@ def main() -> None:
     # Read the TLS configuration before the server starts, so a broken one is
     # reported here instead of deep inside uvicorn.
     logger.info("Weasyprint service scheme: %s", get_scheme(get_tls_options(API_TLS_PREFIX)))
+
+    # Read the resource policy here as well: a malformed origin stops the start
+    # rather than every conversion which reaches for a resource.
+    load_policy()
 
     api_keys = get_api_keys()
     if api_keys:

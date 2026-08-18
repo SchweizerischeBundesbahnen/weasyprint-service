@@ -408,6 +408,51 @@ docker run --detach \
 --volume /path/to/logs:/opt/weasyprint/logs
 ```
 
+### External resources of a document
+
+A document names its own resources: an image, a font, a stylesheet. WeasyPrint loads what it names, so a document reaching this service can make it read an address of the network it sits in, and `<link rel="attachment">` returns the answer inside the produced PDF.
+
+Every load therefore goes through a policy. By default the service refuses every address which is not public: loopback, private ranges, link local including the cloud metadata address `169.254.169.254`, and their IPv6 equivalents.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `EXTERNAL_RESOURCES_POLICY` | `BLOCK_INTERNAL` | `BLOCK_INTERNAL`, `ALLOWLIST_ONLY` or `ALLOW_ALL` |
+| `EXTERNAL_RESOURCES_ALLOWED_ORIGINS` | empty | Comma separated origins which are allowed whatever they resolve to |
+| `EXTERNAL_RESOURCES_MAX_SIZE_MB` | `16` | Size a single resource may reach |
+| `EXTERNAL_RESOURCES_TIMEOUT_SECONDS` | `10` | Time the whole load of one resource may take, its redirects and its address attempts included. Resolving a name is bounded by the resolver of the host rather than by this value, so one lookup may outlast it. No further lookup starts once it has passed |
+
+To load resources from an internal host, list its origin:
+
+```properties
+EXTERNAL_RESOURCES_ALLOWED_ORIGINS=cdn.intranet,https://images.intranet:8443
+```
+
+An entry is written `[scheme://]host[:port]`, and what it leaves out is not compared:
+
+| Entry | What it allows |
+| --- | --- |
+| `cdn.intranet` | that host under either scheme, on any port |
+| `cdn.intranet:8443` | that host on port 8443, under either scheme |
+| `https://cdn.intranet` | that host under https, on port 443 |
+| `https://cdn.intranet:8443` | that host under https, on port 8443 |
+
+The three policies:
+
+```bash
+# BLOCK_INTERNAL (default) - public addresses and the allowed origins
+# ALLOWLIST_ONLY           - only the allowed origins
+# ALLOW_ALL                - no restriction, this exposes the network of the service to whoever writes a document
+-e EXTERNAL_RESOURCES_POLICY=ALLOWLIST_ONLY
+```
+
+**How a request is made.** The name is resolved, every address it answers with is checked, and the request is bound to what was checked, so a second lookup cannot answer differently. Every redirect hop is checked again, at most five of them. A loaded resource has to be an image, a font or a stylesheet, by the declared type and, where a server declares none, by the content itself. That last rule is what closes `<link rel="attachment">` as a way to read a body back.
+
+**Schemes.** `data:` passes, it carries its own content. `file:` is refused, except for the files uploaded with a request to `/convert/html-with-attachments`, which the service itself put in a temporary directory. `ftp:` and everything else are refused.
+
+**Behind a proxy.** A proxy resolves the name itself, so such a request cannot be bound to a checked address. It is made only for a host listed in `EXTERNAL_RESOURCES_ALLOWED_ORIGINS`. Where a proxy is configured for every destination, `BLOCK_INTERNAL` therefore behaves as `ALLOWLIST_ONLY`.
+
+Blocked resources are reported in the log and the document is rendered without them, which is how WeasyPrint treats a resource it cannot load.
+
 ### HTTPS
 
 Both servers speak plain HTTP by default, which is what a deployment behind a reverse proxy or an ingress expects: TLS terminates there and nothing has to be configured here. That remains the recommended setup where such a component is already in place.

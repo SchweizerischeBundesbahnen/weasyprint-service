@@ -72,6 +72,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             "/secret.txt": (200, "text/plain", b"top secret"),
             "/undeclared": (200, "application/octet-stream", PNG),
             "/undeclared-text": (200, "application/octet-stream", b"top secret"),
+            "/styles.css": (200, "text/css; charset=iso-8859-1", b"body { color: red }"),
             "/huge.png": (200, "image/png", PNG + b"\x00" * (2 * 1024 * 1024)),
             "/missing": (404, "text/plain", b"gone"),
         }
@@ -651,3 +652,60 @@ def test_a_readable_configuration_is_reported_at_the_start(monkeypatch: pytest.M
     monkeypatch.setenv(ALLOWED_ORIGINS_VAR, "cdn.intranet, https://fonts.example")
 
     assert load_policy() is ResourcePolicy.ALLOWLIST_ONLY
+
+
+def test_a_stylesheet_keeps_the_charset_it_was_served_with(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """The rule reads the declared type, and what is handed on is what decodes the body."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+
+    response = PolicyUrlFetcher().fetch(f"{local_server}/styles.css")
+
+    # WeasyPrint normalises the parameter it parses, so the charset is read
+    # back rather than compared as a string.
+    assert response.headers.get_content_charset() == "iso-8859-1"
+
+
+def test_a_url_which_names_no_usable_port_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SplitResult.port raises rather than answering None, and a document writes the url."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    fetcher = PolicyUrlFetcher()
+
+    with pytest.raises(ExternalResourceError, match="no usable port"):
+        fetcher.fetch("http://cdn.example:80x/image.png")
+
+
+def test_a_url_whose_port_is_out_of_range_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    fetcher = PolicyUrlFetcher()
+
+    with pytest.raises(ExternalResourceError, match="no usable port"):
+        fetcher.fetch("http://cdn.example:99999/image.png")
+
+
+def test_an_origin_whose_port_is_out_of_range_stops_the_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The check at the start is there for a typo, and this is one it used to accept."""
+    monkeypatch.setenv(ALLOWED_ORIGINS_VAR, "cdn.intranet:70000")
+
+    with pytest.raises(ExternalResourceError, match="which is not a port"):
+        load_policy()
+
+
+def test_a_proxied_request_carries_neither_userinfo_nor_fragment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The absolute form of RFC 7230 is built, not taken from the url a document wrote."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    monkeypatch.setenv("http_proxy", "http://proxy.intranet:3128")
+    asked: dict[str, str] = {}
+
+    def record(connection: object, target: str, request_headers: dict[str, str], url: str) -> tuple[object, object]:
+        asked["target"] = target
+        raise ExternalResourceError("stop here, the request is what this test reads")
+
+    monkeypatch.setattr(PolicyUrlFetcher, "_ask", staticmethod(record))
+    monkeypatch.setattr(PolicyUrlFetcher, "_through_proxy", lambda *args, **kwargs: None)
+
+    fetcher = PolicyUrlFetcher()
+
+    with pytest.raises(ExternalResourceError):
+        fetcher.fetch("http://user:pass@cdn.example/sprite.svg?v=2#icon")
+
+    assert asked["target"] == "http://cdn.example/sprite.svg?v=2"

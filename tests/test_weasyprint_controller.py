@@ -1,9 +1,11 @@
 import os
 import platform
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
+from pypdf import PdfReader
 
 from app.weasyprint_controller import app
 
@@ -73,6 +75,28 @@ def test_convert_html_with_attachments_files():
             files=files,
         )
         assert result.status_code == 200
+
+
+def test_an_attachment_the_html_links_to_is_embedded():
+    """The endpoint rewrites the href to a file: URI, which only its own temporary directory may serve.
+
+    A status code alone would still pass with the attachment dropped, since
+    WeasyPrint swallows a fetch which fails, so the result is read: this is what
+    fails if the resource policy stops granting the endpoint its own directory.
+    """
+    attachment_path = Path("tests/test-data/html-with-attachments/attachment2.pdf")
+    html = f'<html><head><link rel="attachment" href="{attachment_path.name}"></head><body>Attached</body></html>'
+    files = [("files", (attachment_path.name, attachment_path.read_bytes(), "application/pdf"))]
+
+    with TestClient(app) as test_client:
+        result = test_client.post(
+            "/convert/html-with-attachments?base_url=/",
+            data={"html": html},
+            files=files,
+        )
+        assert result.status_code == 200
+
+    assert attachment_path.name in PdfReader(BytesIO(result.content)).attachments
 
 
 def test_health_with_chromium_unhealthy():

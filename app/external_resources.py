@@ -57,6 +57,7 @@ READ_CHUNK_BYTES = 64 * 1024
 HTTP_OK = 200
 HTTP_REDIRECT_RANGE = range(300, 400)
 DEFAULT_PORTS = {"http": 80, "https": 443}
+MAX_PORT = 65535
 
 # What a document may load: an image, a font or a stylesheet. Anything else is
 # not a resource of a page, it is a body someone wants read back.
@@ -117,6 +118,8 @@ class Origin:
         scheme = match["scheme"].lower() if match["scheme"] else None
         if match["port"]:
             port = int(match["port"])
+            if not 0 <= port <= MAX_PORT:
+                raise ExternalResourceError(f"'{value}' names port {port}, which is not a port")
         elif scheme:
             port = DEFAULT_PORTS[scheme]
         else:
@@ -318,7 +321,13 @@ class PolicyUrlFetcher(URLFetcher):
         if scheme not in DEFAULT_PORTS:
             raise ExternalResourceError(f"'{scheme}:' is not a scheme a document may load from")
         host = parts.hostname or ""
-        port = parts.port or DEFAULT_PORTS[scheme]
+        # SplitResult.port raises rather than answering None, and a document
+        # writes this url, so the parser error becomes the refusal every other
+        # failed load raises.
+        try:
+            port = parts.port or DEFAULT_PORTS[scheme]
+        except ValueError as e:
+            raise ExternalResourceError(f"'{url}' names no usable port: {e}") from e
         if not host:
             raise ExternalResourceError(f"'{url}' names no host")
 
@@ -394,11 +403,16 @@ class PolicyUrlFetcher(URLFetcher):
 
         if proxy:
             connection = self._through_proxy(proxy, scheme, host, port, self._remaining(deadline, url))
-            if scheme != "https":
-                # A plain request travels to the proxy itself, so its
-                # credentials belong to this request rather than to a tunnel.
-                request_headers.update(proxy_authorization(proxy))
-            return self._ask(connection, url if scheme != "https" else target, request_headers, url)
+            if scheme == "https":
+                return self._ask(connection, target, request_headers, url)
+            # A plain request travels to the proxy itself, so its credentials
+            # belong to this request rather than to a tunnel, and the target is
+            # built rather than taken from the url: the absolute form of RFC
+            # 7230 carries neither the userinfo a document may write nor the
+            # fragment a stylesheet leaves on a font.
+            request_headers.update(proxy_authorization(proxy))
+            absolute = urlunsplit((scheme, host_header(host, port, scheme), parts.path or "/", parts.query, ""))
+            return self._ask(connection, absolute, request_headers, url)
 
         # A request is made to an address which was vetted, never to a name: the
         # name would be resolved again, by whoever answers next.
@@ -515,7 +529,10 @@ class PolicyUrlFetcher(URLFetcher):
             if declared in UNDECLARED_CONTENT_TYPES and not _looks_like_a_resource(body):
                 raise ExternalResourceError(f"'{url}' declares no usable content type and its body is not an image or a font")
 
-            headers = {"Content-Type": declared or "application/octet-stream"}
+            # The declared type is what the rule is applied to; what is handed
+            # on is what the server sent, so the charset of a stylesheet is
+            # still there to decode it with.
+            headers = {"Content-Type": response.getheader("Content-Type") or "application/octet-stream"}
             return URLFetcherResponse(url=url, body=body, headers=headers, status=response.status)
 
 

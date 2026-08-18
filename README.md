@@ -445,7 +445,7 @@ The three policies:
 -e EXTERNAL_RESOURCES_POLICY=ALLOWLIST_ONLY
 ```
 
-**How a request is made.** The name is resolved, every address it answers with is checked, and the request is bound to what was checked, so a second lookup cannot answer differently. Every redirect hop is checked again, at most five of them. A loaded resource has to be an image, a font or a stylesheet, by the declared type and, where a server declares none, by the content itself. That last rule is what closes `<link rel="attachment">` as a way to read a body back.
+**How a request is made.** The name is resolved, every address it answers with is checked, and the request is bound to what was checked, so a second lookup cannot answer differently. Every redirect hop is checked again, at most five of them. A loaded resource has to be an image, a font or a stylesheet, by the declared type and, where a server declares none, by the content itself. That last rule is what closes `<link rel="attachment">` as a way to read a body back, and it costs one thing: a stylesheet served without a content type is refused, because a stylesheet cannot be told from any other text by its first bytes, and it is text bodies which the rule is there to keep out. A server which declares `text/css` is loaded as before.
 
 **Schemes.** `data:` passes, it carries its own content. `file:` is refused, except for the files uploaded with a request to `/convert/html-with-attachments`, which the service itself put in a temporary directory. `ftp:` and everything else are refused.
 

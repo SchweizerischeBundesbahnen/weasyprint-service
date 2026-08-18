@@ -22,6 +22,7 @@ Three variables configure it: ``EXTERNAL_RESOURCES_POLICY``,
 
 from __future__ import annotations
 
+import base64
 import http.client
 import ipaddress
 import logging
@@ -34,7 +35,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
 from urllib.request import getproxies, proxy_bypass, url2pathname
 
 from weasyprint.urls import URLFetcher, URLFetcherResponse  # type: ignore[import-untyped]
@@ -208,6 +209,19 @@ def host_header(host: str, port: int, scheme: str) -> str:
     return literal if port == DEFAULT_PORTS[scheme] else f"{literal}:{port}"
 
 
+def proxy_authorization(proxy: str) -> dict[str, str]:
+    """The header a proxy which asks for credentials expects, taken from its URL.
+
+    ``http_proxy=http://user:pass@proxy.intranet:3128`` is how a deployment
+    states them, and the fetcher this service replaced read them the same way.
+    """
+    parts = urlsplit(proxy if "//" in proxy else f"//{proxy}")
+    if not parts.username:
+        return {}
+    credentials = f"{unquote(parts.username)}:{unquote(parts.password or '')}"
+    return {"Proxy-Authorization": f"Basic {base64.b64encode(credentials.encode()).decode()}"}
+
+
 def resolve(host: str, port: int) -> tuple[str, ...]:
     """Resolve a host to every address it answers with.
 
@@ -219,6 +233,26 @@ def resolve(host: str, port: int) -> tuple[str, ...]:
     except OSError as e:
         raise ExternalResourceError(f"'{host}' does not resolve: {e}") from e
     return tuple(dict.fromkeys(str(info[4][0]) for info in infos))
+
+
+def load_policy() -> ResourcePolicy:
+    """Read the whole configuration once and prove it parses.
+
+    A server start uses this, so a malformed entry stops the start instead of
+    failing every conversion at request time. The readers are what a request
+    calls, and the other three fall back on their own; the origins are the one
+    thing which cannot be guessed at, so a typo there has to be seen here.
+    """
+    policy = get_policy()
+    origins = get_allowed_origins()
+    logger.info(
+        "External resources policy: %s, %d allowed origin(s), %d MB per resource, %.1fs per load",
+        policy.value,
+        len(origins),
+        get_max_size_bytes() // (1024 * 1024),
+        get_timeout_seconds(),
+    )
+    return policy
 
 
 class PolicyUrlFetcher(URLFetcher):
@@ -324,14 +358,21 @@ class PolicyUrlFetcher(URLFetcher):
         for _ in range(MAX_REDIRECTS + 1):
             scheme, host, port, addresses = self._vet(seen, deadline)
             connection, response = self._send(scheme, host, port, addresses, seen, headers, deadline)
-            location = response.getheader("Location") if response.status in HTTP_REDIRECT_RANGE else None
-            if location is None:
-                return self._read_response(seen, response, connection, deadline)
-            # A hop carries no resource, and its body is bounded like any other,
-            # in time as well as in size: a server which drips a redirect body
-            # holds the load open exactly as one dripping an image would.
-            with response:
-                self._read_body(seen, response, connection, deadline)
+            # Closing the response releases its reader, not the socket under it,
+            # and a hop opens a connection of its own, so each one is closed
+            # here rather than left to the collector.
+            try:
+                location = response.getheader("Location") if response.status in HTTP_REDIRECT_RANGE else None
+                if location is None:
+                    return self._read_response(seen, response, connection, deadline)
+                # A hop carries no resource, and its body is bounded like any
+                # other, in time as well as in size: a server which drips a
+                # redirect body holds the load open exactly as one dripping an
+                # image would.
+                with response:
+                    self._read_body(seen, response, connection, deadline)
+            finally:
+                connection.close()
             seen = urljoin(seen, location)
         raise ExternalResourceError(f"'{url}' redirects more than {MAX_REDIRECTS} times")
 
@@ -353,6 +394,10 @@ class PolicyUrlFetcher(URLFetcher):
 
         if proxy:
             connection = self._through_proxy(proxy, scheme, host, port, self._remaining(deadline, url))
+            if scheme != "https":
+                # A plain request travels to the proxy itself, so its
+                # credentials belong to this request rather than to a tunnel.
+                request_headers.update(proxy_authorization(proxy))
             return self._ask(connection, url if scheme != "https" else target, request_headers, url)
 
         # A request is made to an address which was vetted, never to a name: the
@@ -384,7 +429,7 @@ class PolicyUrlFetcher(URLFetcher):
         try:
             connection.request("GET", target, headers=request_headers)
             return connection, connection.getresponse()
-        except OSError as e:
+        except (OSError, http.client.HTTPException) as e:
             connection.close()
             raise ExternalResourceError(f"'{url}' could not be loaded: {e}") from e
 
@@ -392,7 +437,9 @@ class PolicyUrlFetcher(URLFetcher):
         """Open the connection a proxy carries, which resolves the name itself."""
         proxy_parts = urlsplit(proxy if "//" in proxy else f"//{proxy}")
         proxy_host = proxy_parts.hostname or ""
-        proxy_port = proxy_parts.port or DEFAULT_PORTS["http"]
+        # The port a proxy is reached on follows the scheme it is written with,
+        # so 'https_proxy=https://proxy.intranet' is 443 rather than 80.
+        proxy_port = proxy_parts.port or DEFAULT_PORTS.get(proxy_parts.scheme.lower(), DEFAULT_PORTS["http"])
         timeout = timeout if timeout is not None else self.timeout_seconds
 
         if scheme != "https":
@@ -400,9 +447,10 @@ class PolicyUrlFetcher(URLFetcher):
 
         # An HTTPSConnection wraps the socket after the CONNECT, so the request
         # travels encrypted inside the tunnel. A plain connection with a tunnel
-        # would put it there in the clear.
+        # would put it there in the clear. A proxy which asks for credentials is
+        # given them on the CONNECT, since the request itself is inside the tunnel.
         connection = http.client.HTTPSConnection(proxy_host, proxy_port, timeout=timeout, context=tls_context())
-        connection.set_tunnel(host, port)
+        connection.set_tunnel(host, port, headers=proxy_authorization(proxy))
         return connection
 
     def _direct(self, scheme: str, host: str, port: int, address: str, timeout: float | None = None) -> http.client.HTTPConnection:
@@ -436,7 +484,14 @@ class PolicyUrlFetcher(URLFetcher):
                 connection.sock.settimeout(remaining)
             # read1 returns what one read of the socket gave, so the deadline is
             # looked at again for every piece rather than once a buffer is full.
-            chunk = response.read1(min(READ_CHUNK_BYTES, self.max_size_bytes + 1 - size))
+            try:
+                chunk = response.read1(min(READ_CHUNK_BYTES, self.max_size_bytes + 1 - size))
+            except TimeoutError as e:
+                # A peer which stops sending mid body spends the rest of the
+                # budget in one read, which is the refusal the deadline states.
+                raise ExternalResourceError(f"'{url}' took longer than the {self.timeout_seconds} seconds a resource may take") from e
+            except (OSError, http.client.HTTPException) as e:
+                raise ExternalResourceError(f"'{url}' could not be loaded: {e}") from e
             if not chunk:
                 break
             chunks.append(chunk)

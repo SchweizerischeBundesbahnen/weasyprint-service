@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import http.client
 import http.server
@@ -10,6 +11,7 @@ import threading
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -26,6 +28,8 @@ from app.external_resources import (
     get_policy,
     host_header,
     is_public_address,
+    load_policy,
+    proxy_authorization,
     tls_context,
 )
 
@@ -35,6 +39,9 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 # A body announced far larger than it arrives, a byte every 50 ms.
 DRIP_BYTES = 200
+
+# How long a server which announces a body and then sends nothing holds it.
+STALL_SECONDS = 3
 
 REDIRECT_TARGETS = {
     "/redirect-to-image": "/image.png",
@@ -75,6 +82,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if path == "/redirect-dripping":
             self._drip(status=302, location="/image.png")
             return
+        if path == "/stalling.png":
+            self._stall()
+            return
         if path == "/redirect-query-only" and query:
             path = "/image.png"
         elif path in REDIRECT_TARGETS:
@@ -100,6 +110,15 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(b"\x00")
                 self.wfile.flush()
                 time.sleep(0.05)
+
+    def _stall(self) -> None:
+        """Announce a body and never send it, the shape which blocks a single read."""
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(DRIP_BYTES))
+        self.end_headers()
+        with contextlib.suppress(OSError):
+            time.sleep(STALL_SECONDS)
 
     def _redirect(self, path: str) -> None:
         """Answer the redirects the tests follow."""
@@ -537,6 +556,98 @@ def test_a_name_is_not_looked_up_once_the_deadline_has_passed(monkeypatch: pytes
         raise AssertionError("the name was looked up after the load ran out of time")
 
     monkeypatch.setattr("app.external_resources.resolve", unreachable)
+    passed = time.monotonic() - 1
 
     with pytest.raises(ExternalResourceError, match="took longer than"):
-        fetcher._vet("http://cdn.example/image.png", time.monotonic() - 1)
+        fetcher._vet("http://cdn.example/image.png", passed)
+
+
+def test_a_body_which_never_arrives_is_refused_like_every_other_failure(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """A peer which announces a body and sends nothing spends the budget in one read."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    monkeypatch.setenv("EXTERNAL_RESOURCES_TIMEOUT_SECONDS", "0.5")
+    fetcher = PolicyUrlFetcher()
+
+    started = time.monotonic()
+    with pytest.raises(ExternalResourceError, match="took longer than"):
+        fetcher.fetch(f"{local_server}/stalling.png")
+    elapsed = time.monotonic() - started
+
+    assert elapsed < STALL_SECONDS, f"the fetch spent {elapsed:.1f}s waiting for a body which never came"
+
+
+def _fetch_recording_the_connection(fetcher: PolicyUrlFetcher, monkeypatch: pytest.MonkeyPatch, url: str) -> list[http.client.HTTPConnection]:
+    """Fetch a url and hand back every connection the fetcher opened for it."""
+    connections: list[http.client.HTTPConnection] = []
+    send = PolicyUrlFetcher._send
+
+    def recording(self: PolicyUrlFetcher, *args: Any, **kwargs: Any) -> Any:
+        connection, response = send(self, *args, **kwargs)
+        connections.append(connection)
+        return connection, response
+
+    monkeypatch.setattr(PolicyUrlFetcher, "_send", recording)
+    with contextlib.suppress(ExternalResourceError):
+        fetcher.fetch(url)
+    return connections
+
+
+def test_the_connection_of_a_hop_is_closed(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """Closing the response releases its reader, not the socket the hop opened."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+
+    connections = _fetch_recording_the_connection(PolicyUrlFetcher(), monkeypatch, f"{local_server}/redirect-to-image")
+
+    assert len(connections) == 2, "a hop and the resource it points at are two connections"
+    assert all(connection.sock is None for connection in connections)
+
+
+def test_the_connection_is_closed_when_the_resource_is_refused(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:
+    """A refusal releases the socket where it is raised, not when the traceback is dropped."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+    monkeypatch.setenv(MAX_SIZE_MB_VAR, "1")
+
+    connections = _fetch_recording_the_connection(PolicyUrlFetcher(), monkeypatch, f"{local_server}/huge.png")
+
+    assert connections, "the fetcher opened no connection"
+    assert all(connection.sock is None for connection in connections)
+
+
+def test_a_proxy_which_asks_for_credentials_is_given_them() -> None:
+    """urllib sent them before this fetcher existed, so a deployment behind such a proxy keeps working."""
+    header = proxy_authorization("http://user:p%40ss@proxy.intranet:3128")
+
+    assert header == {"Proxy-Authorization": "Basic " + base64.b64encode(b"user:p@ss").decode()}
+
+
+def test_a_proxy_without_credentials_is_given_none() -> None:
+    assert proxy_authorization("http://proxy.intranet:3128") == {}
+
+
+def test_an_https_proxy_without_a_port_is_reached_on_the_port_of_its_scheme() -> None:
+    """'https_proxy=https://proxy.intranet' is 443, which the http default hid."""
+    connection = PolicyUrlFetcher()._through_proxy("https://proxy.intranet", "http", "cdn.example", 80)
+
+    assert connection.port == 443
+
+
+def test_a_tunnel_carries_the_credentials_of_the_proxy() -> None:
+    """The request travels inside the tunnel, so the CONNECT is where they belong."""
+    connection = PolicyUrlFetcher()._through_proxy("http://user:pass@proxy.intranet:3128", "https", "cdn.example", 443)
+
+    assert connection._tunnel_headers["Proxy-Authorization"] == "Basic " + base64.b64encode(b"user:pass").decode()
+
+
+def test_a_malformed_origin_stops_the_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A typo which fails at request time is an outage found by traffic instead of by the start."""
+    monkeypatch.setenv(ALLOWED_ORIGINS_VAR, "cdn.intranet:por")
+
+    with pytest.raises(ExternalResourceError, match="not a valid entry"):
+        load_policy()
+
+
+def test_a_readable_configuration_is_reported_at_the_start(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOWLIST_ONLY.value)
+    monkeypatch.setenv(ALLOWED_ORIGINS_VAR, "cdn.intranet, https://fonts.example")
+
+    assert load_policy() is ResourcePolicy.ALLOWLIST_ONLY

@@ -29,6 +29,7 @@ from app.attachment_manager import AttachmentManager
 from app.auth import require_api_key
 from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.constants import API_VERSION
+from app.external_resources import PolicyUrlFetcher
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
 from app.metrics_server import MetricsServer, get_metrics_port, is_metrics_server_enabled
@@ -456,6 +457,7 @@ async def __generate_pdf_from_parsed_html(
     output: OutputOptions,
     chromium_manager: ChromiumManager,
     attachments: list | None = None,
+    attachments_dir: Path | None = None,
 ) -> bytes:
     """
     Generate PDF from already-parsed HTML element tree.
@@ -491,11 +493,16 @@ async def __generate_pdf_from_parsed_html(
     if base_url:
         logger.debug("Using base URL: %s", sanitize_url_for_logging(base_url))
 
+    # Every resource the document names is loaded through the policy: a document
+    # decides what to reference, it does not decide what this service reaches.
+    url_fetcher = PolicyUrlFetcher(allowed_file_root=attachments_dir)
+
     logger.debug("Creating WeasyPrint HTML object with media_type=%s", render.media_type)
     weasyprint_html = weasyprint.HTML(
         string=processed_html,
         base_url=base_url,
         media_type=render.media_type,
+        url_fetcher=url_fetcher,
     )
 
     logger.debug(
@@ -642,7 +649,7 @@ async def convert_html_with_attachments(
         )
 
         # Use common PDF generation logic (handles notes, SVG, WeasyPrint)
-        output_pdf = await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments)
+        output_pdf = await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments, attachments_dir=Path(tmpdir))
         response = await __create_response(output, output_pdf)
         __record_conversion_metrics(chromium_manager, start_time, success=True)
     # Same, for the attachments endpoint.

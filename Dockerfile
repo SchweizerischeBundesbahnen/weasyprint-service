@@ -95,11 +95,15 @@ ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
 # patterns, frozen at 2017-01-12) with the newer dehyph-exptl patterns
 # (dehyphn-x 2024-02-28). These fix single-letter mis-hyphenation such as
 # "Über-g-ang" -> "Über-gang" and cover reformed orthography for DE/AT/CH.
-# The same reformed pattern set is used for both de_DE and de_CH.
+# The same reformed pattern set is used for de_DE, de_AT and de_CH. The MIT
+# notice is shipped alongside the data (dehyph-exptl requires it to travel with
+# redistributed copies, which the image is).
 COPY dictionaries/hyph_de_dehyphn-x-2024-02-28.dic ${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic
+COPY dictionaries/LICENSE.dehyph-exptl ${WORKING_DIR}/dictionaries/LICENSE.dehyph-exptl
 RUN DICT_DIR="$(python -c 'import os, pyphen; print(os.path.dirname(str(pyphen.LANGUAGES["de_DE"])))')" && \
-    cp ${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic "${DICT_DIR}/hyph_de_DE.dic" && \
-    cp ${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic "${DICT_DIR}/hyph_de_CH.dic"
+    cp "${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic" "${DICT_DIR}/hyph_de_DE.dic" && \
+    cp "${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic" "${DICT_DIR}/hyph_de_AT.dic" && \
+    cp "${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic" "${DICT_DIR}/hyph_de_CH.dic"
 
 # Verify WeasyPrint is installed and working
 RUN weasyprint --version

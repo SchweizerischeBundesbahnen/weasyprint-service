@@ -1,10 +1,10 @@
 # German hyphenation dictionaries
 
 WeasyPrint hyphenates via [Pyphen](https://pyphen.org/), which ships the
-LibreOffice hyphenation dictionaries. The bundled German dictionary
-(`hyph_de_DE.dic` / `hyph_de_CH.dic`) is frozen at **2017-01-12** and contains
-known defects, e.g. it breaks a single letter off compounds:
-`Über-g-ang`, `Fuß-gän-ger-über-g-ang`, `Bil-let-t-au-to-mat`.
+LibreOffice hyphenation dictionaries. The bundled German dictionaries
+(`hyph_de_DE.dic`, `hyph_de_AT.dic`, `hyph_de_CH.dic`) are frozen at
+**2017-01-12** and contain known defects, e.g. they break a single letter off
+compounds: `Über-g-ang`, `Fuß-gän-ger-über-g-ang`, `Bil-let-t-au-to-mat`.
 
 To fix this, the Docker image replaces the bundled German patterns with the
 newer, actively maintained **dehyph-exptl** patterns.
@@ -18,11 +18,16 @@ newer, actively maintained **dehyph-exptl** patterns.
 | Version | 2024-02-28 |
 | Upstream | https://ctan.org/pkg/dehyph-exptl |
 | Authors | Deutschsprachige Trennmustermannschaft (`trennmuster@dante.de`) |
-| License | MIT |
+| License | MIT — see [`LICENSE.dehyph-exptl`](LICENSE.dehyph-exptl) (shipped in the image next to the data) |
 
 The `.dic` is the `dehyphn-x` TeX patterns converted to the Hunspell format
 Pyphen consumes (the TeX `\patterns{ ... }` wrapper removed and an encoding
-line prepended). The reformed pattern set is used for both `de_DE` and `de_CH`,
-consistent with the reformed orthography already used by the service. At image
-build time it is copied over `hyph_de_DE.dic` and `hyph_de_CH.dic` (see
-`Dockerfile`).
+line prepended). At image build time it is copied over `hyph_de_DE.dic`,
+`hyph_de_AT.dic` and `hyph_de_CH.dic` (see `Dockerfile`).
+
+`dehyphn-x` is the reformed-orthography set covering Germany, Austria and
+Switzerland, so it is used for all three locales — consistent with the reformed
+orthography the service already relies on. Note that Swiss German writes `ss`
+where Germany/Austria write `ß`; patterns containing `ß` simply never match
+Swiss text, so reusing the reformed set for `de_CH` is safe (it replaces a
+`de_CH` dictionary that was already the reformed German set).

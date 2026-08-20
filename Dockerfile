@@ -91,6 +91,16 @@ RUN chmod +x ${WORKING_DIR}/entrypoint.sh ${WORKING_DIR}/healthcheck.sh
 ENV PATH="/opt/weasyprint/.venv/bin:$PATH" \
     PYTHONPATH=${WORKING_DIR}
 
+# Replace the German hyphenation dictionaries bundled with Pyphen (LibreOffice
+# patterns, frozen at 2017-01-12) with the newer dehyph-exptl patterns
+# (dehyphn-x 2024-02-28). These fix single-letter mis-hyphenation such as
+# "Über-g-ang" -> "Über-gang" and cover reformed orthography for DE/AT/CH.
+# The same reformed pattern set is used for both de_DE and de_CH.
+COPY dictionaries/hyph_de_dehyphn-x-2024-02-28.dic ${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic
+RUN DICT_DIR="$(python -c 'import os, pyphen; print(os.path.dirname(str(pyphen.LANGUAGES["de_DE"])))')" && \
+    cp ${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic "${DICT_DIR}/hyph_de_DE.dic" && \
+    cp ${WORKING_DIR}/dictionaries/hyph_de_dehyphn-x-2024-02-28.dic "${DICT_DIR}/hyph_de_CH.dic"
+
 # Verify WeasyPrint is installed and working
 RUN weasyprint --version
 

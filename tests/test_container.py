@@ -138,6 +138,27 @@ def test_health(test_parameters: TestParameters) -> None:
     assert response.text == "OK"
 
 
+def test_german_hyphenation_uses_dehyphn_x_2024(test_parameters: TestParameters) -> None:
+    """The built image ships the dehyph-exptl 2024 German patterns instead of
+    Pyphen's bundled 2017 LibreOffice ones for de_DE, de_AT and de_CH, so
+    compounds no longer break a single letter off (e.g. "Über-g-ang")."""
+    script = """
+import pyphen
+for lang in ('de_DE', 'de_AT', 'de_CH'):
+    p = pyphen.Pyphen(lang=lang)
+    got = p.inserted('Übergangsbestimmung', hyphen='-')
+    assert got == 'Über-gangs-be-stim-mung', (lang, got)
+    for word in ('Übergang', 'Fußgängerübergang', 'Billettautomat'):
+        parts = p.inserted(word, hyphen='-').split('-')
+        assert all(len(part) >= 2 for part in parts), (lang, word, parts)
+print('hyphenation-ok')
+"""
+    exit_code, output = test_parameters.container.exec_run(["python", "-c", script], environment={"PYTHONUTF8": "1"})
+    decoded = output.decode("utf-8")
+    assert exit_code == 0, decoded
+    assert "hyphenation-ok" in decoded
+
+
 def test_convert_simple_html(test_parameters: TestParameters) -> None:
     simple_html = "<html><body>My test body</body</html>"
 

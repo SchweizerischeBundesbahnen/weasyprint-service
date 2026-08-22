@@ -1,5 +1,12 @@
 # Changelog
 
+## [69.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.1...v69.0.2) (2026-08-22)
+
+
+### Bug Fixes
+
+* **deps:** update dependency uvicorn to v0.52.4 ([6554e18](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6554e18f70c5305aeb43437ed15caab9334902e1))
+
 ## [69.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.0...v69.0.1) (2026-08-21)
 
 

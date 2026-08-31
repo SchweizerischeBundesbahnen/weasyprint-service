@@ -122,6 +122,9 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
         "Chromium browser prepared successfully",
         "Metrics server started on port 9180",
         "Health monitor loop started",
+        # uvicorn logs through the root logger, so its own messages show up as well
+        "Application startup complete",
+        "Uvicorn running on",
     ]
 
     log_text = "\n".join(log_lines)

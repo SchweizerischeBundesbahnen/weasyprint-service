@@ -117,11 +117,15 @@ class MetricsServer:
             return
 
         tls_options = load_tls_options(METRICS_TLS_PREFIX)
+        # log_config=None keeps uvicorn from applying its own logging configuration, and
+        # no log_level is given here either. Both settings reach the uvicorn loggers of
+        # the whole process, which this server shares with the main one: a level set here
+        # used to silence the main server. See configure_uvicorn_logging.
         config = uvicorn.Config(
             app=metrics_app,
             host="",
             port=self.port,
-            log_level="warning",
+            log_config=None,
             **tls_options,
         )
         self._server = uvicorn.Server(config)

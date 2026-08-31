@@ -381,6 +381,8 @@ The service includes a robust logging system with the following features:
 - Log level can be configured via `LOG_LEVEL` environment variable (default: INFO)
 - Log format: `timestamp - logger name - log level - message`
 - Each service start creates a new timestamped log file
+- The messages uvicorn writes itself (startup, shutdown, errors) use the same format and the same file, under the `uvicorn.error` logger name
+- Per-request access lines are written at DEBUG level only. The Docker healthcheck calls `/health` every 5 seconds and Prometheus scrapes `/metrics`, so at INFO those lines would bury everything else
 
 To customize logging when running the container:
 

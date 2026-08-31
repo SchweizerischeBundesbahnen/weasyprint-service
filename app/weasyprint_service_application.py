@@ -49,6 +49,34 @@ def get_graceful_shutdown_timeout() -> int:
         return timeout
 
 
+def configure_uvicorn_logging(level: int) -> None:
+    """
+    Route the messages uvicorn writes itself through the handlers of the root logger.
+
+    uvicorn ships a logging configuration which gives its loggers a handler of their
+    own and stops them from propagating. Two problems follow: the messages never reach
+    the log file, and the level is global, so the metrics server sets the level of the
+    main server as well. Both servers are started with ``log_config=None``, which leaves
+    the loggers to this function.
+
+    Access logging stays off below DEBUG. The Docker healthcheck calls /health every 5
+    seconds and Prometheus scrapes /metrics, so a line per request buries the rest.
+
+    Args:
+        level: The level configured through LOG_LEVEL.
+    """
+    for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.asgi"):
+        uvicorn_logger = logging.getLogger(logger_name)
+        uvicorn_logger.handlers.clear()
+        uvicorn_logger.propagate = True
+        uvicorn_logger.setLevel(level)
+
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.handlers.clear()
+    access_logger.setLevel(level)
+    access_logger.propagate = level <= logging.DEBUG
+
+
 def setup_logging() -> Path:
     """
     Configure logging for the WeasyPrint service with both file and console output.
@@ -106,6 +134,8 @@ def setup_logging() -> Path:
     for logger_name in ["fontTools", "fontTools.subset", "fontTools.ttLib", "weasyprint", "PIL", "playwright"]:
         logging.getLogger(logger_name).setLevel(configured_level)
 
+    configure_uvicorn_logging(configured_level)
+
     # Force immediate file creation
     root_logger.info(f"Logging initialized with level: {log_level}")
     root_logger.info(f"Log file: {log_file}")
@@ -121,11 +151,14 @@ def start_server(port: int) -> None:
     # uvicorn installs its own SIGTERM and SIGINT handlers. Both stop the server
     # gracefully and run the lifespan shutdown, which closes the metrics server and
     # the Chromium browser.
+    # log_config=None keeps uvicorn from applying its own logging configuration, which
+    # would take its messages out of the log file. See configure_uvicorn_logging.
     uvicorn.run(
         app=weasyprint_controller.app,
         host="",
         port=port,
         timeout_graceful_shutdown=get_graceful_shutdown_timeout(),
+        log_config=None,
         **load_tls_options(),
     )
 

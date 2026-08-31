@@ -87,6 +87,11 @@ def test_sigterm_shuts_the_service_down_gracefully(stopped_container) -> None:
     logs = container.logs().decode("utf-8")
 
     expected_patterns = [
+        # uvicorn reports the stop through the root logger, the service reports the rest
+        "Shutting down",
+        "Waiting for application shutdown",
+        "Application shutdown complete",
+        "Finished server process",
         "Metrics server stopped",
         "Stopping background health monitoring...",
         "Background health monitoring stopped",

@@ -189,6 +189,8 @@ grype weasyprint-service:0.0.0
 
 ### Configuration and Environment Variables
 
+**Logging:** `setup_logging()` (`app/weasyprint_service_application.py`) owns the logging configuration of the whole process. Every uvicorn server is started with `log_config=None`, which is what keeps uvicorn from applying its own configuration, and `configure_uvicorn_logging()` routes the uvicorn loggers into the root handlers. Never give a `uvicorn.Config` a `log_level`, and never give it a logging configuration of its own: both are applied to the uvicorn loggers of the whole process, and the metrics server used to silence the main server that way. Access logs (`uvicorn.access`) propagate at DEBUG only.
+
 **General Configuration:**
 - `LOG_LEVEL`: Logging verbosity (DEBUG, INFO, WARNING, ERROR, CRITICAL) - defaults to INFO
 - `LOG_DIR`: Directory for log files (defaults to `/opt/weasyprint/logs`)

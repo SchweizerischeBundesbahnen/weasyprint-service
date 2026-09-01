@@ -181,6 +181,32 @@ docker run --detach \
 
 To diagnose Chromium startup issues, check the service logs for error messages during initialization. The container will exit if Chromium fails to start.
 
+### Graceful Shutdown
+
+The service shuts down on SIGTERM, the signal `docker stop` and Kubernetes send. The signal reaches the service process directly, which then:
+
+1. Stops accepting new requests.
+2. Waits for the running conversions to finish.
+3. Closes the metrics server and the Chromium browser.
+4. Exits with code 143 (128 + SIGTERM), the normal result of a stop by signal.
+
+The wait for running conversions is bounded by the `GRACEFUL_SHUTDOWN_TIMEOUT` environment variable:
+
+```bash
+docker run --detach \
+  --init \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env GRACEFUL_SHUTDOWN_TIMEOUT=60 \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+**Valid range:** 1 - 300 seconds (default: 30). Invalid values fall back to the default with a warning logged.
+
+Keep the stop grace period of the orchestrator above this value (`docker stop --time`, or `terminationGracePeriodSeconds` in Kubernetes). A shorter one ends in SIGKILL, which leaves the Chromium browser unclosed.
+
+The log line `Service shutdown complete` marks a shutdown which ran to the end.
+
 ### Monitoring Dashboard
 
 The service includes an interactive web-based monitoring dashboard accessible at `/dashboard`:
@@ -355,6 +381,8 @@ The service includes a robust logging system with the following features:
 - Log level can be configured via `LOG_LEVEL` environment variable (default: INFO)
 - Log format: `timestamp - logger name - log level - message`
 - Each service start creates a new timestamped log file
+- The messages uvicorn writes itself (startup, shutdown, errors) use the same format and the same file, under the `uvicorn.error` logger name
+- Per-request access lines are written at DEBUG level only. The Docker healthcheck calls `/health` every 5 seconds and Prometheus scrapes `/metrics`, so at INFO those lines would bury everything else
 
 To customize logging when running the container:
 
@@ -745,6 +773,8 @@ To stop the running container, execute:
 ```bash
 docker container stop weasyprint-service
 ```
+
+The command sends SIGTERM, which the service handles gracefully. See [Graceful Shutdown](#graceful-shutdown).
 
 ### Testing
 

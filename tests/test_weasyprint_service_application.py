@@ -1,6 +1,8 @@
 import logging
 import sys
 
+import pytest
+
 from app import weasyprint_service_application
 
 
@@ -42,3 +44,41 @@ def test_main_reports_a_disabled_metrics_server(monkeypatch, tmp_path):
     # setup_logging reconfigures the root logger, so the log file is the record.
     logged = "".join(path.read_text(encoding="utf-8") for path in log_dir.glob("weasyprint-service_*.log"))
     assert "Metrics server disabled" in logged
+
+
+def test_graceful_shutdown_timeout_defaults(monkeypatch):
+    """Without the variable the timeout falls back to the default."""
+    monkeypatch.delenv("GRACEFUL_SHUTDOWN_TIMEOUT", raising=False)
+
+    assert weasyprint_service_application.get_graceful_shutdown_timeout() == weasyprint_service_application.DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT
+
+
+def test_graceful_shutdown_timeout_reads_the_variable(monkeypatch):
+    """A valid value is used as is."""
+    monkeypatch.setenv("GRACEFUL_SHUTDOWN_TIMEOUT", "45")
+
+    assert weasyprint_service_application.get_graceful_shutdown_timeout() == 45
+
+
+@pytest.mark.parametrize("value", ["not-a-number", "0", "301"])
+def test_graceful_shutdown_timeout_rejects_bad_values(monkeypatch, value):
+    """An invalid or out of range value falls back to the default."""
+    monkeypatch.setenv("GRACEFUL_SHUTDOWN_TIMEOUT", value)
+
+    assert weasyprint_service_application.get_graceful_shutdown_timeout() == weasyprint_service_application.DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT
+
+
+def test_start_server_passes_the_graceful_shutdown_timeout(monkeypatch):
+    """start_server hands the timeout to uvicorn, which applies it on SIGTERM."""
+    monkeypatch.setenv("GRACEFUL_SHUTDOWN_TIMEOUT", "12")
+    captured = {}
+
+    def fake_run(**kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(weasyprint_service_application.uvicorn, "run", fake_run)
+
+    weasyprint_service_application.start_server(9999)
+
+    assert captured["timeout_graceful_shutdown"] == 12
+    assert captured["port"] == 9999

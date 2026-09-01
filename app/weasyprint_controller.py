@@ -95,6 +95,10 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG0
     except Exception as e:  # noqa: BLE001
         lifespan_logger.error("Error stopping Chromium browser: %s", e)
 
+    # Last line of the shutdown. A SIGTERM which reaches the service produces it, so its
+    # absence in the container logs means the process was killed instead of stopped.
+    lifespan_logger.info("Service shutdown complete")
+
 
 logger = logging.getLogger(__name__)
 

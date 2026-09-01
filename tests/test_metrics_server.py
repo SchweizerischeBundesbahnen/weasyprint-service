@@ -1,6 +1,7 @@
 """Tests for the dedicated metrics server module."""
 
 import asyncio
+import logging
 import os
 from unittest.mock import AsyncMock, patch
 
@@ -323,3 +324,31 @@ class TestMetricsServer:
 
         assert server.is_running is False
         assert server._server.should_exit is True
+
+    @pytest.mark.asyncio
+    async def test_start_leaves_the_shared_uvicorn_loggers_alone(self):
+        """
+        The metrics server must not reconfigure the uvicorn loggers.
+
+        Both servers run in one process and share those loggers, so a level set here
+        used to silence the messages of the main server.
+        """
+        uvicorn_logger = logging.getLogger("uvicorn.error")
+        original_level = uvicorn_logger.level
+        uvicorn_logger.setLevel(logging.INFO)
+        server = MetricsServer(port=9189)
+
+        try:
+            with patch("app.metrics_server.uvicorn.Server") as mock_server_cls:
+                mock_server = AsyncMock()
+                mock_server.started = True
+                mock_server.serve = AsyncMock()
+                mock_server_cls.return_value = mock_server
+
+                await server.start()
+
+            assert uvicorn_logger.level == logging.INFO
+            assert uvicorn_logger.handlers == []
+        finally:
+            uvicorn_logger.setLevel(original_level)
+            server._started = False

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import functools
 import logging
 import os
 import platform
 import shutil
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 from urllib.parse import unquote
@@ -52,7 +55,7 @@ apply_pdfa_colorspace_patch()
 
 
 @contextlib.asynccontextmanager
-async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG001
+async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
     """
     Manage the lifecycle of the Chromium browser and metrics server.
 
@@ -71,6 +74,13 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG0
     lifespan_logger.info("Prepare Chromium browser for SVG conversion...")
     await chromium_manager.start()
     lifespan_logger.info("Chromium browser prepared successfully")
+
+    # The renderings run in this pool, sized to the configured limit. A pool of its own,
+    # rather than the default executor of the loop: that one is sized from the CPU count,
+    # which would cap the limit at a value the configuration never names.
+    render_limit = get_max_concurrent_pdf_conversions()
+    app_instance.state.pdf_render_executor = ThreadPoolExecutor(max_workers=render_limit, thread_name_prefix="pdf-render")
+    lifespan_logger.info("PDF rendering limited to %d concurrent conversions", render_limit)
 
     # Start metrics server if enabled
     metrics_server: MetricsServer | None = None
@@ -95,12 +105,50 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG0
     except Exception as e:  # noqa: BLE001
         lifespan_logger.error("Error stopping Chromium browser: %s", e)
 
+    # Drop the renderings which are still queued. One already under way keeps its thread:
+    # a worker cannot be interrupted, and the process leaves once it returns.
+    app_instance.state.pdf_render_executor.shutdown(wait=False, cancel_futures=True)
+
     # Last line of the shutdown. A SIGTERM which reaches the service produces it, so its
     # absence in the container logs means the process was killed instead of stopped.
     lifespan_logger.info("Service shutdown complete")
 
 
 logger = logging.getLogger(__name__)
+
+# Bounds for the number of PDF renderings which may run at the same time. Rendering is
+# memory heavy: the README plans for about 1 GB per concurrent conversion of a large
+# document, so the default stays low and is raised together with the memory of the container.
+DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS = 2
+MIN_CONCURRENT_PDF_CONVERSIONS = 1
+MAX_CONCURRENT_PDF_CONVERSIONS = 100
+
+
+def get_max_concurrent_pdf_conversions() -> int:
+    """
+    Read the PDF rendering limit from the MAX_CONCURRENT_PDF_CONVERSIONS variable.
+
+    Returns:
+        Number of renderings allowed at the same time (default: 2). An invalid or out of
+        range value falls back to the default.
+    """
+    value = os.environ.get("MAX_CONCURRENT_PDF_CONVERSIONS", str(DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS))
+    try:
+        limit = int(value)
+        if not (MIN_CONCURRENT_PDF_CONVERSIONS <= limit <= MAX_CONCURRENT_PDF_CONVERSIONS):
+            logger.warning(
+                "MAX_CONCURRENT_PDF_CONVERSIONS must be between %d and %d, using default: %d",
+                MIN_CONCURRENT_PDF_CONVERSIONS,
+                MAX_CONCURRENT_PDF_CONVERSIONS,
+                DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS,
+            )
+            return DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS
+    except ValueError:
+        logger.warning("Invalid MAX_CONCURRENT_PDF_CONVERSIONS value '%s', using default: %d", value, DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS)
+        return DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS
+    else:
+        return limit
+
 
 app = FastAPI(
     title="WeasyPrint Service API",
@@ -518,13 +566,21 @@ async def __generate_pdf_from_parsed_html(
         f", attachments={len(attachments)}" if attachments else "",
     )
 
-    output_pdf = weasyprint_html.write_pdf(
-        target=None,  # Explicitly set to default (returns bytes); included for clarity
-        pdf_variant=output.pdf_variant,
-        presentational_hints=render.presentational_hints,
-        custom_metadata=output.custom_metadata,
-        full_fonts=output.full_fonts,
-        attachments=attachments,
+    # The rendering runs in a worker thread. Called directly it would hold the event loop,
+    # and a held loop cannot act on SIGTERM: the graceful shutdown timeout would not start
+    # before the rendering ends, and no other request would be served meanwhile. The pool
+    # bounds how many renderings share the memory of the container.
+    output_pdf = await asyncio.get_running_loop().run_in_executor(
+        app.state.pdf_render_executor,
+        functools.partial(
+            weasyprint_html.write_pdf,
+            target=None,  # Explicitly set to default (returns bytes); included for clarity
+            pdf_variant=output.pdf_variant,
+            presentational_hints=render.presentational_hints,
+            custom_metadata=output.custom_metadata,
+            full_fonts=output.full_fonts,
+            attachments=attachments,
+        ),
     )
 
     logger.info("PDF generated successfully, size: %d bytes", len(output_pdf))

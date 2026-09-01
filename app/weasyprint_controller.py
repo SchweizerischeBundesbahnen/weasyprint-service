@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import logging
 import os
 import platform
 import shutil
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 from urllib.parse import unquote
@@ -73,10 +75,11 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
     await chromium_manager.start()
     lifespan_logger.info("Chromium browser prepared successfully")
 
-    # An asyncio.Semaphore binds to the loop it is first awaited on, so it is built here,
-    # under the loop which serves the requests, and not on the first conversion.
+    # The renderings run in this pool, sized to the configured limit. A pool of its own,
+    # rather than the default executor of the loop: that one is sized from the CPU count,
+    # which would cap the limit at a value the configuration never names.
     render_limit = get_max_concurrent_pdf_conversions()
-    app_instance.state.pdf_render_semaphore = asyncio.Semaphore(render_limit)
+    app_instance.state.pdf_render_executor = ThreadPoolExecutor(max_workers=render_limit, thread_name_prefix="pdf-render")
     lifespan_logger.info("PDF rendering limited to %d concurrent conversions", render_limit)
 
     # Start metrics server if enabled
@@ -101,6 +104,10 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
         lifespan_logger.info("Chromium browser stopped successfully")
     except Exception as e:  # noqa: BLE001
         lifespan_logger.error("Error stopping Chromium browser: %s", e)
+
+    # Drop the renderings which are still queued. One already under way keeps its thread:
+    # a worker cannot be interrupted, and the process leaves once it returns.
+    app_instance.state.pdf_render_executor.shutdown(wait=False, cancel_futures=True)
 
     # Last line of the shutdown. A SIGTERM which reaches the service produces it, so its
     # absence in the container logs means the process was killed instead of stopped.
@@ -561,10 +568,11 @@ async def __generate_pdf_from_parsed_html(
 
     # The rendering runs in a worker thread. Called directly it would hold the event loop,
     # and a held loop cannot act on SIGTERM: the graceful shutdown timeout would not start
-    # before the rendering ends, and no other request would be served meanwhile. The
-    # semaphore bounds how many renderings share the memory of the container.
-    async with app.state.pdf_render_semaphore:
-        output_pdf = await asyncio.to_thread(
+    # before the rendering ends, and no other request would be served meanwhile. The pool
+    # bounds how many renderings share the memory of the container.
+    output_pdf = await asyncio.get_running_loop().run_in_executor(
+        app.state.pdf_render_executor,
+        functools.partial(
             weasyprint_html.write_pdf,
             target=None,  # Explicitly set to default (returns bytes); included for clarity
             pdf_variant=output.pdf_variant,
@@ -572,7 +580,8 @@ async def __generate_pdf_from_parsed_html(
             custom_metadata=output.custom_metadata,
             full_fonts=output.full_fonts,
             attachments=attachments,
-        )
+        ),
+    )
 
     logger.info("PDF generated successfully, size: %d bytes", len(output_pdf))
     result = notes_processor.process_pdf_with_notes(output_pdf, notes)

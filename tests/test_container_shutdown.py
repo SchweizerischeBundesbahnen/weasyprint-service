@@ -1,5 +1,6 @@
 """Container shutdown tests: "docker stop" has to reach the service as SIGTERM."""
 
+import contextlib
 import logging
 import subprocess
 import time
@@ -44,6 +45,11 @@ def stopped_container():
         tuple: The stopped container and the seconds the stop took.
     """
     client = docker.from_env()
+
+    # A container of an interrupted run holds the name, and the run below would fail on it.
+    with contextlib.suppress(docker.errors.NotFound):
+        client.containers.get(CONTAINER_NAME).remove(force=True)
+
     result = subprocess.run(
         ["docker", "build", "--build-arg", "APP_IMAGE_VERSION=1.0.0", "--tag", IMAGE_TAG, "."],
         capture_output=True,
@@ -74,11 +80,15 @@ def stopped_container():
 
         yield container, elapsed
     finally:
-        # Teardown is best effort.
+        # Teardown is best effort. The image belongs to this test alone, so it goes too.
         try:
             container.remove(force=True)
         except Exception:  # noqa: BLE001
             logger.warning("Failed to remove container %s", container.id[:12])
+        try:
+            client.images.remove(IMAGE_TAG, force=True)
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to remove image %s", IMAGE_TAG)
 
 
 def test_sigterm_shuts_the_service_down_gracefully(stopped_container) -> None:

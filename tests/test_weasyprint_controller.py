@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
+from app import weasyprint_controller
 from app.weasyprint_controller import app
 
 
@@ -363,3 +364,70 @@ def test_health_detailed_with_health_monitoring_disabled():
         assert data["metrics"]["last_health_check"] == ""
         assert data["metrics"]["pdf_generations"] == 5
         assert data["metrics"]["total_svg_conversions"] == 15
+
+
+def test_pdf_rendering_runs_off_the_event_loop():
+    """
+    The PDF rendering must not run on the event loop.
+
+    A held loop cannot act on SIGTERM, so the graceful shutdown timeout would only start
+    once the rendering ended, and no other request would be served meanwhile.
+    """
+    import asyncio
+
+    ran_on_the_loop = {}
+    real_html = weasyprint_controller.weasyprint.HTML
+
+    def recording_html(*args, **kwargs):
+        html = real_html(*args, **kwargs)
+        real_write_pdf = html.write_pdf
+
+        def write_pdf(*write_args, **write_kwargs):
+            # get_running_loop only succeeds on the thread the loop runs on.
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                ran_on_the_loop["value"] = False
+            else:
+                ran_on_the_loop["value"] = True
+            return real_write_pdf(*write_args, **write_kwargs)
+
+        html.write_pdf = write_pdf
+        return html
+
+    with patch.object(weasyprint_controller.weasyprint, "HTML", side_effect=recording_html), TestClient(app) as test_client:
+        result = test_client.post("/convert/html", content="<p>text</p>")
+
+    assert result.status_code == 200
+    assert ran_on_the_loop["value"] is False, "The rendering ran on the event loop thread"
+
+
+def test_concurrent_pdf_conversions_default():
+    """Without the variable the limit falls back to the default."""
+    with patch.dict(os.environ, {}, clear=False):
+        os.environ.pop("MAX_CONCURRENT_PDF_CONVERSIONS", None)
+        assert weasyprint_controller.get_max_concurrent_pdf_conversions() == weasyprint_controller.DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS
+
+
+def test_concurrent_pdf_conversions_reads_the_variable():
+    """A valid value is used as is."""
+    with patch.dict(os.environ, {"MAX_CONCURRENT_PDF_CONVERSIONS": "5"}):
+        assert weasyprint_controller.get_max_concurrent_pdf_conversions() == 5
+
+
+def test_concurrent_pdf_conversions_rejects_bad_values():
+    """An invalid or out of range value falls back to the default."""
+    for value in ("not-a-number", "0", "101"):
+        with patch.dict(os.environ, {"MAX_CONCURRENT_PDF_CONVERSIONS": value}):
+            assert weasyprint_controller.get_max_concurrent_pdf_conversions() == weasyprint_controller.DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS
+
+
+def test_pdf_render_semaphore_follows_the_limit():
+    """The semaphore is built from the configured limit."""
+    weasyprint_controller.get_pdf_render_semaphore.cache_clear()
+    try:
+        with patch.dict(os.environ, {"MAX_CONCURRENT_PDF_CONVERSIONS": "3"}):
+            semaphore = weasyprint_controller.get_pdf_render_semaphore()
+            assert semaphore._value == 3
+    finally:
+        weasyprint_controller.get_pdf_render_semaphore.cache_clear()

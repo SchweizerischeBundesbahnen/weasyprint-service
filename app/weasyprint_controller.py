@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import functools
 import logging
 import os
 import platform
@@ -101,6 +103,56 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG0
 
 
 logger = logging.getLogger(__name__)
+
+# Bounds for the number of PDF renderings which may run at the same time. Rendering is
+# memory heavy: the README plans for about 1 GB per concurrent conversion of a large
+# document, so the default stays low and is raised together with the memory of the container.
+DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS = 2
+MIN_CONCURRENT_PDF_CONVERSIONS = 1
+MAX_CONCURRENT_PDF_CONVERSIONS = 100
+
+
+def get_max_concurrent_pdf_conversions() -> int:
+    """
+    Read the PDF rendering limit from the MAX_CONCURRENT_PDF_CONVERSIONS variable.
+
+    Returns:
+        Number of renderings allowed at the same time (default: 2). An invalid or out of
+        range value falls back to the default.
+    """
+    value = os.environ.get("MAX_CONCURRENT_PDF_CONVERSIONS", str(DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS))
+    try:
+        limit = int(value)
+        if not (MIN_CONCURRENT_PDF_CONVERSIONS <= limit <= MAX_CONCURRENT_PDF_CONVERSIONS):
+            logger.warning(
+                "MAX_CONCURRENT_PDF_CONVERSIONS must be between %d and %d, using default: %d",
+                MIN_CONCURRENT_PDF_CONVERSIONS,
+                MAX_CONCURRENT_PDF_CONVERSIONS,
+                DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS,
+            )
+            return DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS
+    except ValueError:
+        logger.warning("Invalid MAX_CONCURRENT_PDF_CONVERSIONS value '%s', using default: %d", value, DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS)
+        return DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS
+    else:
+        return limit
+
+
+@functools.lru_cache(maxsize=1)
+def get_pdf_render_semaphore() -> asyncio.Semaphore:
+    """
+    Return the semaphore which bounds the concurrent PDF renderings.
+
+    The semaphore is built once, on the first conversion. Tests which change
+    MAX_CONCURRENT_PDF_CONVERSIONS clear the cache through ``cache_clear()``.
+
+    Returns:
+        The shared semaphore.
+    """
+    limit = get_max_concurrent_pdf_conversions()
+    logger.info("PDF rendering limited to %d concurrent conversions", limit)
+    return asyncio.Semaphore(limit)
+
 
 app = FastAPI(
     title="WeasyPrint Service API",
@@ -518,14 +570,20 @@ async def __generate_pdf_from_parsed_html(
         f", attachments={len(attachments)}" if attachments else "",
     )
 
-    output_pdf = weasyprint_html.write_pdf(
-        target=None,  # Explicitly set to default (returns bytes); included for clarity
-        pdf_variant=output.pdf_variant,
-        presentational_hints=render.presentational_hints,
-        custom_metadata=output.custom_metadata,
-        full_fonts=output.full_fonts,
-        attachments=attachments,
-    )
+    # The rendering runs in a worker thread. Called directly it would hold the event loop,
+    # and a held loop cannot act on SIGTERM: the graceful shutdown timeout would not start
+    # before the rendering ends, and no other request would be served meanwhile. The
+    # semaphore bounds how many renderings share the memory of the container.
+    async with get_pdf_render_semaphore():
+        output_pdf = await asyncio.to_thread(
+            weasyprint_html.write_pdf,
+            target=None,  # Explicitly set to default (returns bytes); included for clarity
+            pdf_variant=output.pdf_variant,
+            presentational_hints=render.presentational_hints,
+            custom_metadata=output.custom_metadata,
+            full_fonts=output.full_fonts,
+            attachments=attachments,
+        )
 
     logger.info("PDF generated successfully, size: %d bytes", len(output_pdf))
     result = notes_processor.process_pdf_with_notes(output_pdf, notes)

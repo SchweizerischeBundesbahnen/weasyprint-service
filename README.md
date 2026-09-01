@@ -203,7 +203,7 @@ docker run --detach \
 
 **Valid range:** 1 - 300 seconds (default: 30). Invalid values fall back to the default with a warning logged.
 
-The rendering itself runs in a worker thread, so the timeout applies to a conversion which is under way. `MAX_CONCURRENT_PDF_CONVERSIONS` bounds how many renderings run at the same time (1 - 100, default: 2). Rendering is memory heavy, so raise the limit together with the memory of the container. See [Memory Requirements](#memory-requirements).
+The rendering runs in a worker thread, so SIGTERM is acted on the moment it arrives and the timeout starts counting at once, whatever a conversion is doing. A rendering already under way still runs to its end: the worker thread is not interrupted, and the process leaves once it returns. Size the stop grace period for the longest document the service converts, not only for the timeout. `MAX_CONCURRENT_PDF_CONVERSIONS` bounds how many renderings run at the same time (1 - 100, default: 2). Rendering is memory heavy, so raise the limit together with the memory of the container. See [Memory Requirements](#memory-requirements).
 
 Keep the stop grace period of the orchestrator above this value (`docker stop --time`, or `terminationGracePeriodSeconds` in Kubernetes). A shorter one ends in SIGKILL, which leaves the Chromium browser unclosed.
 

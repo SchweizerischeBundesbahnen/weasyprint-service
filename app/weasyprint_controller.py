@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import functools
 import logging
 import os
 import platform
@@ -54,7 +53,7 @@ apply_pdfa_colorspace_patch()
 
 
 @contextlib.asynccontextmanager
-async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG001
+async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
     """
     Manage the lifecycle of the Chromium browser and metrics server.
 
@@ -73,6 +72,12 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:  # noqa: ARG0
     lifespan_logger.info("Prepare Chromium browser for SVG conversion...")
     await chromium_manager.start()
     lifespan_logger.info("Chromium browser prepared successfully")
+
+    # An asyncio.Semaphore binds to the loop it is first awaited on, so it is built here,
+    # under the loop which serves the requests, and not on the first conversion.
+    render_limit = get_max_concurrent_pdf_conversions()
+    app_instance.state.pdf_render_semaphore = asyncio.Semaphore(render_limit)
+    lifespan_logger.info("PDF rendering limited to %d concurrent conversions", render_limit)
 
     # Start metrics server if enabled
     metrics_server: MetricsServer | None = None
@@ -136,22 +141,6 @@ def get_max_concurrent_pdf_conversions() -> int:
         return DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS
     else:
         return limit
-
-
-@functools.lru_cache(maxsize=1)
-def get_pdf_render_semaphore() -> asyncio.Semaphore:
-    """
-    Return the semaphore which bounds the concurrent PDF renderings.
-
-    The semaphore is built once, on the first conversion. Tests which change
-    MAX_CONCURRENT_PDF_CONVERSIONS clear the cache through ``cache_clear()``.
-
-    Returns:
-        The shared semaphore.
-    """
-    limit = get_max_concurrent_pdf_conversions()
-    logger.info("PDF rendering limited to %d concurrent conversions", limit)
-    return asyncio.Semaphore(limit)
 
 
 app = FastAPI(
@@ -574,7 +563,7 @@ async def __generate_pdf_from_parsed_html(
     # and a held loop cannot act on SIGTERM: the graceful shutdown timeout would not start
     # before the rendering ends, and no other request would be served meanwhile. The
     # semaphore bounds how many renderings share the memory of the container.
-    async with get_pdf_render_semaphore():
+    async with app.state.pdf_render_semaphore:
         output_pdf = await asyncio.to_thread(
             weasyprint_html.write_pdf,
             target=None,  # Explicitly set to default (returns bytes); included for clarity

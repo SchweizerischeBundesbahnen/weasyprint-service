@@ -423,11 +423,6 @@ def test_concurrent_pdf_conversions_rejects_bad_values():
 
 
 def test_pdf_render_semaphore_follows_the_limit():
-    """The semaphore is built from the configured limit."""
-    weasyprint_controller.get_pdf_render_semaphore.cache_clear()
-    try:
-        with patch.dict(os.environ, {"MAX_CONCURRENT_PDF_CONVERSIONS": "3"}):
-            semaphore = weasyprint_controller.get_pdf_render_semaphore()
-            assert semaphore._value == 3
-    finally:
-        weasyprint_controller.get_pdf_render_semaphore.cache_clear()
+    """The startup builds the semaphore from the configured limit, under its own loop."""
+    with patch.dict(os.environ, {"MAX_CONCURRENT_PDF_CONVERSIONS": "3"}), TestClient(app):
+        assert app.state.pdf_render_semaphore._value == 3

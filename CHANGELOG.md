@@ -1,5 +1,23 @@
 # Changelog
 
+## [69.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.1...v69.0.2) (2026-09-01)
+
+
+### Features
+
+* shut down gracefully on SIGTERM ([#363](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/363)) ([e7f3c4a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/e7f3c4a8a7d5e80906f1e8519894e5b8362ef1a6))
+
+
+### Bug Fixes
+
+* **deps:** update dependency pypdf to v6.16.2 ([9a04089](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9a040896eba1b51afee3844d84435506ebd82a1c))
+* **deps:** update dependency uvicorn to v0.52.4 ([6554e18](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6554e18f70c5305aeb43437ed15caab9334902e1))
+
+
+### Miscellaneous Chores
+
+* empty commit ([#365](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/365)) ([9de2765](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9de2765c6507ed945efcb163d2027f58cb2c0ae8))
+
 ## [69.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.0...v69.0.1) (2026-08-21)
 
 

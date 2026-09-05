@@ -1,5 +1,15 @@
 # Changelog
 
+## [69.0.3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.2...v69.0.3) (2026-09-05)
+
+
+### Bug Fixes
+
+* **deps:** update dependency tox to v4.61.2 ([2977800](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2977800d69d309b90f9139c03d873aa139f3256d))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.10 ([2f8b45b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2f8b45bdfa3ef23aaa155f1145beb0e97fc9d980))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.9 ([99ec961](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/99ec9613389a680812cc3b19db85118d5141edb4))
+* render the PDF off the event loop ([#367](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/367)) ([6d74f3a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6d74f3a4f6010f41dcd896fc76eb7ef64ec49f28))
+
 ## [69.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.1...v69.0.2) (2026-09-01)
 
 

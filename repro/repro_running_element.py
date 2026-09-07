@@ -94,7 +94,9 @@ print(f"weasyprint {label}")
 for name, html in documents().items():
     try:
         pdf_bytes = weasyprint.HTML(string=html).write_pdf()
-    except Exception as error:  # noqa: BLE001
+    except TypeError as error:
+        # Only the error under study is caught. Any other one is a new symptom and
+        # deserves its traceback rather than a line in this table.
         print(f"  {name:32} ->  CRASHES: {type(error).__name__}: {error}")
     else:
         print(f"  {name:32} ->  CONVERTS ok ({len(pdf_bytes)} bytes{running_text_position(pdf_bytes)})")

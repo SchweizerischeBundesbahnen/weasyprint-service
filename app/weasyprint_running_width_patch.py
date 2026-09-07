@@ -32,13 +32,9 @@ without ever breaking PDF generation. Remove it once fixed upstream.
 
 from __future__ import annotations
 
+import importlib
 import logging
 from typing import TYPE_CHECKING, Any
-
-from weasyprint.layout import flex as weasyprint_flex  # type: ignore[import-untyped]
-from weasyprint.layout import grid as weasyprint_grid  # type: ignore[import-untyped]
-from weasyprint.layout import page as weasyprint_page  # type: ignore[import-untyped]
-from weasyprint.layout import preferred as weasyprint_preferred  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -46,6 +42,23 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _PATCH_FLAG = "_running_element_width_patch"
+
+
+def _layout_module(name: str) -> Any | None:
+    """Import a private WeasyPrint layout module, or return ``None``.
+
+    These modules are internal to WeasyPrint. Importing them by hand keeps the
+    no-op promise of this shim honest: a future WeasyPrint that moves or drops
+    one must not stop the service from starting.
+    """
+    try:
+        return importlib.import_module(f"weasyprint.layout.{name}")
+    except ImportError:
+        logger.warning("WeasyPrint layout module %r not found; running-element patch degraded", name, exc_info=True)
+        return None
+
+
+weasyprint_preferred = _layout_module("preferred")
 
 # Intrinsic-width entry points of weasyprint.layout.preferred, with the value a
 # running box must contribute. The table-cell helpers are patched too because
@@ -59,18 +72,24 @@ _PATCHED_FUNCTIONS: dict[str, Any] = {
 
 # Modules that bind min_content_width/max_content_width by name at import time.
 # Patching weasyprint.layout.preferred alone would leave their copies unpatched.
-_MIRROR_MODULES = (weasyprint_flex, weasyprint_grid, weasyprint_page)
+_MIRROR_MODULES = tuple(module for module in (_layout_module("flex"), _layout_module("grid"), _layout_module("page")) if module is not None)
 _MIRRORED_NAMES = ("min_content_width", "max_content_width")
 
 
 def _zero_for_running(function: Callable[..., Any], empty: Any) -> Callable[..., Any]:
     """Wrap an intrinsic-width function so a running box contributes ``empty``."""
+    warned = False
 
     def wrapper(context: Any, box: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal warned
         try:
             is_running = box.is_running()
         except Exception:
-            logger.warning("Running-element width patch skipped for one box", exc_info=True)
+            # This branch means the box API changed, so every box takes it. Warn once
+            # per wrapper instead of once per box, or one conversion floods the log.
+            if not warned:
+                warned = True
+                logger.warning("Running-element width patch skipped for one box; suppressing further warnings", exc_info=True)
             is_running = False
         if is_running:
             return empty
@@ -86,7 +105,7 @@ def apply_running_width_patch() -> bool:
     Returns ``True`` when the patch is applied, ``False`` when it was already
     applied or the WeasyPrint internals could not be located.
     """
-    if is_applied():
+    if weasyprint_preferred is None or is_applied():
         return False
 
     originals: dict[str, Any] = {}

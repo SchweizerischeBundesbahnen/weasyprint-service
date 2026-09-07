@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      @page {
+        size: 400px 300px;
+        margin: 40px;
+        @top-center { content: element(header); }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      The shrink-to-fit wrapper is what triggers the crash. repro_running_element.py
+      swaps `float: left` here for every other intrinsic-width wrapper it tests.
+      The @top-center rule above is not needed to reproduce it; it is here to check
+      that the running element still reaches its margin box once the fix is applied.
+    -->
+    <div style="float: left">
+      <div style="position: running(header)">RUNNINGTEXT</div>
+      WRAPPERTEXT
+    </div>
+    BODYTEXT
+  </body>
+</html>

@@ -1,5 +1,6 @@
 """Render tests for CSS gradients in plain and PDF/A output."""
 
+import importlib
 from io import BytesIO
 
 import pytest
@@ -7,6 +8,10 @@ import weasyprint
 from PIL import Image
 
 from tests import utils_pdf
+
+# Install the WeasyPrint patches the service applies at import, so these tests render
+# through the same stack as production and do not depend on test collection order.
+importlib.import_module("app.weasyprint_controller")
 
 # A page whose only visible content is a CSS linear-gradient background.
 GRADIENT_HTML = '<!doctype html><html><body style="margin:20px"><div style="width:200px;height:100px;background:linear-gradient(135deg,#11998e 0%,#38ef7d 100%)"></div></body></html>'

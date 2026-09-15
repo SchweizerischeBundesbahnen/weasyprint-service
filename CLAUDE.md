@@ -178,7 +178,7 @@ grype weasyprint-service:0.0.0
 - `full_fonts` - Embed full fonts instead of subsetting (default: false). Escape hatch for fonts that fail during subsetting. Note: fonttools 4.63.0 accepts reserved OS/2 ulUnicodeRange bits 123-127, so the former `ValueError: expected 0 <= int <= 122` no longer occurs (truly out-of-range bits now raise `expected 0 <= int <= 127`)
 - `device_scale_factor` - Override default SVG to PNG scale factor
 
-**Supported PDF variants (WeasyPrint 68.0):**
+**Supported PDF variants (WeasyPrint 70.0):**
 - PDF/A basic: `pdf/a-1b`, `pdf/a-2b`, `pdf/a-3b`
 - PDF/A unicode: `pdf/a-2u`, `pdf/a-3u`, `pdf/a-4u`
 - PDF/A accessible: `pdf/a-1a`, `pdf/a-2a`, `pdf/a-3a`

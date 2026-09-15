@@ -46,17 +46,12 @@ from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
 from app.vsdx_processor import VsdxProcessor
-from app.weasyprint_pdfa_patch import apply_pdfa_colorspace_patch
 from app.weasyprint_running_width_patch import apply_running_width_patch
-
-# WeasyPrint 69.0 writes PDF/A gradient colour spaces as a bare ``/srgb`` name that
-# pdfium/MuPDF and PDFBox cannot resolve, which drops gradients. Apply the fix at
-# import time so every conversion path is covered. See app/weasyprint_pdfa_patch.py.
-apply_pdfa_colorspace_patch()
 
 # WeasyPrint crashes on a block-level ``position: running()`` element that holds text
 # inside a shrink-to-fit box (float, inline-block, absolute, table cell, flex item).
-# Apply the fix at import time as well. See app/weasyprint_running_width_patch.py.
+# Apply the fix at import time so every conversion path is covered.
+# See app/weasyprint_running_width_patch.py.
 apply_running_width_patch()
 
 

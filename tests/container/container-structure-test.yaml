@@ -16,7 +16,7 @@ commandTests:
   - name: Weasyprint version is correct
     command: weasyprint
     args: [--version]
-    expectedOutput: [67.0]
+    expectedOutput: [70.0]
   - name: Chromium version is correct
     # The browser directory carries the Playwright revision, and its inner directory
     # carries the architecture (chrome-linux64 on amd64, chrome-linux-arm64 on arm64),

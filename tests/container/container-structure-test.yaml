@@ -18,9 +18,13 @@ commandTests:
     args: [--version]
     expectedOutput: [67.0]
   - name: Chromium version is correct
-    command: /opt/playwright/chromium-1200/chrome-linux/chrome
-    args: [--version]
-    expectedOutput: [Chromium 143.*.*.*]
+    # The browser directory carries the Playwright revision, and its inner directory
+    # carries the architecture (chrome-linux64 on amd64, chrome-linux-arm64 on arm64),
+    # so both are matched by a glob. The version string differs per build, so only the
+    # version number is asserted.
+    command: sh
+    args: [-c, /opt/playwright/chromium-*/chrome-linux*/chrome --version]
+    expectedOutput: [153\.0\.8010\.12]
   - name: Tox should not be installed
     command: uv
     args: [run, --no-sync, tox, --version]

@@ -1,5 +1,15 @@
 # Changelog
 
+## [70.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.0...v70.0.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* **deps:** update dependency tox to v4.63.0 ([18e12e7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/18e12e7675e030658bc1900e7de1b39c6717f59d))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.18 ([bd590f3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/bd590f3edfee3ac49f58370d1f3c7b42b54878f0))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.19 ([a463fff](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/a463fffc36786886b52545ca3098794413ae4341))
+* **deps:** update prom/prometheus:latest docker digest to efd719c ([0948762](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/09487622b1b686573dac112437e7264b91c6a479))
+
 ## [70.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.2...v70.0.0) (2026-09-22)
 
 

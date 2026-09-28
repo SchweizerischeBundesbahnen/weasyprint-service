@@ -1,5 +1,6 @@
 """Tests for SvgProcessor utility functions and SVG processing."""
 
+import base64
 from pathlib import Path
 
 import pytest
@@ -407,6 +408,37 @@ def test_apply_img_dimensions_from_svg_where_the_document_gives_none(html, expec
 
     assert node.get("width") == expected_width
     assert node.get("style") == expected_style
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "style,expected_render_size",
+    [
+        # The PNG is rasterized at the size the document draws the image at, so the scale factor keeps it
+        # sharp there rather than at the size of the SVG; #375.
+        ('style="width: 400px; height: 200px;"', (400, 200)),
+        ('style="width: 400px;"', (400, 200)),  # the height follows the ratio of the SVG
+        ('style="height: 50px;"', (100, 50)),
+        # Nothing the document draws the image at, so the SVG says the size, as it always did
+        ('style="max-width: 650px;"', None),
+        ('style="width: 50%;"', None),  # a percentage has no meaning without a layout
+        ("", None),
+    ],
+)
+async def test_svg_is_rasterized_at_the_size_the_document_draws_it(style, expected_render_size, mocker):
+    """The size handed to the conversion is the size the image is drawn at."""
+    from bs4 import BeautifulSoup
+
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100"></svg>'
+    src = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+    soup = BeautifulSoup(f'<img src="{src}" {style}>', "html.parser")
+
+    processor = SvgProcessor()
+    convert = mocker.patch.object(processor, "replace_svg_with_png", return_value=("image/png", b"png bytes"))
+
+    await processor.replace_img_base64(soup)
+
+    assert convert.call_args.args[1] == expected_render_size
 
 
 @pytest.mark.parametrize(

@@ -125,7 +125,7 @@ class SvgProcessor:
             if svg is None:
                 continue
 
-            image_type, image_content = await self.replace_svg_with_png(svg)
+            image_type, image_content = await self.replace_svg_with_png(svg, self._requested_size_px(node, svg))
             replaced_content_base64 = self.to_base64(image_content)
 
             # Skip if nothing changed
@@ -170,14 +170,60 @@ class SvgProcessor:
             # Log at debug level to avoid noise but prevent silent pass
             logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
 
+    def _requested_size_px(self, node: Tag, svg: Element) -> tuple[int, int] | None:
+        """The size the document gives this image, in px, or None where it gives none this can be read.
+
+        The PNG is rasterized at this size times the scale factor, which is what keeps an image sharp on a
+        dense display and in print. Without it an image the document enlarges would be rasterized at the size
+        of its SVG and blown up from there.
+        """
+        style = self._style_declarations(node)
+        width = self._px_value(style.get("width"))
+        height = self._px_value(style.get("height"))
+        if width is None and height is None:
+            return None
+
+        # The drawing is scaled into the size asked for, which a viewBox is what makes possible
+        if self.parse_viewbox(svg) == (None, None):
+            return None
+
+        own_width, own_height, _ = self.extract_svg_dimensions_as_px(svg)
+        if not own_width or not own_height:
+            return None
+        if width is None:
+            width = math.ceil(height * own_width / own_height)  # type: ignore[operator]
+        if height is None:
+            height = math.ceil(width * own_height / own_width)
+        return width, height
+
+    @staticmethod
+    def _px_value(value: str | None) -> int | None:
+        """A CSS length in px, or None for anything else - a percentage has no meaning without a layout."""
+        if value is None or not value.endswith("px"):
+            return None
+        try:
+            return math.ceil(float(value[:-2].strip()))
+        except ValueError:
+            return None
+
+    def _style_declarations(self, node: Tag) -> dict[str, str]:
+        """The inline style of the element, as property to value, lowercased."""
+        style_val = (self._get_attr_str(node, "style") or "").lower()
+        declarations = {}
+        for part in style_val.split(";"):
+            name, separator, value = part.partition(":")
+            if separator:
+                declarations[name.strip()] = value.strip()
+        return declarations
+
     def _has_own_size(self, node: Tag) -> bool:
         """Whether the document sizes this image itself, through its inline style.
 
         Only the style counts: the `width` and `height` attributes of an <img> which replaced an
         inline <svg> are the ones this processor copied off that SVG.
         """
-        style_val = (self._get_attr_str(node, "style") or "").lower()
-        return any(part.strip().startswith(("width:", "height:")) for part in style_val.split(";"))
+        declarations = self._style_declarations(node)
+        return "width" in declarations or "height" in declarations
 
     # ---------------- Core helpers ----------------
 
@@ -215,10 +261,13 @@ class SvgProcessor:
             self.log.error("Failed to decode base64 content: %s", e)
             return None
 
-    async def replace_svg_with_png(self, svg: Element) -> tuple[str, str | bytes]:
+    async def replace_svg_with_png(self, svg: Element, render_size: tuple[int, int] | None = None) -> tuple[str, str | bytes]:
         """
         Convert SVG Element to PNG bytes using CDP.
         Returns tuple of (mime, content). If conversion fails, returns original SVG.
+
+        `render_size` is the size the document draws the image at, where it gives one: the PNG is rasterized
+        at that size times the scale factor, so it stays sharp wherever the image is enlarged.
         """
         updated_svg = self.ensure_mandatory_attributes(svg)
 
@@ -226,6 +275,10 @@ class SvgProcessor:
         if not width or not height:
             self.log.warning("Invalid or undefined dimensions for SVG (width: %s, height: %s)", width, height)
             return self.without_changes(svg)
+
+        if render_size is not None:
+            width, height = render_size
+            updated_svg = self.replace_svg_size_attributes(updated_svg, width, height)
         self.log.debug("Converting SVG (%dx%d px) to PNG with scale factor %.2f", width, height, self.device_scale_factor)
 
         svg_content = self.svg_to_string(updated_svg)

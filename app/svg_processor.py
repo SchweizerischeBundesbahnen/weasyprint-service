@@ -143,15 +143,23 @@ class SvgProcessor:
         return parsed_html
 
     def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element) -> None:
-        """Best-effort: set only width attribute and inline style from SVG px dims."""
+        """Best-effort: give the <img> the width of the SVG, where the document gives it none.
+
+        The PNG is rasterized at the size of the SVG times the scale factor, so an <img> without a
+        width of its own would come out that many times too large. A width or a height the document
+        states is the size its author asked for, and it stays - `max-width` is a cap rather than a
+        size, so an image carrying only that still gets the width of the SVG.
+        """
         try:
+            if self._has_own_size(node):
+                return
+
             w, _, _ = self.extract_svg_dimensions_as_px(svg)
             style_val = self._get_attr_str(node, "style") or ""
             style_parts = [s.strip() for s in style_val.split(";") if s.strip()]
 
             if isinstance(w, int):
                 node["width"] = f"{w}px"
-                style_parts = [p for p in style_parts if not p.lower().startswith(("width:", "height:"))]
                 style_parts.append(f"width: {w}px")
 
             if style_parts:
@@ -161,6 +169,15 @@ class SvgProcessor:
         except Exception as e:  # noqa: BLE001
             # Log at debug level to avoid noise but prevent silent pass
             logging.getLogger(__name__).debug("Failed to apply img dimensions from SVG: %s", e)
+
+    def _has_own_size(self, node: Tag) -> bool:
+        """Whether the document sizes this image itself, through its inline style.
+
+        Only the style counts: the `width` and `height` attributes of an <img> which replaced an
+        inline <svg> are the ones this processor copied off that SVG.
+        """
+        style_val = (self._get_attr_str(node, "style") or "").lower()
+        return any(part.strip().startswith(("width:", "height:")) for part in style_val.split(";"))
 
     # ---------------- Core helpers ----------------
 

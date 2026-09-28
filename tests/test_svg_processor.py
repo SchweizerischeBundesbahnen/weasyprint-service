@@ -387,30 +387,47 @@ def test_ensure_mandatory_attributes(svg_input):
     assert svg_content.count('xmlns="http://www.w3.org/2000/svg"') == 1
 
 
-def test_apply_img_dimensions_from_svg():
-    """Test that existing width/height styles are replaced when applying SVG dimensions."""
+@pytest.mark.parametrize(
+    "html,expected_width,expected_style",
+    [
+        # Nothing sizes the image, so it gets the width of the SVG: the PNG is rasterized at the size
+        # of the SVG times the scale factor and would otherwise come out that many times too large.
+        ('<img style="color: red;">', "100px", "color: red; width: 100px"),
+        ('<img style="max-width: 650px;">', "100px", "max-width: 650px; width: 100px"),
+        ("<img>", "100px", "width: 100px"),
+    ],
+)
+def test_apply_img_dimensions_from_svg_where_the_document_gives_none(html, expected_width, expected_style):
+    """The width of the SVG lands on an image the document does not size."""
     from bs4 import BeautifulSoup
 
-    svg_processor = SvgProcessor()
+    node = BeautifulSoup(html, "html.parser").find("img")
 
-    # Create an img tag with existing width/height styles
-    html = '<img style="width: 500px; height: 300px; color: red;">'
-    soup = BeautifulSoup(html, "html.parser")
-    node = soup.find("img")
+    SvgProcessor()._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
 
-    # Create SVG with known dimensions
-    svg = det.fromstring('<svg width="100" height="200"></svg>')
+    assert node.get("width") == expected_width
+    assert node.get("style") == expected_style
 
-    svg_processor._apply_img_dimensions_from_svg(node, svg)
 
-    # Check width attribute is set
-    assert node.get("width") == "100px"
+@pytest.mark.parametrize(
+    "html",
+    [
+        '<img style="width: 500px; height: 300px; color: red;">',
+        '<img style="width: 50%;">',
+        '<img style="height: 300px;">',
+        '<img style="max-width: 650px; width: 200%;">',
+    ],
+)
+def test_apply_img_dimensions_keeps_the_size_the_document_gives(html):
+    """A width or a height of the document is the size its author asked for; #375."""
+    from bs4 import BeautifulSoup
 
-    # Check style: width replaced, height removed, other styles preserved
-    style = node.get("style")
-    assert "width: 100px" in style
-    assert "height:" not in style.lower()
-    assert "color: red" in style
+    node = BeautifulSoup(html, "html.parser").find("img")
+    before = dict(node.attrs)
+
+    SvgProcessor()._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
+
+    assert dict(node.attrs) == before
 
 
 def test_apply_img_dimensions_survives_a_broken_svg(mocker):

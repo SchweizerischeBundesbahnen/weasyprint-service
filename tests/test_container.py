@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import docker
+import pymupdf
 import pypdf
 import pytest
 import requests
@@ -341,6 +342,21 @@ def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
         pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
     except utils_pdf.ReferenceMissingError as e:
         pytest.skip(str(e))
+
+
+def test_convert_svg_keeps_the_size_the_document_gives(test_parameters: TestParameters) -> None:
+    """An SVG comes out at the size the document asks for, not at its own; #375."""
+    html = __load_test_html("tests/test-data/svg-image-sized-by-the-document.html")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    assert response.status_code == 200
+
+    # A CSS px is 0.75 pt, so the rendered rectangles are read back in px
+    with pymupdf.open(stream=response.content, filetype="pdf") as doc:
+        widths = [round(rect.width / 0.75) for page in doc for xref in {img[0] for img in page.get_images(full=True)} for rect in page.get_image_rects(xref)]
+
+    # The SVG is 200x100: its own size where the document gives none, then half of it, twice it, and
+    # a width with a height.
+    assert widths == [200, 100, 400, 300]
 
 
 def test_convert_svg_without_xmlns(test_parameters: TestParameters) -> None:

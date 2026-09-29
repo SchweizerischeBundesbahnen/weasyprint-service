@@ -401,6 +401,8 @@ def test_ensure_mandatory_attributes(svg_input):
         ("<img>", "width: 100px"),
         ('<img style="color: red;">', "color: red; width: 100px"),
         ('<img style="max-width: 650px;">', "max-width: 650px; width: 100px"),
+        # A density of the document sizes nothing by itself, and the scale factor must not size it either
+        ('<img style="image-resolution: 3dppx;">', "image-resolution: 3dppx; width: 100px"),
     ],
 )
 def test_apply_img_dimensions_from_svg(html, expected_style):
@@ -419,8 +421,8 @@ def test_apply_img_dimensions_from_svg(html, expected_style):
     [
         # A PNG of the size of its SVG says nothing about its density
         ('<img style="width: 400px;">', 1.0, "width: 400px;"),  # untouched, as it was written
-        # And a density the document gives stays
-        ('<img style="image-resolution: 3dppx;">', 2.0, "image-resolution: 3dppx;"),
+        # And a density the document gives stays, where it sizes the image too
+        ('<img style="image-resolution: 3dppx; width: 400px;">', 2.0, "image-resolution: 3dppx; width: 400px;"),
     ],
 )
 def test_apply_img_dimensions_writes_nothing_where_there_is_nothing_to_say(html, scale, expected_style):

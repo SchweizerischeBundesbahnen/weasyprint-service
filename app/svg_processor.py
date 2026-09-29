@@ -151,21 +151,20 @@ class SvgProcessor:
 
         The PNG carries the pixels of the SVG times the scale factor, so an image left to size itself
         would come out that many times too large. Where the document sizes the image nowhere, the width
-        of the SVG says the size, exactly. Where it does - a width, a height, one of them inherited or
+        of the SVG says the size, exactly - said as a density it would leave the layout to follow the
+        scale factor, which is there for the detail of a raster rather than for the size of anything. Where it does - a width, a height, one of them inherited or
         `auto` - the density of the PNG is said instead, so the size the document gives lands where it
         would have with the SVG, and with the ratio the SVG has.
         """
         try:
             scale = self.device_scale_factor or 1.0
             declarations = self._style_declarations(node)
-            if "image-resolution" in declarations:
-                return
-
             style_val = self._get_attr_str(node, "style") or ""
             style_parts = [part.strip() for part in style_val.split(";") if part.strip()]
 
             if "width" in declarations or "height" in declarations:
-                if scale == 1.0:
+                # A density the document gives is the one that counts, and it needs no help from this
+                if math.isclose(scale, 1.0) or "image-resolution" in declarations:
                     return
                 style_parts.append(f"image-resolution: {scale:g}dppx")
             else:

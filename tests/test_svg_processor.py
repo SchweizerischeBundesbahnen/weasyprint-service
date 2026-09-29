@@ -449,7 +449,8 @@ async def test_svg_is_rasterized_at_the_size_the_document_draws_it(style, expect
     [
         # `auto` and the keywords beside it state no size, so the width of the SVG still lands on the image
         ('<img style="width: auto;">', "100px", "width: auto; width: 100px"),
-        ('<img style="height: inherit;">', "100px", "height: inherit; width: 100px"),
+        ('<img style="width: initial;">', "100px", "width: initial; width: 100px"),
+        ('<img style="width: unset;">', "100px", "width: unset; width: 100px"),
         ('<img style="width: fit-content; max-width: 650px;">', "100px", "width: fit-content; max-width: 650px; width: 100px"),
     ],
 )
@@ -474,6 +475,7 @@ def test_apply_img_dimensions_where_the_style_states_no_size(html, expected_widt
         '<img style="width: 50%;">',
         '<img style="height: 300px;">',
         '<img style="max-width: 650px; width: 200%;">',
+        '<img style="width: inherit;">',  # the size of the parent, which a width written here would win over
     ],
 )
 def test_apply_img_dimensions_keeps_the_size_the_document_gives(html):

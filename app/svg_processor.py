@@ -240,18 +240,23 @@ class SvgProcessor:
         """Whether the document sizes this image itself, through its inline style.
 
         Only the style counts: the `width` and `height` attributes of an <img> which replaced an
-        inline <svg> are the ones this processor copied off that SVG. And only a length or a
-        percentage is a size - `auto` and the other keywords leave the size to the image itself.
+        inline <svg> are the ones this processor copied off that SVG.
         """
         declarations = self._style_declarations(node)
         return any(self._is_a_size(declarations.get(name)) for name in ("width", "height"))
 
     @staticmethod
     def _is_a_size(value: str | None) -> bool:
-        """Whether a CSS value states a size: a length or a percentage, rather than `auto` or a keyword."""
+        """Whether a CSS value says how wide the image is: a length, a percentage, or `inherit`.
+
+        `auto` and the keywords which come down to it - `initial`, `unset`, `revert` and the
+        content-based ones - leave the size to the image, which is the case this processor is for:
+        the image would take the size of a PNG rasterized at the scale factor. `inherit` takes the
+        size of the parent, and a width written here would win over it.
+        """
         if not value:
             return False
-        return value.startswith("calc(") or value[0].isdigit() or value[0] in "+-."
+        return value == "inherit" or value.startswith("calc(") or value[0].isdigit() or value[0] in "+-."
 
     # ---------------- Core helpers ----------------
 

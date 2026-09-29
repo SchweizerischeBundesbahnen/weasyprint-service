@@ -267,9 +267,8 @@ class SvgProcessor:
         """
         if not src or not src.startswith(self.DATA_PREFIX) or ";base64," not in src:
             return None
+        # The source starts with the prefix, so the header before ";base64," does too
         header, b64data = src.split(";base64,", 1)
-        if not header.startswith(self.DATA_PREFIX):
-            return None
         content_type = header[len(self.DATA_PREFIX) :]
         return content_type, b64data
 
@@ -445,10 +444,9 @@ class SvgProcessor:
         if unit in self.SPECIAL_UNITS:
             return math.ceil((val / 100) * viewbox_dimension)
 
-        fallback = self.convert_to_px(value, unit)
-        if fallback is None:
-            raise ValueError(f"Cannot convert unit '{unit}' to px")
-        return fallback
+        # The value is a number and the unit is none of the special ones, which is what `convert_to_px`
+        # does with such a pair
+        return math.ceil(val * self.get_px_conversion_ratio(unit))
 
     # ---------------- Generic helpers ----------------
 

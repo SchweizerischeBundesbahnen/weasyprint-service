@@ -389,25 +389,60 @@ def test_ensure_mandatory_attributes(svg_input):
 
 
 @pytest.mark.parametrize(
-    "html,expected_width,expected_style",
+    "html,expected_style",
     [
-        # Nothing sizes the image, so it gets the width of the SVG: the PNG is rasterized at the size
-        # of the SVG times the scale factor and would otherwise come out that many times too large.
-        ('<img style="color: red;">', "100px", "color: red; width: 100px"),
-        ('<img style="max-width: 650px;">', "100px", "max-width: 650px; width: 100px"),
-        ("<img>", "100px", "width: 100px"),
+        # A size of the document keeps the ratio of the SVG, whatever shape the size takes
+        ('<img style="width: 400px;">', "width: 400px; image-resolution: 2dppx"),
+        ('<img style="height: 50px;">', "height: 50px; image-resolution: 2dppx"),
+        ('<img style="width: inherit;">', "width: inherit; image-resolution: 2dppx"),
+        ('<img style="height: inherit;">', "height: inherit; image-resolution: 2dppx"),
+        ('<img style="width: auto;">', "width: auto; image-resolution: 2dppx"),
+        # And where the document sizes it nowhere, the width of the SVG says the size, exactly
+        ("<img>", "width: 100px"),
+        ('<img style="color: red;">', "color: red; width: 100px"),
+        ('<img style="max-width: 650px;">', "max-width: 650px; width: 100px"),
     ],
 )
-def test_apply_img_dimensions_from_svg_where_the_document_gives_none(html, expected_width, expected_style):
-    """The width of the SVG lands on an image the document does not size."""
+def test_apply_img_dimensions_from_svg(html, expected_style):
+    """The image comes out at the size of the SVG it replaced, however the document sizes it; #375."""
     from bs4 import BeautifulSoup
 
     node = BeautifulSoup(html, "html.parser").find("img")
 
-    SvgProcessor()._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
+    SvgProcessor(device_scale_factor=2.0)._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
 
-    assert node.get("width") == expected_width
     assert node.get("style") == expected_style
+
+
+@pytest.mark.parametrize(
+    "html,scale,expected_style",
+    [
+        # A PNG of the size of its SVG says nothing about its density
+        ('<img style="width: 400px;">', 1.0, "width: 400px;"),  # untouched, as it was written
+        # And a density the document gives stays
+        ('<img style="image-resolution: 3dppx;">', 2.0, "image-resolution: 3dppx;"),
+    ],
+)
+def test_apply_img_dimensions_writes_nothing_where_there_is_nothing_to_say(html, scale, expected_style):
+    from bs4 import BeautifulSoup
+
+    node = BeautifulSoup(html, "html.parser").find("img")
+
+    SvgProcessor(device_scale_factor=scale)._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
+
+    assert node.get("style") == expected_style
+    assert "width" not in node.attrs
+
+
+def test_apply_img_dimensions_leaves_an_svg_of_no_size_alone():
+    """Nothing to say where neither the document nor the SVG gives a size."""
+    from bs4 import BeautifulSoup
+
+    node = BeautifulSoup("<img>", "html.parser").img
+
+    SvgProcessor(device_scale_factor=2.0)._apply_img_dimensions_from_svg(node, det.fromstring("<svg/>"))
+
+    assert node.attrs == {}
 
 
 @pytest.mark.asyncio
@@ -442,54 +477,6 @@ async def test_svg_is_rasterized_at_the_size_the_document_draws_it(style, expect
     await processor.replace_img_base64(soup)
 
     assert convert.call_args.args[1] == expected_render_size
-
-
-@pytest.mark.parametrize(
-    "html,expected_width,expected_style",
-    [
-        # `auto` and the keywords beside it state no size, so the width of the SVG still lands on the image
-        ('<img style="width: auto;">', "100px", "width: auto; width: 100px"),
-        # An inherited height can come down to `auto`, which leaves the image the size of its PNG
-        ('<img style="height: inherit;">', "100px", "height: inherit; width: 100px"),
-        ('<img style="width: initial;">', "100px", "width: initial; width: 100px"),
-        ('<img style="width: unset;">', "100px", "width: unset; width: 100px"),
-        ('<img style="width: fit-content; max-width: 650px;">', "100px", "width: fit-content; max-width: 650px; width: 100px"),
-    ],
-)
-def test_apply_img_dimensions_where_the_style_states_no_size(html, expected_width, expected_style):
-    """A keyword is not a size: without one the PNG would come out as many times too large as the scale factor."""
-    from bs4 import BeautifulSoup
-
-    node = BeautifulSoup(html, "html.parser").find("img")
-
-    SvgProcessor()._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
-
-    assert node.get("width") == expected_width
-    assert node.get("style") == expected_style
-
-
-@pytest.mark.parametrize(
-    "html",
-    [
-        '<img style="width: 500px; height: 300px; color: red;">',
-        '<img style="width : 100px;">',  # a space before the colon is valid CSS
-        '<img style="WIDTH: 100PX;">',
-        '<img style="width: 50%;">',
-        '<img style="height: 300px;">',
-        '<img style="max-width: 650px; width: 200%;">',
-        '<img style="width: inherit;">',  # the width of the parent, which a width written here would win over
-    ],
-)
-def test_apply_img_dimensions_keeps_the_size_the_document_gives(html):
-    """A width or a height of the document is the size its author asked for; #375."""
-    from bs4 import BeautifulSoup
-
-    node = BeautifulSoup(html, "html.parser").find("img")
-    before = dict(node.attrs)
-
-    SvgProcessor()._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
-
-    assert dict(node.attrs) == before
 
 
 def test_apply_img_dimensions_survives_a_broken_svg(mocker):
@@ -557,18 +544,6 @@ async def test_replace_img_base64_leaves_an_svg_the_conversion_gives_back(mocker
 
     assert soup.find("img")["src"] == src
     assert "style" not in soup.find("img").attrs
-
-
-def test_apply_img_dimensions_leaves_an_svg_without_a_width_alone():
-    """Nothing to apply where the SVG states no width, and no style is written for the sake of it."""
-    from bs4 import BeautifulSoup
-
-    node = BeautifulSoup("<img>", "html.parser").img
-
-    SvgProcessor()._apply_img_dimensions_from_svg(node, det.fromstring("<svg/>"))
-
-    assert "width" not in node.attrs
-    assert "style" not in node.attrs
 
 
 @pytest.mark.parametrize(

@@ -147,27 +147,35 @@ class SvgProcessor:
         return parsed_html
 
     def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element) -> None:
-        """Best-effort: give the <img> the width of the SVG, where the document gives it none.
+        """Best-effort: give the <img> the size of the SVG it replaced, in the way the document allows.
 
-        The PNG is rasterized at the size of the SVG times the scale factor, so an <img> without a
-        width of its own would come out that many times too large. A width or a height the document
-        states is the size its author asked for, and it stays - `max-width` is a cap rather than a
-        size, so an image carrying only that still gets the width of the SVG.
+        The PNG carries the pixels of the SVG times the scale factor, so an image left to size itself
+        would come out that many times too large. Where the document sizes the image nowhere, the width
+        of the SVG says the size, exactly. Where it does - a width, a height, one of them inherited or
+        `auto` - the density of the PNG is said instead, so the size the document gives lands where it
+        would have with the SVG, and with the ratio the SVG has.
         """
         try:
-            if self._has_own_size(node):
+            scale = self.device_scale_factor or 1.0
+            declarations = self._style_declarations(node)
+            if "image-resolution" in declarations:
                 return
 
-            w, _, _ = self.extract_svg_dimensions_as_px(svg)
             style_val = self._get_attr_str(node, "style") or ""
-            style_parts = [s.strip() for s in style_val.split(";") if s.strip()]
+            style_parts = [part.strip() for part in style_val.split(";") if part.strip()]
 
-            if isinstance(w, int):
+            if "width" in declarations or "height" in declarations:
+                if scale == 1.0:
+                    return
+                style_parts.append(f"image-resolution: {scale:g}dppx")
+            else:
+                w, _, _ = self.extract_svg_dimensions_as_px(svg)
+                if not isinstance(w, int):
+                    return
                 node["width"] = f"{w}px"
                 style_parts.append(f"width: {w}px")
 
-            if style_parts:
-                node["style"] = "; ".join(style_parts)
+            node["style"] = "; ".join(style_parts)
 
         # Applying dimensions is best effort.
         except Exception as e:  # noqa: BLE001
@@ -246,33 +254,6 @@ class SvgProcessor:
             if marked:
                 important.add(name)
         return declarations
-
-    def _has_own_size(self, node: Tag) -> bool:
-        """Whether the document sizes this image itself, through its inline style.
-
-        Only the style counts: the `width` and `height` attributes of an <img> which replaced an
-        inline <svg> are the ones this processor copied off that SVG.
-
-        A height is a size of its own: the image keeps its ratio, so its width follows. `inherit`
-        counts for the width alone - it takes the width of the parent, which a width written here
-        would win over, while an inherited height may come down to `auto` and leave the image the
-        size of its PNG.
-        """
-        declarations = self._style_declarations(node)
-        width = declarations.get("width")
-        return self._is_a_size(width) or width == "inherit" or self._is_a_size(declarations.get("height"))
-
-    @staticmethod
-    def _is_a_size(value: str | None) -> bool:
-        """Whether a CSS value states a size: a length or a percentage.
-
-        `auto` and the keywords which come down to it - `initial`, `unset`, `revert` and the
-        content-based ones - leave the size to the image, which is the case this processor is for:
-        the image would take the size of a PNG rasterized at the scale factor.
-        """
-        if not value:
-            return False
-        return value.startswith("calc(") or value[0].isdigit() or value[0] in "+-."
 
     # ---------------- Core helpers ----------------
 

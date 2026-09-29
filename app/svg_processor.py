@@ -35,6 +35,10 @@ class SvgProcessor:
 
     # MIME/constants
     SPECIAL_UNITS = ("vw", "vh", "%")
+
+    # What a browser is asked to rasterize at most, after the scale factor: one side, and the pixels of it
+    MAX_RENDER_SIDE = 10_000
+    MAX_RENDER_PIXELS = 50_000_000
     IMAGE_PNG = "image/png"
     IMAGE_SVG = "image/svg+xml"
     NON_SVG_CONTENT_TYPES = ("image/jpeg", "image/png", "image/gif")
@@ -198,6 +202,13 @@ class SvgProcessor:
             width = math.ceil(height * own_width / own_height)  # type: ignore[operator]
         if height is None:
             height = math.ceil(width * own_height / own_width)
+
+        # A document could otherwise size an image into a screenshot of any size, and the memory of the
+        # browser taking it is shared with every conversion running beside this one
+        scale = self.device_scale_factor or 1.0
+        if max(width, height) * scale > self.MAX_RENDER_SIDE or width * height * scale * scale > self.MAX_RENDER_PIXELS:
+            self.log.warning("Rasterizing an SVG at its own size: %dx%d px at a scale of %.2f is too large", width, height, scale)
+            return None
         return width, height
 
     @staticmethod
@@ -241,22 +252,27 @@ class SvgProcessor:
 
         Only the style counts: the `width` and `height` attributes of an <img> which replaced an
         inline <svg> are the ones this processor copied off that SVG.
+
+        A height is a size of its own: the image keeps its ratio, so its width follows. `inherit`
+        counts for the width alone - it takes the width of the parent, which a width written here
+        would win over, while an inherited height may come down to `auto` and leave the image the
+        size of its PNG.
         """
         declarations = self._style_declarations(node)
-        return any(self._is_a_size(declarations.get(name)) for name in ("width", "height"))
+        width = declarations.get("width")
+        return self._is_a_size(width) or width == "inherit" or self._is_a_size(declarations.get("height"))
 
     @staticmethod
     def _is_a_size(value: str | None) -> bool:
-        """Whether a CSS value says how wide the image is: a length, a percentage, or `inherit`.
+        """Whether a CSS value states a size: a length or a percentage.
 
         `auto` and the keywords which come down to it - `initial`, `unset`, `revert` and the
         content-based ones - leave the size to the image, which is the case this processor is for:
-        the image would take the size of a PNG rasterized at the scale factor. `inherit` takes the
-        size of the parent, and a width written here would win over it.
+        the image would take the size of a PNG rasterized at the scale factor.
         """
         if not value:
             return False
-        return value == "inherit" or value.startswith("calc(") or value[0].isdigit() or value[0] in "+-."
+        return value.startswith("calc(") or value[0].isdigit() or value[0] in "+-."
 
     # ---------------- Core helpers ----------------
 

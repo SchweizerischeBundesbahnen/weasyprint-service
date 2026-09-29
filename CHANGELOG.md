@@ -1,5 +1,21 @@
 # Changelog
 
+## [70.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.0...v70.0.1) (2026-09-29)
+
+
+### Bug Fixes
+
+* **deps:** update dependency ruff to v0.16.9 ([b740f11](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b740f118482641fce6dde80715bf9deab8c7bc7f))
+* **deps:** update dependency tox to v4.63.0 ([18e12e7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/18e12e7675e030658bc1900e7de1b39c6717f59d))
+* **deps:** update dependency tox to v4.64.1 ([43ce90b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/43ce90bd3e5b818843f7210ac18d45294991fa02))
+* **deps:** update dependency tox to v4.64.3 ([37ae4fb](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/37ae4fb83ef6285d46e947781e531a0f0fcb753e))
+* **deps:** update dependency uvicorn to v0.54.0 ([9ea438e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9ea438e368dfaf7be1d8480e1c99fe64f6cf93fe))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.18 ([bd590f3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/bd590f3edfee3ac49f58370d1f3c7b42b54878f0))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.19 ([a463fff](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/a463fffc36786886b52545ca3098794413ae4341))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.20 ([d833e98](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d833e9811587d2faadf523bf9011e2a2d7d5a29a))
+* **deps:** update prom/prometheus:latest docker digest to efd719c ([0948762](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/09487622b1b686573dac112437e7264b91c6a479))
+* **svg:** keep the size the document gives an image ([#376](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/376)) ([58f2eb9](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/58f2eb99bf34b0e0db5391278005cc0ca74a9c00)), closes [#375](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/375)
+
 ## [70.0.0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v69.0.2...v70.0.0) (2026-09-22)
 
 

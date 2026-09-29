@@ -182,6 +182,10 @@ class SvgProcessor:
         height = self._px_value(style.get("height"))
         if width is None and height is None:
             return None
+        # A size this cannot read, a percentage among others, says nothing about how wide the image ends up,
+        # and the other half of a pair would be a guess. The SVG says the size then, as it always did.
+        if (width is None) != (style.get("width") is None) or (height is None) != (style.get("height") is None):
+            return None
 
         # The drawing is scaled into the size asked for, which a viewBox is what makes possible
         if self.parse_viewbox(svg) == (None, None):
@@ -202,18 +206,34 @@ class SvgProcessor:
         if value is None or not value.endswith("px"):
             return None
         try:
-            return math.ceil(float(value[:-2].strip()))
+            length = float(value[:-2].strip())
         except ValueError:
             return None
+        # `infpx` parses as a float and would raise on the way to an int
+        return math.ceil(length) if math.isfinite(length) else None
 
     def _style_declarations(self, node: Tag) -> dict[str, str]:
-        """The inline style of the element, as property to value, lowercased."""
+        """The inline style of the element, as property to value, lowercased.
+
+        A later declaration wins, unless an earlier one is `!important` - the cascade of a style attribute.
+        """
         style_val = (self._get_attr_str(node, "style") or "").lower()
-        declarations = {}
+        declarations: dict[str, str] = {}
+        important: set[str] = set()
         for part in style_val.split(";"):
             name, separator, value = part.partition(":")
-            if separator:
-                declarations[name.strip()] = value.strip()
+            if not separator:
+                continue
+            name = name.strip()
+            value = value.strip()
+            marked = value.endswith("!important")
+            if marked:
+                value = value[: -len("!important")].strip()
+            if name in important and not marked:
+                continue
+            declarations[name] = value
+            if marked:
+                important.add(name)
         return declarations
 
     def _has_own_size(self, node: Tag) -> bool:

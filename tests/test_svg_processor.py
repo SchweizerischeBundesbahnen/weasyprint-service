@@ -419,9 +419,12 @@ def test_apply_img_dimensions_from_svg_where_the_document_gives_none(html, expec
         ('style="width: 400px; height: 200px;"', (400, 200)),
         ('style="width: 400px;"', (400, 200)),  # the height follows the ratio of the SVG
         ('style="height: 50px;"', (100, 50)),
+        ('style="width: 400px !important; width: 100px;"', (400, 200)),  # the cascade of a style attribute
         # Nothing the document draws the image at, so the SVG says the size, as it always did
         ('style="max-width: 650px;"', None),
         ('style="width: 50%;"', None),  # a percentage has no meaning without a layout
+        ('style="width: 50%; height: 50px;"', None),  # and the other half would be a guess
+        ('style="width: infpx;"', None),  # a length which is no length
         ("", None),
     ],
 )

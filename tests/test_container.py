@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import docker
+import pymupdf
 import pypdf
 import pytest
 import requests
@@ -341,6 +342,54 @@ def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
         pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
     except utils_pdf.ReferenceMissingError as e:
         pytest.skip(str(e))
+
+
+def __images_drawn(doc: pymupdf.Document) -> list[tuple[int, int]]:
+    """Every image of the document, top to bottom: the width it is drawn at and the width it carries, in px.
+
+    A CSS px is 0.75 pt, the unit a PDF is laid out in.
+    """
+    drawn = []
+    for page in doc:
+        for xref in {img[0] for img in page.get_images(full=True)}:
+            pixels = doc.extract_image(xref)["width"]
+            drawn.extend((rect.y0, rect.x0, round(rect.width / 0.75), pixels) for rect in page.get_image_rects(xref))
+    return [(width, pixels) for _, _, width, pixels in sorted(drawn)]
+
+
+def test_convert_svg_keeps_the_size_the_document_gives(test_parameters: TestParameters) -> None:
+    """An SVG comes out at the size the document asks for, not at its own; #375."""
+    html = __load_test_html("tests/test-data/svg-image-sized-by-the-document.html")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    assert response.status_code == 200
+
+    with pymupdf.open(stream=response.content, filetype="pdf") as doc:
+        widths = [width for width, _ in __images_drawn(doc)]
+
+    # The SVG is 200x100: its own size where the document gives none, then half of it, twice it, and
+    # a width with a height.
+    assert widths == [200, 100, 400, 300]
+
+
+@pytest.mark.parametrize("scale", [1.0, 2.0])
+def test_convert_svg_rasterizes_at_the_size_it_is_drawn(scale: float, test_parameters: TestParameters) -> None:
+    """The PNG carries the scale factor over the size the document draws the image at; #375."""
+    html = __load_test_html("tests/test-data/svg-image-sized-by-the-document.html")
+    response = __call_convert_html(
+        base_url=test_parameters.base_url,
+        request_session=test_parameters.request_session,
+        data=html,
+        print_error=True,
+        parameters=f"scale_factor={scale}",
+    )
+    assert response.status_code == 200
+
+    with pymupdf.open(stream=response.content, filetype="pdf") as doc:
+        drawn = __images_drawn(doc)
+
+    # Every image carries as many pixels as the scale factor asks for at the size it is drawn
+    assert drawn == [(width, round(width * scale)) for width, _ in drawn]
+    assert [width for width, _ in drawn] == [200, 100, 400, 300]
 
 
 def test_convert_svg_without_xmlns(test_parameters: TestParameters) -> None:

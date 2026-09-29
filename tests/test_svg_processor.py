@@ -1,5 +1,6 @@
 """Tests for SvgProcessor utility functions and SVG processing."""
 
+import base64
 from pathlib import Path
 
 import pytest
@@ -387,30 +388,97 @@ def test_ensure_mandatory_attributes(svg_input):
     assert svg_content.count('xmlns="http://www.w3.org/2000/svg"') == 1
 
 
-def test_apply_img_dimensions_from_svg():
-    """Test that existing width/height styles are replaced when applying SVG dimensions."""
+@pytest.mark.parametrize(
+    "html,expected_style",
+    [
+        # A size of the document keeps the ratio of the SVG, whatever shape the size takes
+        ('<img style="width: 400px;">', "width: 400px; image-resolution: 2dppx"),
+        ('<img style="height: 50px;">', "height: 50px; image-resolution: 2dppx"),
+        ('<img style="width: inherit;">', "width: inherit; image-resolution: 2dppx"),
+        ('<img style="height: inherit;">', "height: inherit; image-resolution: 2dppx"),
+        ('<img style="width: auto;">', "width: auto; image-resolution: 2dppx"),
+        # And where the document sizes it nowhere, the width of the SVG says the size, exactly
+        ("<img>", "width: 100px"),
+        ('<img style="color: red;">', "color: red; width: 100px"),
+        ('<img style="max-width: 650px;">', "max-width: 650px; width: 100px"),
+        # A density of the document sizes nothing by itself, and the scale factor must not size it either
+        ('<img style="image-resolution: 3dppx;">', "image-resolution: 3dppx; width: 100px"),
+    ],
+)
+def test_apply_img_dimensions_from_svg(html, expected_style):
+    """The image comes out at the size of the SVG it replaced, however the document sizes it; #375."""
     from bs4 import BeautifulSoup
 
-    svg_processor = SvgProcessor()
+    node = BeautifulSoup(html, "html.parser").find("img")
 
-    # Create an img tag with existing width/height styles
-    html = '<img style="width: 500px; height: 300px; color: red;">'
-    soup = BeautifulSoup(html, "html.parser")
-    node = soup.find("img")
+    SvgProcessor(device_scale_factor=2.0)._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
 
-    # Create SVG with known dimensions
-    svg = det.fromstring('<svg width="100" height="200"></svg>')
+    assert node.get("style") == expected_style
 
-    svg_processor._apply_img_dimensions_from_svg(node, svg)
 
-    # Check width attribute is set
-    assert node.get("width") == "100px"
+@pytest.mark.parametrize(
+    "html,scale,expected_style",
+    [
+        # A PNG of the size of its SVG says nothing about its density
+        ('<img style="width: 400px;">', 1.0, "width: 400px;"),  # untouched, as it was written
+        # And a density the document gives stays, where it sizes the image too
+        ('<img style="image-resolution: 3dppx; width: 400px;">', 2.0, "image-resolution: 3dppx; width: 400px;"),
+    ],
+)
+def test_apply_img_dimensions_writes_nothing_where_there_is_nothing_to_say(html, scale, expected_style):
+    from bs4 import BeautifulSoup
 
-    # Check style: width replaced, height removed, other styles preserved
-    style = node.get("style")
-    assert "width: 100px" in style
-    assert "height:" not in style.lower()
-    assert "color: red" in style
+    node = BeautifulSoup(html, "html.parser").find("img")
+
+    SvgProcessor(device_scale_factor=scale)._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
+
+    assert node.get("style") == expected_style
+    assert "width" not in node.attrs
+
+
+def test_apply_img_dimensions_leaves_an_svg_of_no_size_alone():
+    """Nothing to say where neither the document nor the SVG gives a size."""
+    from bs4 import BeautifulSoup
+
+    node = BeautifulSoup("<img>", "html.parser").img
+
+    SvgProcessor(device_scale_factor=2.0)._apply_img_dimensions_from_svg(node, det.fromstring("<svg/>"))
+
+    assert node.attrs == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "style,expected_render_size",
+    [
+        # The PNG is rasterized at the size the document draws the image at, so the scale factor keeps it
+        # sharp there rather than at the size of the SVG; #375.
+        ('style="width: 400px; height: 200px;"', (400, 200)),
+        ('style="width: 400px;"', (400, 200)),  # the height follows the ratio of the SVG
+        ('style="height: 50px;"', (100, 50)),
+        ('style="width: 400px !important; width: 100px;"', (400, 200)),  # the cascade of a style attribute
+        # Nothing the document draws the image at, so the SVG says the size, as it always did
+        ('style="max-width: 650px;"', None),
+        ('style="width: 50%;"', None),  # a percentage has no meaning without a layout
+        ('style="width: 50%; height: 50px;"', None),  # and the other half would be a guess
+        ('style="width: infpx;"', None),  # a length which is no length
+        ("", None),
+    ],
+)
+async def test_svg_is_rasterized_at_the_size_the_document_draws_it(style, expected_render_size, mocker):
+    """The size handed to the conversion is the size the image is drawn at."""
+    from bs4 import BeautifulSoup
+
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100"></svg>'
+    src = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+    soup = BeautifulSoup(f'<img src="{src}" {style}>', "html.parser")
+
+    processor = SvgProcessor()
+    convert = mocker.patch.object(processor, "replace_svg_with_png", return_value=("image/png", b"png bytes"))
+
+    await processor.replace_img_base64(soup)
+
+    assert convert.call_args.args[1] == expected_render_size
 
 
 def test_apply_img_dimensions_survives_a_broken_svg(mocker):
@@ -424,3 +492,186 @@ def test_apply_img_dimensions_survives_a_broken_svg(mocker):
     processor._apply_img_dimensions_from_svg(node, det.fromstring("<svg/>"))
 
     assert "style" not in node.attrs
+
+
+# The paths a document takes which nothing else in this file reaches: #375 asks for all of them.
+
+
+@pytest.mark.parametrize(
+    "svg,expected",
+    [
+        ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 5"/>', {"src"}),
+        ('<svg xmlns="http://www.w3.org/2000/svg" width="10"/>', {"src", "width"}),
+        ('<svg xmlns="http://www.w3.org/2000/svg" height="5"/>', {"src", "height"}),
+    ],
+)
+def test_replace_svg_with_img_carries_the_dimensions_the_svg_has(svg, expected):
+    """An inline <svg> becomes an <img> with the width and the height it states, and no others."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(f"<div>{svg}</div>", "html.parser")
+
+    SvgProcessor().replace_inline_svgs_with_img(soup)
+
+    assert set(soup.find("img").attrs) == expected
+
+
+@pytest.mark.asyncio
+async def test_replace_img_base64_passes_over_what_is_not_an_svg_data_url(mocker):
+    """An image which is not a base64 data URL, and one whose payload is no SVG, are left as they are."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup('<img src="picture.png"><img src="data:image/png;base64,Zm9v">', "html.parser")
+    processor = SvgProcessor()
+    convert = mocker.patch.object(processor, "replace_svg_with_png")
+
+    await processor.replace_img_base64(soup)
+
+    convert.assert_not_called()
+    assert [img["src"] for img in soup.find_all("img")] == ["picture.png", "data:image/png;base64,Zm9v"]
+
+
+@pytest.mark.asyncio
+async def test_replace_img_base64_leaves_an_svg_the_conversion_gives_back(mocker):
+    """Where the conversion returns the SVG it was given, the image keeps the source it had."""
+    from bs4 import BeautifulSoup
+
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="5"/>'
+    src = "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+    soup = BeautifulSoup(f'<img src="{src}">', "html.parser")
+    processor = SvgProcessor()
+    mocker.patch.object(processor, "replace_svg_with_png", return_value=("image/svg+xml", svg))
+
+    await processor.replace_img_base64(soup)
+
+    assert soup.find("img")["src"] == src
+    assert "style" not in soup.find("img").attrs
+
+
+@pytest.mark.parametrize(
+    "svg",
+    [
+        '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100"/>',  # no viewBox to scale into
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 0 0"/>',  # no size of its own
+    ],
+)
+def test_requested_size_is_none_where_the_svg_cannot_be_scaled(svg):
+    """The size of the document is kept, but the PNG is rasterized as it always was."""
+    from bs4 import BeautifulSoup
+
+    node = BeautifulSoup('<img style="width: 400px;">', "html.parser").img
+
+    assert SvgProcessor()._requested_size_px(node, det.fromstring(svg)) is None
+
+
+@pytest.mark.parametrize(
+    "style,scale",
+    [
+        ('style="width: 60000px;"', 1.0),  # more pixels than a browser should be asked for
+        ('style="width: 20000px;"', 1.0),  # a side longer than it should be asked for
+        ('style="width: 9000px;"', 2.0),  # within reach at a scale of one, out of it at two
+    ],
+)
+def test_a_size_too_large_to_rasterize_falls_back_to_the_svg(style, scale):
+    """The memory of the browser is shared with every conversion beside this one; #375."""
+    from bs4 import BeautifulSoup
+
+    node = BeautifulSoup(f"<img {style}>", "html.parser").img
+    svg = det.fromstring('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100"/>')
+
+    assert SvgProcessor(device_scale_factor=scale)._requested_size_px(node, svg) is None
+
+
+@pytest.mark.parametrize("value,expected", [("abcpx", None), ("10", None), (None, None), ("10px", 10)])
+def test_px_value(value, expected):
+    """A length in px, and nothing else."""
+    assert SvgProcessor()._px_value(value) == expected
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        "picture.png",  # no data URL at all
+        "data:image/svg+xml,<svg/>",  # a data URL which is not base64
+        "not-data:image/svg+xml;base64,Zm9v",  # base64, but no data URL
+    ],
+)
+def test_parse_data_url_base64_takes_only_a_base64_data_url(src):
+    assert SvgProcessor()._parse_data_url_base64(src) is None
+
+
+@pytest.mark.asyncio
+async def test_replace_svg_with_png_keeps_an_svg_without_dimensions():
+    """Nothing to rasterize where the SVG says no size."""
+    processor = SvgProcessor()
+
+    content_type, content = await processor.replace_svg_with_png(det.fromstring('<svg xmlns="http://www.w3.org/2000/svg"/>'))
+
+    assert content_type == processor.IMAGE_SVG
+    assert "<svg" in content
+
+
+@pytest.mark.asyncio
+async def test_replace_svg_with_png_rasterizes_at_the_size_it_is_given(mocker):
+    """The size handed in replaces the one of the SVG, which its viewBox scales the drawing into."""
+    processor = SvgProcessor()
+    processor.chromium_manager = mocker.Mock()
+    processor.chromium_manager.convert_svg_to_png = mocker.AsyncMock(return_value=b"png bytes")
+    svg = det.fromstring('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100"/>')
+
+    content_type, content = await processor.replace_svg_with_png(svg, (400, 200))
+
+    assert (content_type, content) == (processor.IMAGE_PNG, b"png bytes")
+    svg_content, width, height, _ = processor.chromium_manager.convert_svg_to_png.call_args.args
+    assert (width, height) == (400, 200)
+    assert 'width="400px"' in svg_content
+
+
+@pytest.mark.asyncio
+async def test_replace_svg_with_png_keeps_the_svg_where_the_conversion_fails(mocker):
+    """A conversion which raises leaves the image as the SVG it was."""
+    processor = SvgProcessor()
+    processor.chromium_manager = mocker.Mock()
+    processor.chromium_manager.convert_svg_to_png = mocker.AsyncMock(side_effect=RuntimeError("no chromium"))
+
+    content_type, content = await processor.replace_svg_with_png(det.fromstring('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="5"/>'))
+
+    assert content_type == processor.IMAGE_SVG
+    assert "<svg" in content
+
+
+def test_calculate_special_unit_refuses_a_value_which_is_no_number():
+    with pytest.raises(ValueError, match="could not convert string to float"):
+        SvgProcessor().calculate_special_unit("ten", "pt", 100)
+
+
+@pytest.mark.parametrize("value,default,expected", [("abc", 1.5, 1.5), (None, 2.5, 2.5), ("3", 1.0, 3.0)])
+def test_parse_float(value, default, expected):
+    assert SvgProcessor()._parse_float(value, default) == expected
+
+
+@pytest.mark.asyncio
+async def test_replace_img_base64_passes_over_what_is_no_tag(mocker):
+    """The search gives tags, and anything else is passed over rather than read as one."""
+    from bs4 import BeautifulSoup, NavigableString
+
+    soup = BeautifulSoup("<img>", "html.parser")
+    mocker.patch.object(soup, "find_all", return_value=[NavigableString("text")])
+    processor = SvgProcessor()
+    convert = mocker.patch.object(processor, "replace_svg_with_png")
+
+    await processor.replace_img_base64(soup)
+
+    convert.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_replace_svg_with_png_keeps_the_svg_without_a_browser_to_rasterize_it():
+    """Nothing converts an SVG where no browser was started, so the image stays the SVG it was."""
+    processor = SvgProcessor()
+    processor.chromium_manager = None
+
+    content_type, content = await processor.replace_svg_with_png(det.fromstring('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="5"/>'))
+
+    assert content_type == processor.IMAGE_SVG
+    assert "<svg" in content

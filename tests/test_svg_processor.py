@@ -442,9 +442,32 @@ async def test_svg_is_rasterized_at_the_size_the_document_draws_it(style, expect
 
 
 @pytest.mark.parametrize(
+    "html,expected_width,expected_style",
+    [
+        # `auto` and the keywords beside it state no size, so the width of the SVG still lands on the image
+        ('<img style="width: auto;">', "100px", "width: auto; width: 100px"),
+        ('<img style="height: inherit;">', "100px", "height: inherit; width: 100px"),
+        ('<img style="width: fit-content; max-width: 650px;">', "100px", "width: fit-content; max-width: 650px; width: 100px"),
+    ],
+)
+def test_apply_img_dimensions_where_the_style_states_no_size(html, expected_width, expected_style):
+    """A keyword is not a size: without one the PNG would come out as many times too large as the scale factor."""
+    from bs4 import BeautifulSoup
+
+    node = BeautifulSoup(html, "html.parser").find("img")
+
+    SvgProcessor()._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'))
+
+    assert node.get("width") == expected_width
+    assert node.get("style") == expected_style
+
+
+@pytest.mark.parametrize(
     "html",
     [
         '<img style="width: 500px; height: 300px; color: red;">',
+        '<img style="width : 100px;">',  # a space before the colon is valid CSS
+        '<img style="WIDTH: 100PX;">',
         '<img style="width: 50%;">',
         '<img style="height: 300px;">',
         '<img style="max-width: 650px; width: 200%;">',

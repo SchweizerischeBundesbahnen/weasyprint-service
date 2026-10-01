@@ -419,6 +419,7 @@ The repository uses extensive pre-commit hooks including:
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
 - Playwright Chromium browser installed via `playwright install chromium --with-deps`
+- Every `uv run` in the Dockerfile needs `--no-sync`: without it uv syncs the default groups again and puts the `dev` group (ruff, mypy, pre-commit) into the image. The container structure test asserts they are absent.
 - **OCI labels**: Security metadata labels for container scanning tools
 
 ### Security and Compliance

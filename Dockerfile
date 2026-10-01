@@ -72,8 +72,10 @@ RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 # Install dependencies (as root - venv will be world-readable)
+# Playwright runs with --no-sync: a plain "uv run" syncs the default groups
+# again and would put the dev group (ruff, mypy, pre-commit) into the image.
 RUN uv sync --frozen --no-dev --no-install-project && \
-    uv run playwright install chromium --with-deps
+    uv run --no-sync playwright install chromium --with-deps
 
 # Create build timestamp
 RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \

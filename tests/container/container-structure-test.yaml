@@ -33,6 +33,18 @@ commandTests:
     command: uv
     args: [run, --no-sync, pytest, --version]
     exitCode: 2
+  - name: Ruff should not be installed
+    command: uv
+    args: [run, --no-sync, ruff, --version]
+    exitCode: 2
+  - name: Mypy should not be installed
+    command: uv
+    args: [run, --no-sync, mypy, --version]
+    exitCode: 2
+  - name: Pre-commit should not be installed
+    command: uv
+    args: [run, --no-sync, pre-commit, --version]
+    exitCode: 2
   - name: Log directory exists
     command: test
     args: [-d, /opt/weasyprint/logs]

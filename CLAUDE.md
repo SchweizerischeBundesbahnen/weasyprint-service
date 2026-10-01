@@ -407,6 +407,7 @@ The repository uses extensive pre-commit hooks including:
 - Fully compatible with Renovate for automated dependency updates
 - Lock file: `uv.lock`
 - Renovate handles automated dependency updates
+- Renovate updates the Python version in `.tool-versions` through its `asdf` manager. `renovate.json` lists `enabledManagers` itself because Renovate replaces that list instead of merging it with the preset's, which has no `asdf`. Keep the preset's managers in the list when changing it.
 - Python 3.14 required
 
 ### Docker Considerations

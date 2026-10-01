@@ -407,7 +407,7 @@ The repository uses extensive pre-commit hooks including:
 - Fully compatible with Renovate for automated dependency updates
 - Lock file: `uv.lock`
 - Renovate handles automated dependency updates
-- Python 3.13+ required
+- Python 3.14 required
 
 ### Docker Considerations
 - Multi-architecture support (amd64/arm64)

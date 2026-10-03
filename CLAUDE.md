@@ -407,7 +407,8 @@ The repository uses extensive pre-commit hooks including:
 - Fully compatible with Renovate for automated dependency updates
 - Lock file: `uv.lock`
 - Renovate handles automated dependency updates
-- Python 3.13+ required
+- Renovate updates the Python version in `.tool-versions` through its `asdf` manager. `renovate.json` lists `enabledManagers` itself because Renovate replaces that list instead of merging it with the preset's, which has no `asdf`. Keep the preset's managers in the list when changing it.
+- Python 3.14 required
 
 ### Docker Considerations
 - Multi-architecture support (amd64/arm64)
@@ -419,6 +420,7 @@ The repository uses extensive pre-commit hooks including:
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
 - Playwright Chromium browser installed via `playwright install chromium --with-deps`
+- Every `uv run` in the Dockerfile needs `--no-sync`: without it uv syncs the default groups again and puts the `dev` group (ruff, mypy, pre-commit) into the image. The container structure test asserts they are absent.
 - **OCI labels**: Security metadata labels for container scanning tools
 
 ### Security and Compliance

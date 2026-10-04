@@ -1,5 +1,21 @@
 # Changelog
 
+## [70.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.1...v70.0.2) (2026-10-04)
+
+
+### Bug Fixes
+
+* **deps:** update dependency coverage to v7.16.2 ([3bacad4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/3bacad44ac3dc715c993ca98a2d0833f27bf70bc))
+* **deps:** update dependency fastapi to v0.142.1 ([85933cc](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/85933ccfbfa570b99410bf875da3ce695bc66c12))
+* **deps:** update dependency fastapi to v0.142.2 ([67baa95](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/67baa9545b742856011ad7f0da977b448fb17693))
+* **deps:** update dependency pytest-mock to v3.16.0 ([0f0b838](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/0f0b838a5f74a83ca126dba62ad77e2866acb937))
+* **deps:** update dependency tox to v4.64.4 ([82adc53](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/82adc5333733da96585e81fe53f5976173470fcc))
+* **deps:** update dependency tox to v4.64.5 ([596fd44](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/596fd44a8e56292c3b045ed529ee242ab21fc8b8))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.21 ([4ae44c0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4ae44c0b3801fb98d3566d79d870f98301e27c67))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.22 ([34ee5f5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/34ee5f51482e091cf540ff4efa28413831140b1c))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.23 ([6dd223e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6dd223e3d5b3c9a4668c8a7062edf60a56f9c408))
+* **deps:** update grafana/grafana:latest docker digest to b28bae1 ([5c5297b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/5c5297bbcce00302544a62f5e0d092de9c2f9da8))
+
 ## [70.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.0...v70.0.1) (2026-09-29)
 
 

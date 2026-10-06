@@ -31,7 +31,11 @@ In a tagged PDF:
 - an image with an empty ``alt`` is drawn as an artifact and has no element in the
   structure tree; a link annotation of its own is moved under its ``Link`` as above;
 - an image with no ``alt`` takes its ``title`` as its alternative text;
-- the ``L`` element of a list states its ``ListNumbering``, from its ``list-style-type``.
+- the ``L`` element of a list states its ``ListNumbering``, from its ``list-style-type``;
+- a ``TH`` element states its ``Scope``, so the headers of a cell stay certain when a merge makes the IDs WeasyPrint
+  links them by, numbers of objects, ambiguous (PDF/UA-1, 7.5);
+- a ``Link`` standing straight in another ``Link``, as WeasyPrint makes of a link pseudo element, as the page number of
+  a table of contents, is merged into it, which ISO 32005 asks of PDF/UA-2.
 
 In a tagged PDF 2.0, as PDF/UA-2 writes:
 
@@ -177,6 +181,7 @@ def _with_image_rules(build_box_tree: Callable[..., Any]) -> Callable[..., Any]:
                 first = element
                 if own:
                     set_list_numbering(box, element, getattr(pdf, _VERSION, None))
+                    set_header_scope(box, element)
             yield element
         _record_anchor(box, first if own else None, parent, pdf)
         _record_bookmark(box, first if own else None, parent, pdf, page_number)
@@ -218,6 +223,22 @@ def set_list_numbering(box: Any, element: Any, pdf_version: Any = None) -> None:
     if numbering in PDF_2_LIST_NUMBERING and not _is_pdf_2(pdf_version):
         numbering = "None"
     element["A"] = pydyf.Dictionary({"O": "/List", "ListNumbering": f"/{numbering}"})
+
+
+def set_header_scope(box: Any, element: Any) -> None:
+    """State the Scope of a TH element: Row where its th says scope="row", Column otherwise, as WeasyPrint reads it.
+
+    WeasyPrint links the cells to their headers by IDs made of the number of the table object, which two merged
+    documents can share, so after a merge the headers of a cell are no longer certain without a Scope (PDF/UA-1, 7.5).
+    """
+    if getattr(box, "element_tag", None) != "th" or element.get("S") != "/TH":
+        return
+    scope = "Row" if box.element.get("scope") == "row" else "Column"
+    attributes = element.get("A")
+    if not isinstance(attributes, pydyf.Dictionary):
+        attributes = pydyf.Dictionary({"O": "/Table"})
+        element["A"] = attributes
+    attributes["Scope"] = f"/{scope}"
 
 
 def _is_pdf_2(pdf_version: Any) -> bool:
@@ -407,6 +428,87 @@ def add_bookmark_structure_destinations(pdf: Any) -> int:
     return changed
 
 
+def merge_nested_links(pdf: Any) -> int:
+    """Merge each Link element standing straight in another Link into that one; returns how many it merged.
+
+    WeasyPrint makes a Link of a link and of each of its pseudo elements, as the page number of an entry of a table of
+    contents, so a Link stands in a Link, which ISO 32005 forbids. The inner one hands its content, marked content,
+    object references and elements, to the outer one, and the parent tree follows.
+    """
+    root = pdf.objects[_number(pdf.catalog["StructTreeRoot"])]
+    replaced: dict[bytes, Any] = {}
+    pending = [pdf.objects[_number(kid)] for kid in _kids(root) if not isinstance(kid, int)]
+    while pending:
+        element = pending.pop()
+        if not isinstance(element, pydyf.Dictionary) or "S" not in element:
+            continue
+        if element["S"] == "/Link":
+            _absorb_links(pdf, element, replaced)
+        pending.extend(pdf.objects[_number(kid)] for kid in _kids(element) if not isinstance(kid, int))
+    if replaced:
+        _repoint_parent_tree(pdf, root, replaced)
+    return len(replaced)
+
+
+def _absorb_links(pdf: Any, link: Any, replaced: dict[bytes, Any]) -> None:
+    """Splice the content of the Link elements among the kids of a Link into it, in their place, until none is left."""
+    absorbed = True
+    while absorbed:
+        absorbed = False
+        kept = pydyf.Array()
+        for kid in _kids(link):
+            inner = None if isinstance(kid, int) else pdf.objects[_number(kid)]
+            if isinstance(inner, pydyf.Dictionary) and inner.get("S") == "/Link":
+                kept.extend(_moved_content(pdf, inner, link))
+                replaced[bytes(inner.reference)] = link
+                absorbed = True
+            else:
+                kept.append(kid)
+        link["K"] = kept
+
+
+def _moved_content(pdf: Any, inner: Any, link: Any) -> list[Any]:
+    """The content of an inner Link as the outer one holds it: marked content of another page as a reference to it."""
+    moved: list[Any] = []
+    other_page = "Pg" in inner and inner.get("Pg") != link.get("Pg")
+    for kid in _kids(inner):
+        if isinstance(kid, int):
+            if other_page:
+                reference = pydyf.Dictionary({"Type": "/MCR", "Pg": inner["Pg"], "MCID": kid})
+                pdf.add_object(reference)
+                moved.append(reference.reference)
+            else:
+                moved.append(kid)
+            continue
+        child = pdf.objects[_number(kid)]
+        if isinstance(child, pydyf.Dictionary) and "S" in child:
+            # Its marked content is on the page of the inner Link, which it took as its own where it names none
+            if other_page and "Pg" not in child:
+                child["Pg"] = inner["Pg"]
+            child["P"] = link.reference
+        moved.append(kid)
+    return moved
+
+
+def _repoint_parent_tree(pdf: Any, root: Any, replaced: dict[bytes, Any]) -> None:
+    """Make the parent tree name the outer Link wherever it named a Link merged into it."""
+
+    def outer(reference: Any) -> Any:
+        link = replaced.get(bytes(reference)) if isinstance(reference, (bytes, bytearray)) else None
+        while link is not None and bytes(link.reference) in replaced:
+            link = replaced[bytes(link.reference)]
+        return link.reference if link is not None else reference
+
+    nums = pdf.objects[_number(root["ParentTree"])]["Nums"]
+    for index in range(1, len(nums), 2):
+        value = nums[index]
+        if isinstance(value, pydyf.Array):
+            for position, reference in enumerate(value):
+                value[position] = outer(reference)
+        else:
+            nums[index] = outer(value)
+
+
 def move_annotations_to_links(pdf: Any, page_count: int) -> int:
     """Move each link annotation which is not under a Link element under the nearest one above it.
 
@@ -439,6 +541,7 @@ def _with_links_moved(add_tags: Callable[..., Any]) -> Callable[..., Any]:
         setattr(pdf, _VERSION, pdf_version)
         result = add_tags(pdf, document, pdf_version, *args, **kwargs)
         move_annotations_to_links(pdf, len(document.pages))
+        merge_nested_links(pdf)
         if _is_pdf_2(pdf_version):
             root = pdf.objects[_number(pdf.catalog["StructTreeRoot"])]
             for kid in _kids(root):

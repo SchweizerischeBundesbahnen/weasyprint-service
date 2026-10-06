@@ -61,6 +61,10 @@ commandTests:
     command: test
     args: [-d, /opt/python]
     exitCode: 0
+  - name: The uv-installed Python has no pip
+    command: sh
+    args: [-c, 'test -z "$(ls -d /opt/python/*/lib/python3.*/site-packages/pip* /opt/python/*/lib/python3.*/ensurepip/_bundled /opt/python/*/bin/pip* 2>/dev/null)"']
+    exitCode: 0
 fileExistenceTests:
   - name: Log directory
     path: /opt/weasyprint/logs

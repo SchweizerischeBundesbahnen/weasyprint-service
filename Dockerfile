@@ -62,11 +62,16 @@ WORKDIR ${WORKING_DIR}
 # Copy Python version file and dependency files
 COPY .tool-versions pyproject.toml uv.lock ./
 
-# Install Python via uv to /opt/python (version from .tool-versions file)
+# Install Python via uv to /opt/python (version from .tool-versions file).
+# pip comes with it, and nothing in the image uses it: uv installs the packages.
+# Removed in the same layer, so the scanners do not report the packages it vendors.
 ENV UV_PYTHON_INSTALL_DIR=/opt/python
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
-    uv python install "${PYTHON_VERSION}"
+    uv python install "${PYTHON_VERSION}" && \
+    find /opt/python -mindepth 1 -maxdepth 1 -type d -exec sh -c ' \
+      rm -rf "$1"/lib/python3.*/site-packages/pip "$1"/lib/python3.*/site-packages/pip-*.dist-info \
+             "$1"/lib/python3.*/ensurepip/_bundled "$1"/bin/pip*' _ {} \;
 
 # Set Playwright browser path to a shared location (accessible by both root and appuser)
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright

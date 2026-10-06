@@ -95,6 +95,16 @@ def test_a_decorative_image_is_an_artifact():
         assert b"/Artifact" in document[0].read_contents()
 
 
+@pytest.mark.parametrize("position", ["absolute", "fixed"])
+def test_a_positioned_decorative_image_is_an_artifact(position):
+    pdf = _pdf(f'<p><img src="{PIXEL}" alt="" style="position:{position};top:0;left:0;width:8px">Should Have</p>')
+
+    _, elements = _structure(pdf)
+    assert not [element for element in elements if element["/S"] == "/Figure"]
+    with pymupdf.open(stream=pdf, filetype="pdf") as document:
+        assert len(document[0].get_image_info()) == 1, "The image is still drawn"
+
+
 def test_an_image_without_alt_is_named_by_its_title():
     pdf = _pdf(f'<p><img src="{PIXEL}" title="Diagram" style="width:8px"></p>')
 

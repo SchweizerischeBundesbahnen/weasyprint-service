@@ -70,6 +70,8 @@ weasyprint_boxes = _module("weasyprint.formatting_structure.boxes")
 
 def _image(box: Any) -> Any | None:
     """The ``img`` element a replaced box draws, or ``None`` for any other box."""
+    # An absolutely or fixed positioned box reaches the tree builder in an AbsolutePlaceholder
+    box = getattr(box, "_box", box)
     if weasyprint_boxes is None or not isinstance(box, weasyprint_boxes.ReplacedBox):
         return None
     element = getattr(box, "element", None)
@@ -126,6 +128,17 @@ def _with_image_rules(build_box_tree: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+def _move_object_reference(pdf: Any, holder: Any, link: Any, key: int) -> None:
+    """Move the object reference of the annotation under the given parent tree key from its holder to the link."""
+    for kid in holder["K"][:]:
+        if isinstance(kid, int):
+            continue
+        kid_object = pdf.objects[_number(kid)]
+        if isinstance(kid_object, pydyf.Dictionary) and kid_object.get("Type") == "/OBJR" and pdf.objects[_number(kid_object["Obj"])].get("StructParent") == key:
+            holder["K"].remove(kid)
+            link["K"].append(kid)
+
+
 def move_annotations_to_links(pdf: Any, page_count: int) -> int:
     """Move each link annotation which is not under a Link element under the nearest one above it.
 
@@ -145,13 +158,7 @@ def move_annotations_to_links(pdf: Any, page_count: int) -> int:
             link = pdf.objects[_number(link["P"])]
         if link is holder or link["S"] != "/Link":
             continue
-        for kid in list(holder["K"]):
-            if isinstance(kid, int):
-                continue
-            kid_object = pdf.objects[_number(kid)]
-            if isinstance(kid_object, pydyf.Dictionary) and kid_object.get("Type") == "/OBJR" and pdf.objects[_number(kid_object["Obj"])].get("StructParent") == key:
-                holder["K"].remove(kid)
-                link["K"].append(kid)
+        _move_object_reference(pdf, holder, link, key)
         nums[index + 1] = link.reference
         moved += 1
     return moved

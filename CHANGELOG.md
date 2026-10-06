@@ -1,5 +1,21 @@
 # Changelog
 
+## [70.0.3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.2...v70.0.3) (2026-10-06)
+
+
+### Features
+
+* scope table headers and merge links nested in links ([#386](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/386)) ([d66fb4b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/d66fb4b26dbd62a2cb424de3e15c173dd6c5c972))
+
+
+### Bug Fixes
+
+* **deps:** update debian:trixie-slim docker digest to a29215f ([f07e9a1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f07e9a176301788b08a00f0c9a8e519d694f4a61))
+* **deps:** update dependency python to v3.14.8 ([66d2678](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/66d2678bc4be2ac870fb42dd665ae09e89296035))
+* **deps:** update dependency tox to v4.64.9 ([#384](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/384)) ([deee33e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/deee33ea22f42d013523dd7881df562099cff765))
+* **docker:** update python to 3.14.7 and keep dev tools out of the image ([#379](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/379)) ([6dad038](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6dad038eba95bb21b9dd0efb518c5e5307748f78))
+* remove pip from the uv-installed python ([#385](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/385)) ([f9ddbb2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f9ddbb2ac4f68bc85b60f8a7592885e280c22a4b))
+
 ## [70.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.1...v70.0.2) (2026-10-06)
 
 

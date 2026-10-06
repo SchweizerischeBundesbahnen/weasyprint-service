@@ -236,6 +236,21 @@ def test_the_text_of_a_div_is_a_paragraph_in_pdf_2():
         assert _element_of(paragraph["/P"])["/S"] != "/P", "No paragraph stands in another"
 
 
+def test_a_block_link_holds_no_paragraph_in_pdf_2():
+    """PDF 2.0 forbids a P in a Link used as a non-grouping element; veraPDF accepts the Span of its div."""
+    _, elements = _structure(_pdf('<a href="https://example.com" style="display:block"><div>Text</div></a><p><a href="https://example.com">inline</a></p>', "pdf/ua-2"))
+
+    for link in (element for element in elements if element["/S"] == "/Link"):
+        kids = link["/K"] if isinstance(link["/K"], pypdf.generic.ArrayObject) else [link["/K"]]
+        below = [_element_of(kid) for kid in kids if isinstance(_element_of(kid), pypdf.generic.DictionaryObject)]
+        while below:
+            element = below.pop()
+            assert element.get("/S") != "/P", "No paragraph is made inside a link"
+            kids = element.get("/K")
+            kids = kids if isinstance(kids, pypdf.generic.ArrayObject) else [kids]
+            below.extend(_element_of(kid) for kid in kids if isinstance(_element_of(kid), pypdf.generic.DictionaryObject))
+
+
 def test_the_text_of_a_div_stays_in_pdf_1_7():
     _, elements = _structure(_pdf("<div>Loose text</div>", "pdf/ua-1"))
 

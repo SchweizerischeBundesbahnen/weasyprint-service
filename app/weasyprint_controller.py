@@ -46,6 +46,7 @@ from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
 from app.vsdx_processor import VsdxProcessor
+from app.weasyprint_actual_text_patch import apply_actual_text_patch
 from app.weasyprint_running_width_patch import apply_running_width_patch
 
 # WeasyPrint crashes on a block-level ``position: running()`` element that holds text
@@ -53,6 +54,10 @@ from app.weasyprint_running_width_patch import apply_running_width_patch
 # Apply the fix at import time so every conversion path is covered.
 # See app/weasyprint_running_width_patch.py.
 apply_running_width_patch()
+
+# WeasyPrint writes no ActualText for an icon drawn with a character of the Unicode Private
+# Use Area, which PDF/A-2a, PDF/A-3a and PDF/UA-2 require. See app/weasyprint_actual_text_patch.py.
+apply_actual_text_patch()
 
 
 @contextlib.asynccontextmanager

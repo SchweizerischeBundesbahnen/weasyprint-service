@@ -61,6 +61,11 @@ commandTests:
     command: test
     args: [-d, /opt/python]
     exitCode: 0
+  # The base Python, not the venv: the venv has no pip of its own either way
+  - name: The uv-installed Python has no pip
+    command: python
+    args: [-c, 'import subprocess, sys; sys.exit(subprocess.run([sys.base_prefix + "/bin/python3", "-I", "-c", "import pip"]).returncode == 0)']
+    exitCode: 0
 fileExistenceTests:
   - name: Log directory
     path: /opt/weasyprint/logs

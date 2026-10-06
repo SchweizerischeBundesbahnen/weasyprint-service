@@ -3,15 +3,6 @@
   "extends": [
     "github>SchweizerischeBundesbahnen/casc-renovate-preset-polarion-docker"
   ],
-  "enabledManagers": [
-    "dockerfile",
-    "docker-compose",
-    "pep621",
-    "pre-commit",
-    "github-actions",
-    "custom.regex",
-    "asdf"
-  ],
   "packageRules": [
     {
       "matchManagers": [
@@ -42,21 +33,6 @@
       "matchPackageNames": [
         "weasyprint"
       ]
-    },
-    {
-      "matchManagers": [
-        "asdf"
-      ],
-      "matchDepNames": [
-        "python"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor"
-      ],
-      "semanticCommitType": "chore",
-      "commitMessageTopic": "Python version",
-      "automerge": false
     },
     {
       "matchManagers": [

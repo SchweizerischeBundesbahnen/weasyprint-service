@@ -379,3 +379,80 @@ def test_a_bookmark_without_a_known_heading_keeps_its_destination():
 
     assert weasyprint_tagging_patch.add_bookmark_structure_destinations(pdf) == 0
     assert item["Dest"] is destination
+
+
+# ------------------------------------------------------------------ table headers and links nested in links
+
+
+@pytest.mark.parametrize("pdf_variant", ["pdf/ua-1", "pdf/ua-2"])
+def test_a_table_header_states_its_scope(pdf_variant):
+    html = "<table><thead><tr><th></th><th>Draft</th></tr></thead><tbody><tr><th scope='row'>Tests</th><td>1</td></tr><tr><th>Plain</th><td>2</td></tr></tbody></table>"
+    _, elements = _structure(_pdf(html, pdf_variant))
+
+    scopes = [str(element["/A"]["/Scope"]) for element in elements if element["/S"] == "/TH"]
+    assert scopes == ["/Column", "/Column", "/Row", "/Column"], "A th says row where it says scope='row', column otherwise, as WeasyPrint reads it"
+    assert all(str(element["/A"]["/O"]) == "/Table" for element in elements if element["/S"] == "/TH")
+
+
+def test_set_header_scope_gives_attributes_where_there_are_none():
+    class Box:
+        element_tag = "th"
+
+        def __init__(self) -> None:
+            self.element = {"scope": "row"}
+
+    element = pydyf.Dictionary({"S": "/TH"})
+    weasyprint_tagging_patch.set_header_scope(Box(), element)
+
+    assert element["A"]["Scope"] == "/Row"
+    assert element["A"]["O"] == "/Table"
+
+
+@pytest.mark.parametrize("pdf_variant", ["pdf/ua-1", "pdf/ua-2"])
+def test_a_link_pseudo_element_makes_no_link_in_a_link(pdf_variant):
+    html = """<style>a.page::after { content: " p. 1"; }</style>
+    <h1 id="head">Head</h1><p><a class="page" href="#head">Head</a></p><p><a href="https://example.com">out</a></p>"""
+    reader, elements = _structure(_pdf(html, pdf_variant))
+
+    links = [element for element in elements if element["/S"] == "/Link"]
+    assert links, "The links are tagged"
+    assert not [link for link in links if _element_of(link["/P"])["/S"] == "/Link"], "No Link stands in a Link"
+    holders = _parent_tree(reader)
+    referenced = {id(value) for value in holders.values() if not isinstance(value, pypdf.generic.ArrayObject)}
+    referenced |= {id(_element_of(item)) for value in holders.values() if isinstance(value, pypdf.generic.ArrayObject) for item in value}
+    assert all(id(element) in referenced or element["/S"] != "/Link" for element in elements if element["/S"] == "/Link"), "The parent tree names the remaining links"
+    assert not [value for value in holders.values() if not isinstance(value, pypdf.generic.ArrayObject) and value.get("/S") == "/Link" and _element_of(value["/P"])["/S"] == "/Link"]
+
+
+def test_merge_nested_links_moves_the_content_of_another_page_as_a_reference():
+    pdf = pydyf.PDF()
+    first, second = pydyf.Dictionary({"Type": "/Page"}), pydyf.Dictionary({"Type": "/Page"})
+    pdf.add_page(first)
+    pdf.add_page(second)
+    outer = pydyf.Dictionary({"Type": "/StructElem", "S": "/Link", "Pg": first.reference, "K": pydyf.Array([0])})
+    pdf.add_object(outer)
+    inner = pydyf.Dictionary({"Type": "/StructElem", "S": "/Link", "Pg": second.reference, "P": outer.reference, "K": pydyf.Array([3])})
+    pdf.add_object(inner)
+    span = pydyf.Dictionary({"Type": "/StructElem", "S": "/Span", "P": inner.reference, "K": pydyf.Array([4])})
+    pdf.add_object(span)
+    inner["K"].append(span.reference)
+    outer["K"].append(inner.reference)
+    document = pydyf.Dictionary({"Type": "/StructElem", "S": "/Document", "K": pydyf.Array([outer.reference])})
+    pdf.add_object(document)
+    outer["P"] = document.reference
+    tree = pydyf.Dictionary({"Nums": pydyf.Array([0, pydyf.Array([outer.reference]), 1, pydyf.Array([None, None, None, inner.reference, span.reference]), 2, inner.reference])})
+    pdf.add_object(tree)
+    root = pydyf.Dictionary({"Type": "/StructTreeRoot", "K": pydyf.Array([document.reference]), "ParentTree": tree.reference})
+    pdf.add_object(root)
+    pdf.catalog["StructTreeRoot"] = root.reference
+
+    assert weasyprint_tagging_patch.merge_nested_links(pdf) == 1
+
+    kids = list(outer["K"])
+    assert kids[0] == 0
+    reference = pdf.objects[weasyprint_tagging_patch._number(kids[1])]
+    assert reference["Type"] == "/MCR" and reference["MCID"] == 3 and reference["Pg"] == second.reference, "Marked content of another page moves as a reference to it"
+    assert kids[2] == span.reference and span["P"] == outer.reference, "An element moves to the outer link"
+    assert span["Pg"] == second.reference, "It keeps the page of its marked content, which it took from the inner link"
+    assert tree["Nums"][3][3] == outer.reference and tree["Nums"][5] == outer.reference, "The parent tree names the outer link"
+    assert tree["Nums"][3][4] == span.reference, "What was not merged keeps its entry"

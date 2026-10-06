@@ -1,5 +1,33 @@
 # Changelog
 
+## [70.0.2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.1...v70.0.2) (2026-10-06)
+
+
+### Features
+
+* give private use characters an ActualText ([#380](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/380)) ([9dfc8b0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9dfc8b0cc7b6e6e8a3b7dc167543e4065cb0dff2))
+* tag links and decorative images as PDF/UA requires ([#381](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/381)) ([a749c10](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/a749c10a47366d31f53ca84b0aa201979dba33a0))
+* write the structure PDF/UA-2 requires ([#382](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/382)) ([0f80df3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/0f80df3cd08950057f06fd9eda2ecece6762cf28))
+
+
+### Bug Fixes
+
+* **deps:** update dependency coverage to v7.16.2 ([3bacad4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/3bacad44ac3dc715c993ca98a2d0833f27bf70bc))
+* **deps:** update dependency fastapi to v0.142.1 ([85933cc](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/85933ccfbfa570b99410bf875da3ce695bc66c12))
+* **deps:** update dependency fastapi to v0.142.2 ([67baa95](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/67baa9545b742856011ad7f0da977b448fb17693))
+* **deps:** update dependency mypy to v2.4.0 ([064a187](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/064a187971391c6d3c6287b0bdf9f2e4f2c84cb7))
+* **deps:** update dependency pytest-mock to v3.16.0 ([0f0b838](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/0f0b838a5f74a83ca126dba62ad77e2866acb937))
+* **deps:** update dependency ruff to v0.16.10 ([47adcea](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/47adceaffbd605fca3144738085cf5529d55bfe2))
+* **deps:** update dependency tox to v4.64.4 ([82adc53](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/82adc5333733da96585e81fe53f5976173470fcc))
+* **deps:** update dependency tox to v4.64.5 ([596fd44](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/596fd44a8e56292c3b045ed529ee242ab21fc8b8))
+* **deps:** update dependency tox to v4.64.6 ([864788c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/864788cd9cc1dbb5f348c17b55e1eb4e33dcedcf))
+* **deps:** update dependency tox to v4.64.7 ([1196be7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1196be7364d1b778401574ea26e10f4f3322cb28))
+* **deps:** update dependency tox-uv to v1.36.1 ([1d4d78c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1d4d78cabf85dc2fd18eee482722846d7067307e))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.21 ([4ae44c0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4ae44c0b3801fb98d3566d79d870f98301e27c67))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.22 ([34ee5f5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/34ee5f51482e091cf540ff4efa28413831140b1c))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.23 ([6dd223e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/6dd223e3d5b3c9a4668c8a7062edf60a56f9c408))
+* **deps:** update grafana/grafana:latest docker digest to b28bae1 ([5c5297b](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/5c5297bbcce00302544a62f5e0d092de9c2f9da8))
+
 ## [70.0.1](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.0...v70.0.1) (2026-09-29)
 
 

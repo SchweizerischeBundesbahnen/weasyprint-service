@@ -13,6 +13,15 @@ WeasyPrint's structure tree breaks two rules of PDF/UA-1 on ordinary HTML:
    image belongs in an artifact. An image with no ``alt`` but a ``title`` gets no
    alternative text either, though HTML names the image by its title then.
 
+PDF/UA-2, built on PDF 2.0, adds three rules WeasyPrint breaks on ordinary HTML:
+
+3. A list with markers needs a ``ListNumbering`` attribute on its ``L`` element
+   (ISO 14289-2, 8.2.5.25).
+4. A ``Span`` or a ``Link`` may not stand straight in a grouping element, a ``Div``
+   or the ``Document``; WeasyPrint puts the text of a block ``div`` there.
+5. A link to a place in the document needs a structure destination, the element it
+   leads to (ISO 14289-2, 8.8); WeasyPrint writes a named destination only.
+
 Fix
 ---
 In a tagged PDF:
@@ -21,7 +30,16 @@ In a tagged PDF:
   nearest ``Link`` above it, and the parent tree follows;
 - an image with an empty ``alt`` is drawn as an artifact and has no element in the
   structure tree; a link annotation of its own is moved under its ``Link`` as above;
-- an image with no ``alt`` takes its ``title`` as its alternative text.
+- an image with no ``alt`` takes its ``title`` as its alternative text;
+- the ``L`` element of a list states its ``ListNumbering``, from its ``list-style-type``.
+
+In a tagged PDF 2.0, as PDF/UA-2 writes:
+
+- a run of inline elements standing straight in a grouping element is wrapped in a
+  ``P``, the paragraph its text makes;
+- a link to a place in the document goes there by a ``GoTo`` action which keeps the
+  named destination and adds the structure destination of the element holding the
+  anchor.
 
 The page does not change. An untagged PDF is left alone.
 
@@ -29,7 +47,7 @@ This is a temporary shim. ``apply_tagging_patch`` is idempotent and, if a future
 WeasyPrint no longer exposes the patched internals, degrades to a no-op without ever
 breaking PDF generation: it patches all of them or none, since drawing an image as an
 artifact without leaving it out of the tree would fail WeasyPrint's own checks. Remove
-it once WeasyPrint tags links and decorative images itself.
+it once WeasyPrint tags links, images, lists and destinations itself.
 """
 
 from __future__ import annotations
@@ -47,6 +65,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _PATCH_FLAG = "_link_and_image_tagging_patch"
+
+# The ListNumbering of a list, by its list-style-type (ISO 32000-2, Table 380)
+LIST_NUMBERING = {
+    "disc": "Disc",
+    "circle": "Circle",
+    "square": "Square",
+    "decimal": "Decimal",
+    "decimal-leading-zero": "Decimal",
+    "lower-roman": "LowerRoman",
+    "upper-roman": "UpperRoman",
+    "lower-alpha": "LowerAlpha",
+    "lower-latin": "LowerAlpha",
+    "upper-alpha": "UpperAlpha",
+    "upper-latin": "UpperAlpha",
+}
+
+# Grouping elements, which hold blocks, and through which PDF 2.0 sees the one above (ISO 32000-2, 14.8.4.4)
+GROUPING = frozenset({"/Document", "/Part", "/Art", "/Sect", "/Div", "/NonStruct", "/BlockQuote"})
+
+# Inline elements, which a paragraph holds; a NonStruct is inline when it holds nothing else
+INLINE = frozenset({"/Span", "/Link", "/Annot", "/Em", "/Strong", "/Code", "/Sub", "/Quote", "/Reference", "/Note"})
+
+# The attributes of the PDF under which the anchors and the bookmarks of a conversion map to their elements
+_ANCHORS = "_tagging_patch_anchors"
+_BOOKMARKS = "_tagging_patch_bookmarks"
+# The attribute of the PDF which holds the version it is written in, set before WeasyPrint builds its tree
+_VERSION = "_tagging_patch_version"
+
+# The ListNumbering values only PDF 2.0 knows; PDF 1.7 names an arbitrary label by None (ISO 32000-1, Table 347)
+PDF_2_LIST_NUMBERING = frozenset({"Ordered", "Unordered"})
 
 
 def _module(name: str) -> Any | None:
@@ -122,7 +170,16 @@ def _with_image_rules(build_box_tree: Callable[..., Any]) -> Callable[..., Any]:
         image = _image(box)
         if image is not None and image.get("alt") is None and image.get("title"):
             image.set("alt", image.get("title"))
-        yield from build_box_tree(box, parent, pdf, page_number, nums, annotations, tags)
+        own = _has_own_element(box)
+        first: Any = None
+        for element in build_box_tree(box, parent, pdf, page_number, nums, annotations, tags):
+            if first is None:
+                first = element
+                if own:
+                    set_list_numbering(box, element, getattr(pdf, _VERSION, None))
+            yield element
+        _record_anchor(box, first if own else None, parent, pdf)
+        _record_bookmark(box, first if own else None, parent, pdf, page_number)
 
     setattr(wrapper, _PATCH_FLAG, True)
     return wrapper
@@ -137,6 +194,217 @@ def _move_object_reference(pdf: Any, holder: Any, link: Any, key: int) -> None:
         if isinstance(kid_object, pydyf.Dictionary) and kid_object.get("Type") == "/OBJR" and pdf.objects[_number(kid_object["Obj"])].get("StructParent") == key:
             holder["K"].remove(kid)
             link["K"].append(kid)
+
+
+def _has_own_element(box: Any) -> bool:
+    """Whether WeasyPrint gives a box an element of its own, not to the html, the body or a page."""
+    if weasyprint_boxes is not None and isinstance(box, weasyprint_boxes.PageBox):
+        return False
+    return getattr(box, "element_tag", None) not in ("html", "body")
+
+
+def set_list_numbering(box: Any, element: Any, pdf_version: Any = None) -> None:
+    """State the ListNumbering of the L element of a list, by its list-style-type, in the values its PDF version knows."""
+    if getattr(box, "element_tag", None) not in ("ul", "ol") or element.get("S") != "/L":
+        return
+    style = box.style["list_style_type"]
+    if style == "none":
+        numbering = "None"
+    elif isinstance(style, str) and style in LIST_NUMBERING:
+        numbering = LIST_NUMBERING[style]
+    else:
+        # A string or a counter style of its own: its kind is all a list states
+        numbering = "Ordered" if box.element_tag == "ol" else "Unordered"
+    if numbering in PDF_2_LIST_NUMBERING and not _is_pdf_2(pdf_version):
+        numbering = "None"
+    element["A"] = pydyf.Dictionary({"O": "/List", "ListNumbering": f"/{numbering}"})
+
+
+def _is_pdf_2(pdf_version: Any) -> bool:
+    """Whether a PDF is written in version 2.0 or later; cast for bytes and None, as WeasyPrint compares it."""
+    return str(pdf_version) >= "2.0"
+
+
+def _record_anchor(box: Any, element: Any, parent: Any, pdf: Any) -> None:
+    """Remember the element an anchor of the box leads to: its own, or its parent when it holds nothing."""
+    anchor = box.style["anchor"] if hasattr(box, "style") else None
+    if not anchor:
+        return
+    anchors = getattr(pdf, _ANCHORS, None)
+    if anchors is None:
+        anchors = {}
+        setattr(pdf, _ANCHORS, anchors)
+    target = element if element is not None and element.get("K") else parent
+    anchors.setdefault(anchor, target)
+
+
+def _record_bookmark(box: Any, element: Any, parent: Any, pdf: Any, page_number: int) -> None:
+    """Remember the element of a box which makes a bookmark, by its page and its label, as WeasyPrint makes them."""
+    label = getattr(box, "bookmark_label", None)
+    if not label or box.style["bookmark_level"] == "none":
+        return
+    bookmarks = getattr(pdf, _BOOKMARKS, None)
+    if bookmarks is None:
+        bookmarks = {}
+        setattr(pdf, _BOOKMARKS, bookmarks)
+    bookmarks.setdefault((page_number, label), []).append(element if element is not None else parent)
+
+
+def _kids(element: Any) -> list[Any]:
+    kids = element.get("K")
+    if kids is None:
+        return []
+    return list(kids) if isinstance(kids, (list, pydyf.Array)) else [kids]
+
+
+def _is_inline(pdf: Any, kid: Any) -> bool:
+    """Whether a kid is inline: an inline element, or a NonStruct holding inline elements only."""
+    if isinstance(kid, int):
+        return False
+    element = pdf.objects[_number(kid)]
+    if not isinstance(element, pydyf.Dictionary) or "S" not in element:
+        return False
+    if element["S"] in INLINE:
+        return True
+    if element["S"] != "/NonStruct":
+        return False
+    kids = _kids(element)
+    return bool(kids) and all(_is_inline(pdf, grandkid) for grandkid in kids)
+
+
+def wrap_inline_runs(pdf: Any, element: Any) -> int:
+    """Wrap each run of inline kids standing straight in a grouping element in a P, below the element.
+
+    Returns how many paragraphs it made.
+    """
+    made = 0
+    if element.get("S") in GROUPING:
+        kept = pydyf.Array()
+        run: list[Any] = []
+
+        def close_run() -> None:
+            nonlocal made
+            if not run:
+                return
+            first = pdf.objects[_number(run[0])]
+            paragraph = pydyf.Dictionary({"Type": "/StructElem", "S": "/P", "K": pydyf.Array(run), "P": element.reference})
+            if "Pg" in first:
+                paragraph["Pg"] = first["Pg"]
+            pdf.add_object(paragraph)
+            for kid in run:
+                pdf.objects[_number(kid)]["P"] = paragraph.reference
+            kept.append(paragraph.reference)
+            run.clear()
+            made += 1
+
+        for kid in _kids(element):
+            if _is_inline(pdf, kid):
+                run.append(kid)
+            else:
+                close_run()
+                kept.append(kid)
+        close_run()
+        if made:
+            element["K"] = kept
+    for kid in _kids(element):
+        # The text of an inline element is a paragraph's already, so it is not wrapped again
+        if not isinstance(kid, int) and not _is_inline(pdf, kid):
+            child = pdf.objects[_number(kid)]
+            if isinstance(child, pydyf.Dictionary) and "S" in child:
+                made += wrap_inline_runs(pdf, child)
+    return made
+
+
+def _named_destinations(pdf: Any) -> dict[str, Any]:
+    """The named destinations of the document, by name."""
+    names = pdf.catalog.get("Names")
+    if names is None or "Dests" not in names:
+        return {}
+    dests = names["Dests"]
+    dests = pdf.objects[_number(dests)] if isinstance(dests, bytes) else dests
+    entries = dests.get("Names", [])
+    return {_name(entries[index]): entries[index + 1] for index in range(0, len(entries), 2)}
+
+
+def _name(value: Any) -> str:
+    """The text of a pydyf string, as a destination name is written."""
+    return str(value.string if hasattr(value, "string") else value)
+
+
+def add_structure_destinations(pdf: Any, page_count: int) -> int:
+    """Lead each link to a place in the document by a GoTo action with a structure destination.
+
+    Returns how many links it changed.
+    """
+    anchors: dict[str, Any] = getattr(pdf, _ANCHORS, {})
+    destinations = _named_destinations(pdf)
+    root = pdf.objects[_number(pdf.catalog["StructTreeRoot"])]
+    nums = pdf.objects[_number(root["ParentTree"])]["Nums"]
+    changed = 0
+    for index in range(0, len(nums), 2):
+        if nums[index] < page_count:
+            continue
+        holder = pdf.objects[_number(nums[index + 1])]
+        for kid in _kids(holder):
+            if isinstance(kid, int):
+                continue
+            reference = pdf.objects[_number(kid)]
+            if not isinstance(reference, pydyf.Dictionary) or reference.get("Type") != "/OBJR":
+                continue
+            annotation = pdf.objects[_number(reference["Obj"])]
+            if "Dest" not in annotation:
+                continue
+            name = _name(annotation["Dest"])
+            target, destination = anchors.get(name), destinations.get(name)
+            if target is None or destination is None:
+                continue
+            annotation["A"] = pydyf.Dictionary(
+                {
+                    "Type": "/Action",
+                    "S": "/GoTo",
+                    "D": annotation["Dest"],
+                    "SD": pydyf.Array([target.reference, *list(destination)[1:]]),
+                }
+            )
+            del annotation["Dest"]
+            changed += 1
+    return changed
+
+
+def _outlines(pdf: Any, first: Any) -> Iterator[Any]:
+    """Every outline item from the first one given on, each before its children."""
+    item_reference = first
+    while item_reference is not None:
+        item = pdf.objects[_number(item_reference)]
+        yield item
+        if "First" in item:
+            yield from _outlines(pdf, item["First"])
+        item_reference = item.get("Next")
+
+
+def add_bookmark_structure_destinations(pdf: Any) -> int:
+    """Lead each bookmark to its heading by a GoTo action with a structure destination.
+
+    Returns how many bookmarks it changed.
+    """
+    bookmarks: dict[tuple[int, str], list[Any]] = getattr(pdf, _BOOKMARKS, {})
+    outlines = pdf.catalog.get("Outlines")
+    if not bookmarks or outlines is None:
+        return 0
+    root = pdf.objects[_number(outlines)]
+    pages = [bytes(reference) for reference in pdf.page_references]
+    changed = 0
+    for item in _outlines(pdf, root.get("First")):
+        destination = item.get("Dest")
+        if destination is None or bytes(destination[0]) not in pages:
+            continue
+        targets = bookmarks.get((pages.index(bytes(destination[0])), _name(item["Title"])))
+        if not targets:
+            continue
+        item["A"] = pydyf.Dictionary({"Type": "/Action", "S": "/GoTo", "D": destination, "SD": pydyf.Array([targets.pop(0).reference, *list(destination)[1:]])})
+        del item["Dest"]
+        changed += 1
+    return changed
 
 
 def move_annotations_to_links(pdf: Any, page_count: int) -> int:
@@ -167,9 +435,16 @@ def move_annotations_to_links(pdf: Any, page_count: int) -> int:
 def _with_links_moved(add_tags: Callable[..., Any]) -> Callable[..., Any]:
     """Wrap add_tags so the link annotations end under their Link elements."""
 
-    def wrapper(pdf: Any, document: Any, *args: Any, **kwargs: Any) -> Any:
-        result = add_tags(pdf, document, *args, **kwargs)
+    def wrapper(pdf: Any, document: Any, pdf_version: Any, *args: Any, **kwargs: Any) -> Any:
+        setattr(pdf, _VERSION, pdf_version)
+        result = add_tags(pdf, document, pdf_version, *args, **kwargs)
         move_annotations_to_links(pdf, len(document.pages))
+        if _is_pdf_2(pdf_version):
+            root = pdf.objects[_number(pdf.catalog["StructTreeRoot"])]
+            for kid in _kids(root):
+                wrap_inline_runs(pdf, pdf.objects[_number(kid)])
+            add_structure_destinations(pdf, len(document.pages))
+            add_bookmark_structure_destinations(pdf)
         return result
 
     setattr(wrapper, _PATCH_FLAG, True)
@@ -192,6 +467,7 @@ def apply_tagging_patch() -> bool:
         "tags.add_tags": getattr(weasyprint_tags, "add_tags", None),
         "pdf.add_tags": getattr(weasyprint_pdf, "add_tags", None),
         "boxes.ReplacedBox": getattr(weasyprint_boxes, "ReplacedBox", None),
+        "boxes.PageBox": getattr(weasyprint_boxes, "PageBox", None),
     }
     missing = [name for name, target in targets.items() if target is None]
     if missing:

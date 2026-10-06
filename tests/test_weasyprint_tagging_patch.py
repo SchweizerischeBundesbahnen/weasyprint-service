@@ -2,6 +2,7 @@
 
 import io
 
+import pydyf
 import pymupdf
 import pypdf
 import pytest
@@ -190,3 +191,191 @@ def test_patch_skips_when_an_internal_is_missing(monkeypatch):
 
     assert apply_tagging_patch() is False
     assert weasyprint_tagging_patch.weasyprint_stream.Stream.marked is marked, "Nothing is patched when one internal is missing"
+
+
+# ------------------------------------------------------------------ PDF/UA-2, written as PDF 2.0
+
+
+def _element_of(reference: object) -> pypdf.generic.DictionaryObject:
+    return reference.get_object() if hasattr(reference, "get_object") else reference
+
+
+@pytest.mark.parametrize(
+    ("list_html", "numbering"),
+    [
+        ("<ul><li>One</li></ul>", "/Disc"),
+        ('<ul style="list-style-type:square"><li>One</li></ul>', "/Square"),
+        ("<ol><li>One</li></ol>", "/Decimal"),
+        ('<ol style="list-style-type:upper-roman"><li>One</li></ol>', "/UpperRoman"),
+        ('<ol style="list-style-type:lower-latin"><li>One</li></ol>', "/LowerAlpha"),
+        ("<ul style=\"list-style-type:'-'\"><li>One</li></ul>", "/Unordered"),
+        ('<ol style="list-style-type:georgian"><li>One</li></ol>', "/Ordered"),
+        ('<ul style="list-style-type:none"><li>One</li></ul>', "/None"),
+    ],
+)
+def test_a_list_states_its_numbering(list_html, numbering):
+    _, elements = _structure(_pdf(list_html, "pdf/ua-2"))
+
+    lists = [element for element in elements if element["/S"] == "/L"]
+    assert [str(element["/A"]["/ListNumbering"]) for element in lists] == [numbering]
+    assert str(lists[0]["/A"]["/O"]) == "/List"
+
+
+def test_the_text_of_a_div_is_a_paragraph_in_pdf_2():
+    _, elements = _structure(_pdf("<div>Loose <b>bold</b> text<p>Paragraph</p>after</div>", "pdf/ua-2"))
+
+    grouping = {"/Document", "/Div"}
+    for element in elements:
+        if element["/S"] in grouping:
+            kids = element.get("/K")
+            kids = kids if isinstance(kids, pypdf.generic.ArrayObject) else [kids]
+            assert not [kid for kid in kids if hasattr(kid, "get_object") and _element_of(kid).get("/S") == "/Span"], "No Span stands straight in a grouping element"
+    paragraphs = [element for element in elements if element["/S"] == "/P"]
+    assert len(paragraphs) == 3, "The text before and after the paragraph make one paragraph each"
+    for paragraph in paragraphs:
+        assert _element_of(paragraph["/P"])["/S"] != "/P", "No paragraph stands in another"
+
+
+def test_a_block_link_holds_no_paragraph_in_pdf_2():
+    """PDF 2.0 forbids a P in a Link used as a non-grouping element; veraPDF accepts the Span of its div."""
+    _, elements = _structure(_pdf('<a href="https://example.com" style="display:block"><div>Text</div></a><p><a href="https://example.com">inline</a></p>', "pdf/ua-2"))
+
+    for link in (element for element in elements if element["/S"] == "/Link"):
+        kids = link["/K"] if isinstance(link["/K"], pypdf.generic.ArrayObject) else [link["/K"]]
+        below = [_element_of(kid) for kid in kids if isinstance(_element_of(kid), pypdf.generic.DictionaryObject)]
+        while below:
+            element = below.pop()
+            assert element.get("/S") != "/P", "No paragraph is made inside a link"
+            kids = element.get("/K")
+            kids = kids if isinstance(kids, pypdf.generic.ArrayObject) else [kids]
+            below.extend(_element_of(kid) for kid in kids if isinstance(_element_of(kid), pypdf.generic.DictionaryObject))
+
+
+def test_the_text_of_a_div_stays_in_pdf_1_7():
+    _, elements = _structure(_pdf("<div>Loose text</div>", "pdf/ua-1"))
+
+    assert not [element for element in elements if element["/S"] == "/P"]
+
+
+def test_a_link_to_a_place_in_the_document_has_a_structure_destination():
+    pdf = _pdf('<h1 id="head">Head</h1><p><a href="#head">to the head</a> <a href="#item">to the item</a> <a href="https://example.com">out</a></p><div><a id="item"></a>Item</div>', "pdf/ua-2")
+
+    reader, _ = _structure(pdf)
+    targets = {}
+    for annotation in _link_annotations(reader):
+        assert "/Dest" not in annotation
+        action = annotation["/A"]
+        if action["/S"] == "/URI":
+            continue
+        assert action["/S"] == "/GoTo"
+        targets[str(action["/D"])] = _element_of(action["/SD"][0])["/S"]
+        assert str(action["/SD"][1]) == "/XYZ"
+    assert targets == {"head": "/H1", "item": "/Div"}, "An empty anchor leads to the element around it"
+
+
+def test_a_link_keeps_its_named_destination_in_pdf_1_7():
+    reader, _ = _structure(_pdf('<h1 id="head">Head</h1><p><a href="#head">to the head</a></p>', "pdf/ua-1"))
+
+    assert [str(annotation["/Dest"]) for annotation in _link_annotations(reader)] == ["head"]
+
+
+def test_a_bookmark_has_a_structure_destination():
+    reader, _ = _structure(_pdf("<h1>First</h1><p>Text</p><h2>Second</h2><h1>First</h1>", "pdf/ua-2"))
+
+    items = []
+    item = reader.trailer["/Root"]["/Outlines"]["/First"]
+    stack = [item]
+    while stack:
+        node = stack.pop().get_object()
+        items.append(node)
+        if "/Next" in node:
+            stack.append(node["/Next"])
+        if "/First" in node:
+            stack.append(node["/First"])
+    assert len(items) == 3
+    for node in items:
+        assert "/Dest" not in node
+        heading = _element_of(node["/A"]["/SD"][0])
+        assert heading["/S"] in ("/H1", "/H2")
+    assert len({id(_element_of(node["/A"]["/SD"][0])) for node in items}) == 3, "Two headings of one title lead to their own elements"
+
+
+@pytest.mark.parametrize(
+    ("list_html", "numbering"),
+    [
+        ("<ul><li>One</li></ul>", "/Disc"),
+        ('<ol style="list-style-type:upper-roman"><li>One</li></ol>', "/UpperRoman"),
+        ("<ul style=\"list-style-type:'-'\"><li>One</li></ul>", "/None"),
+        ('<ol style="list-style-type:georgian"><li>One</li></ol>', "/None"),
+    ],
+)
+def test_a_list_states_a_numbering_pdf_1_7_knows(list_html, numbering):
+    _, elements = _structure(_pdf(list_html, "pdf/ua-1"))
+
+    assert [str(element["/A"]["/ListNumbering"]) for element in elements if element["/S"] == "/L"] == [numbering]
+
+
+def _destinations_pdf(anchors: dict, names: list) -> tuple[pydyf.PDF, pydyf.Dictionary]:
+    """A PDF of one page whose one link goes to the named destination "target", with the anchors and the names given."""
+    pdf = pydyf.PDF()
+    pdf.add_page(pydyf.Dictionary({"Type": "/Page"}))
+    annotation = pydyf.Dictionary({"Type": "/Annot", "Subtype": "/Link", "Dest": pydyf.String("target"), "StructParent": 1})
+    pdf.add_object(annotation)
+    reference = pydyf.Dictionary({"Type": "/OBJR", "Obj": annotation.reference})
+    pdf.add_object(reference)
+    link = pydyf.Dictionary({"Type": "/StructElem", "S": "/Link", "K": pydyf.Array([reference.reference])})
+    pdf.add_object(link)
+    tree = pydyf.Dictionary({"Nums": pydyf.Array([1, link.reference])})
+    pdf.add_object(tree)
+    root = pydyf.Dictionary({"Type": "/StructTreeRoot", "ParentTree": tree.reference})
+    pdf.add_object(root)
+    pdf.catalog["StructTreeRoot"] = root.reference
+    pdf.catalog["Names"] = pydyf.Dictionary({"Dests": pydyf.Dictionary({"Names": pydyf.Array(names)})})
+    setattr(pdf, "_tagging_patch_anchors", anchors)  # noqa: B010 - the attribute the patch reads
+    return pdf, annotation
+
+
+def test_a_link_with_a_known_target_gets_a_structure_destination():
+    heading = pydyf.Dictionary({"Type": "/StructElem", "S": "/H1"})
+    pdf, annotation = _destinations_pdf({}, [])
+    pdf.add_object(heading)
+    setattr(pdf, "_tagging_patch_anchors", {"target": heading})  # noqa: B010 - the attribute the patch reads
+    pdf.catalog["Names"]["Dests"]["Names"] = pydyf.Array([pydyf.String("target"), pydyf.Array([pdf.page_references[0], "/XYZ", 0, 0, 0])])
+
+    assert weasyprint_tagging_patch.add_structure_destinations(pdf, 1) == 1
+    assert "Dest" not in annotation
+    assert annotation["A"]["SD"][0] == heading.reference
+
+
+def test_a_link_without_a_known_anchor_keeps_its_named_destination():
+    pdf, annotation = _destinations_pdf({}, [pydyf.String("target"), pydyf.Array([b"1 0 R", "/XYZ", 0, 0, 0])])
+
+    assert weasyprint_tagging_patch.add_structure_destinations(pdf, 1) == 0
+    assert annotation["Dest"].string == "target"
+    assert "A" not in annotation
+
+
+def test_a_link_without_a_named_destination_keeps_it():
+    heading = pydyf.Dictionary({"Type": "/StructElem", "S": "/H1"})
+    pdf, annotation = _destinations_pdf({}, [])
+    pdf.add_object(heading)
+    setattr(pdf, "_tagging_patch_anchors", {"target": heading})  # noqa: B010 - the attribute the patch reads
+
+    assert weasyprint_tagging_patch.add_structure_destinations(pdf, 1) == 0
+    assert annotation["Dest"].string == "target"
+
+
+def test_a_bookmark_without_a_known_heading_keeps_its_destination():
+    pdf, _ = _destinations_pdf({}, [])
+    destination = pydyf.Array([pdf.page_references[0], "/XYZ", 0, 0, 0])
+    item = pydyf.Dictionary({"Title": pydyf.String("Unknown"), "Dest": destination})
+    pdf.add_object(item)
+    outlines = pydyf.Dictionary({"Type": "/Outlines", "First": item.reference})
+    pdf.add_object(outlines)
+    pdf.catalog["Outlines"] = outlines.reference
+    heading = pydyf.Dictionary({"Type": "/StructElem", "S": "/H1"})
+    pdf.add_object(heading)
+    setattr(pdf, "_tagging_patch_bookmarks", {(0, "Known"): [heading]})  # noqa: B010 - the attribute the patch reads
+
+    assert weasyprint_tagging_patch.add_bookmark_structure_destinations(pdf) == 0
+    assert item["Dest"] is destination

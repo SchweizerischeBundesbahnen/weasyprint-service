@@ -61,9 +61,21 @@ commandTests:
     command: test
     args: [-d, /opt/python]
     exitCode: 0
-  - name: The uv-installed Python has no pip
-    command: sh
-    args: [-c, 'test -z "$(ls -d /opt/python/*/lib/python3.*/site-packages/pip* /opt/python/*/lib/python3.*/ensurepip/_bundled /opt/python/*/bin/pip* 2>/dev/null)"']
+  # Asked of the interpreter the service runs, not of a layout of /opt/python, so a new layout of uv fails the test
+  - name: The uv-installed Python the service runs has no pip
+    command: python
+    args:
+      - -c
+      - |
+        import glob, os, subprocess, sys
+        base = sys.base_prefix
+        assert base.startswith("/opt/python/"), f"the service runs a Python outside /opt/python: {base}"
+        left = glob.glob(f"{base}/lib/python3.*/site-packages/pip*") + glob.glob(f"{base}/lib/python3.*/ensurepip/_bundled") + glob.glob(f"{base}/bin/pip*")
+        assert not left, f"pip is left in {base}: {left}"
+        imported = subprocess.run([os.path.join(base, "bin", "python3"), "-I", "-c", "import pip"], capture_output=True)
+        assert imported.returncode != 0, "the base Python imports pip"
+        print("no pip in", base)
+    expectedOutput: ["^no pip in /opt/python/"]
     exitCode: 0
 fileExistenceTests:
   - name: Log directory

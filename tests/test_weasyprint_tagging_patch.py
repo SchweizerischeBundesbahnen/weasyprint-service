@@ -453,5 +453,6 @@ def test_merge_nested_links_moves_the_content_of_another_page_as_a_reference():
     reference = pdf.objects[weasyprint_tagging_patch._number(kids[1])]
     assert reference["Type"] == "/MCR" and reference["MCID"] == 3 and reference["Pg"] == second.reference, "Marked content of another page moves as a reference to it"
     assert kids[2] == span.reference and span["P"] == outer.reference, "An element moves to the outer link"
+    assert span["Pg"] == second.reference, "It keeps the page of its marked content, which it took from the inner link"
     assert tree["Nums"][3][3] == outer.reference and tree["Nums"][5] == outer.reference, "The parent tree names the outer link"
     assert tree["Nums"][3][4] == span.reference, "What was not merged keeps its entry"

@@ -482,6 +482,9 @@ def _moved_content(pdf: Any, inner: Any, link: Any) -> list[Any]:
             continue
         child = pdf.objects[_number(kid)]
         if isinstance(child, pydyf.Dictionary) and "S" in child:
+            # Its marked content is on the page of the inner Link, which it took as its own where it names none
+            if other_page and "Pg" not in child:
+                child["Pg"] = inner["Pg"]
             child["P"] = link.reference
         moved.append(kid)
     return moved

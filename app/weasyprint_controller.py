@@ -48,6 +48,7 @@ from app.svg_processor import SvgProcessor
 from app.vsdx_processor import VsdxProcessor
 from app.weasyprint_actual_text_patch import apply_actual_text_patch
 from app.weasyprint_running_width_patch import apply_running_width_patch
+from app.weasyprint_tagging_patch import apply_tagging_patch
 
 # WeasyPrint crashes on a block-level ``position: running()`` element that holds text
 # inside a shrink-to-fit box (float, inline-block, absolute, table cell, flex item).
@@ -58,6 +59,11 @@ apply_running_width_patch()
 # WeasyPrint writes no ActualText for an icon drawn with a character of the Unicode Private
 # Use Area, which PDF/A-2a, PDF/A-3a and PDF/UA-2 require. See app/weasyprint_actual_text_patch.py.
 apply_actual_text_patch()
+
+# WeasyPrint puts the annotation of a link holding other elements under those elements, and
+# makes a decorative image a Figure without an alternative text, which PDF/UA forbids.
+# See app/weasyprint_tagging_patch.py.
+apply_tagging_patch()
 
 
 @contextlib.asynccontextmanager

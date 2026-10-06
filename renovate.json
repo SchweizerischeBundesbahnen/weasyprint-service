@@ -36,21 +36,6 @@
     },
     {
       "matchManagers": [
-        "asdf"
-      ],
-      "matchDepNames": [
-        "python"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor"
-      ],
-      "semanticCommitType": "chore",
-      "commitMessageTopic": "Python version",
-      "automerge": false
-    },
-    {
-      "matchManagers": [
         "dockerfile"
       ],
       "matchDatasources": [

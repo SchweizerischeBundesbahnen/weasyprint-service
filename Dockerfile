@@ -69,9 +69,7 @@ ENV UV_PYTHON_INSTALL_DIR=/opt/python
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
     uv python install "${PYTHON_VERSION}" && \
-    find /opt/python -mindepth 1 -maxdepth 1 -type d -exec sh -c ' \
-      rm -rf "$1"/lib/python3.*/site-packages/pip "$1"/lib/python3.*/site-packages/pip-*.dist-info \
-             "$1"/lib/python3.*/ensurepip/_bundled "$1"/bin/pip*' _ {} \;
+    rm -rf /opt/python/*/lib/python3.*/site-packages/pip* /opt/python/*/lib/python3.*/ensurepip/_bundled /opt/python/*/bin/pip*
 
 # Set Playwright browser path to a shared location (accessible by both root and appuser)
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright

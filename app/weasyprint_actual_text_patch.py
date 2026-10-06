@@ -13,7 +13,8 @@ Fix
 When WeasyPrint writes a tagged PDF, wrap each text box which holds a PUA character in
 a ``/Span`` marked-content sequence with an ``ActualText``. The ActualText is the text
 of the box without its PUA characters. A box which holds nothing else, an icon, takes
-the ``aria-label`` of its element, or nothing. The glyphs are drawn as before, so the
+the ``aria-label`` of its element in place of the icon, or nothing, and keeps its
+spaces. The glyphs are drawn as before, so the
 page does not change; a reader or an extraction reads the ActualText instead of the
 codes of the icon font.
 
@@ -41,8 +42,10 @@ logger = logging.getLogger(__name__)
 
 _PATCH_FLAG = "_private_use_actual_text_patch"
 
-# The Private Use Area of the Basic Multilingual Plane and the two supplementary ones
-PRIVATE_USE = re.compile("[-\U000f0000-\U000ffffd\U00100000-\U0010fffd]")
+# The Private Use Area of the Basic Multilingual Plane and the two supplementary ones, as
+# code points: a class written with escapes of eight hex digits is misread by code scanners
+PRIVATE_USE_RANGES = ((0xE000, 0xF8FF), (0xF0000, 0xFFFFD), (0x100000, 0x10FFFD))
+PRIVATE_USE = re.compile("[" + "".join(f"{chr(first)}-{chr(last)}" for first, last in PRIVATE_USE_RANGES) + "]+")
 
 
 def _draw_module(name: str) -> Any | None:
@@ -73,8 +76,10 @@ def actual_text(text: str, element: Any) -> str | None:
     rest = PRIVATE_USE.sub("", text)
     if rest.strip():
         return rest
+    # An icon alone: its label, or nothing, in its place, the spaces around it kept so the
+    # words beside the box do not run together in the extracted text
     label = element.get("aria-label") if element is not None else None
-    return label or ""
+    return PRIVATE_USE.sub(label or "", text)
 
 
 def _with_actual_text(draw_text: Callable[..., Any]) -> Callable[..., Any]:

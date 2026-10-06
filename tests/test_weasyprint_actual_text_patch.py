@@ -80,6 +80,14 @@ def test_an_icon_reads_as_its_aria_label(icon_font):
     assert "Plan" in _text(pdf)
 
 
+def test_the_spaces_around_an_icon_are_kept(icon_font):
+    pdf = _pdf(icon_font, f'<p>Version<span class="icon"> {ICON} </span>1.0</p>', "pdf/a-2a")
+
+    text = _text(pdf)
+    assert ICON not in text
+    assert "Version1.0" not in text.replace("\n", "")
+
+
 def test_the_text_beside_an_icon_in_one_box_is_kept(icon_font):
     pdf = _pdf(icon_font, f'<p class="icon">a{ICON}b</p>', "pdf/a-2a")
 
@@ -109,7 +117,9 @@ def test_text_without_private_use_characters_gets_no_actual_text(icon_font):
         (ICON, None, ""),
         (ICON, "Plan", "Plan"),
         (f"a{ICON}b", "Plan", "ab"),
-        (f" {ICON} ", None, ""),
+        (f" {ICON} ", None, "  "),
+        (f" {ICON} ", "Plan", " Plan "),
+        (f"{ICON}{ICON}", "Plan", "Plan"),
         ("\U000f0001", None, ""),
         ("\U00100001x", None, "x"),
     ],

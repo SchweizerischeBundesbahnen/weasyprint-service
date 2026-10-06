@@ -76,10 +76,12 @@ def actual_text(text: str, element: Any) -> str | None:
     rest = PRIVATE_USE.sub("", text)
     if rest.strip():
         return rest
-    # An icon alone: its label, or nothing, in its place, the spaces around it kept so the
-    # words beside the box do not run together in the extracted text
+    # Icons alone: the label of their element once, in place of the first, and the spaces
+    # around them kept so the words beside the box do not run together in the extracted
+    # text. The label is document content, so it is joined as text, never as a template.
     label = element.get("aria-label") if element is not None else None
-    return PRIVATE_USE.sub(label or "", text)
+    first, *others = PRIVATE_USE.split(text)
+    return first + (label or "") + "".join(others)
 
 
 def _with_actual_text(draw_text: Callable[..., Any]) -> Callable[..., Any]:

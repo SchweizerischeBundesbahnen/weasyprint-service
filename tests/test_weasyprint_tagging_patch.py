@@ -2,6 +2,7 @@
 
 import io
 
+import pydyf
 import pymupdf
 import pypdf
 import pytest
@@ -284,33 +285,82 @@ def test_a_bookmark_has_a_structure_destination():
     assert len({id(_element_of(node["/A"]["/SD"][0])) for node in items}) == 3, "Two headings of one title lead to their own elements"
 
 
-def test_a_link_without_a_known_target_keeps_its_named_destination():
-    class Element(dict):
-        def __init__(self, number: int, **entries: object) -> None:
-            super().__init__(entries)
-            self.number = number
+@pytest.mark.parametrize(
+    ("list_html", "numbering"),
+    [
+        ("<ul><li>One</li></ul>", "/Disc"),
+        ('<ol style="list-style-type:upper-roman"><li>One</li></ol>', "/UpperRoman"),
+        ("<ul style=\"list-style-type:'-'\"><li>One</li></ul>", "/None"),
+        ('<ol style="list-style-type:georgian"><li>One</li></ol>', "/None"),
+    ],
+)
+def test_a_list_states_a_numbering_pdf_1_7_knows(list_html, numbering):
+    _, elements = _structure(_pdf(list_html, "pdf/ua-1"))
 
-        @property
-        def reference(self) -> bytes:
-            return f"{self.number} 0 R".encode()
+    assert [str(element["/A"]["/ListNumbering"]) for element in elements if element["/S"] == "/L"] == [numbering]
 
-    class Pdf:
-        def __init__(self) -> None:
-            self.objects: list[object] = [None]
-            self.catalog: dict = {}
 
-        def add(self, element: Element) -> Element:
-            self.objects.append(element)
-            return element
-
-    pdf = Pdf()
-    annotation = pdf.add(Element(1, Dest="nowhere", StructParent=1))
-    reference = pdf.add(Element(2, Type="/OBJR", Obj=annotation.reference))
-    link = pdf.add(Element(3, S="/Link", K=[reference.reference]))
-    tree = pdf.add(Element(4, Nums=[1, link.reference]))
-    root = pdf.add(Element(5, ParentTree=tree.reference))
+def _destinations_pdf(anchors: dict, names: list) -> tuple[pydyf.PDF, pydyf.Dictionary]:
+    """A PDF of one page whose one link goes to the named destination "target", with the anchors and the names given."""
+    pdf = pydyf.PDF()
+    pdf.add_page(pydyf.Dictionary({"Type": "/Page"}))
+    annotation = pydyf.Dictionary({"Type": "/Annot", "Subtype": "/Link", "Dest": pydyf.String("target"), "StructParent": 1})
+    pdf.add_object(annotation)
+    reference = pydyf.Dictionary({"Type": "/OBJR", "Obj": annotation.reference})
+    pdf.add_object(reference)
+    link = pydyf.Dictionary({"Type": "/StructElem", "S": "/Link", "K": pydyf.Array([reference.reference])})
+    pdf.add_object(link)
+    tree = pydyf.Dictionary({"Nums": pydyf.Array([1, link.reference])})
+    pdf.add_object(tree)
+    root = pydyf.Dictionary({"Type": "/StructTreeRoot", "ParentTree": tree.reference})
+    pdf.add_object(root)
     pdf.catalog["StructTreeRoot"] = root.reference
+    pdf.catalog["Names"] = pydyf.Dictionary({"Dests": pydyf.Dictionary({"Names": pydyf.Array(names)})})
+    setattr(pdf, "_tagging_patch_anchors", anchors)  # noqa: B010 - the attribute the patch reads
+    return pdf, annotation
+
+
+def test_a_link_with_a_known_target_gets_a_structure_destination():
+    heading = pydyf.Dictionary({"Type": "/StructElem", "S": "/H1"})
+    pdf, annotation = _destinations_pdf({}, [])
+    pdf.add_object(heading)
+    setattr(pdf, "_tagging_patch_anchors", {"target": heading})  # noqa: B010 - the attribute the patch reads
+    pdf.catalog["Names"]["Dests"]["Names"] = pydyf.Array([pydyf.String("target"), pydyf.Array([pdf.page_references[0], "/XYZ", 0, 0, 0])])
+
+    assert weasyprint_tagging_patch.add_structure_destinations(pdf, 1) == 1
+    assert "Dest" not in annotation
+    assert annotation["A"]["SD"][0] == heading.reference
+
+
+def test_a_link_without_a_known_anchor_keeps_its_named_destination():
+    pdf, annotation = _destinations_pdf({}, [pydyf.String("target"), pydyf.Array([b"1 0 R", "/XYZ", 0, 0, 0])])
 
     assert weasyprint_tagging_patch.add_structure_destinations(pdf, 1) == 0
+    assert annotation["Dest"].string == "target"
+    assert "A" not in annotation
+
+
+def test_a_link_without_a_named_destination_keeps_it():
+    heading = pydyf.Dictionary({"Type": "/StructElem", "S": "/H1"})
+    pdf, annotation = _destinations_pdf({}, [])
+    pdf.add_object(heading)
+    setattr(pdf, "_tagging_patch_anchors", {"target": heading})  # noqa: B010 - the attribute the patch reads
+
+    assert weasyprint_tagging_patch.add_structure_destinations(pdf, 1) == 0
+    assert annotation["Dest"].string == "target"
+
+
+def test_a_bookmark_without_a_known_heading_keeps_its_destination():
+    pdf, _ = _destinations_pdf({}, [])
+    destination = pydyf.Array([pdf.page_references[0], "/XYZ", 0, 0, 0])
+    item = pydyf.Dictionary({"Title": pydyf.String("Unknown"), "Dest": destination})
+    pdf.add_object(item)
+    outlines = pydyf.Dictionary({"Type": "/Outlines", "First": item.reference})
+    pdf.add_object(outlines)
+    pdf.catalog["Outlines"] = outlines.reference
+    heading = pydyf.Dictionary({"Type": "/StructElem", "S": "/H1"})
+    pdf.add_object(heading)
+    setattr(pdf, "_tagging_patch_bookmarks", {(0, "Known"): [heading]})  # noqa: B010 - the attribute the patch reads
+
     assert weasyprint_tagging_patch.add_bookmark_structure_destinations(pdf) == 0
-    assert annotation["Dest"] == "nowhere"
+    assert item["Dest"] is destination

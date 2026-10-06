@@ -90,6 +90,11 @@ INLINE = frozenset({"/Span", "/Link", "/Annot", "/Em", "/Strong", "/Code", "/Sub
 # The attributes of the PDF under which the anchors and the bookmarks of a conversion map to their elements
 _ANCHORS = "_tagging_patch_anchors"
 _BOOKMARKS = "_tagging_patch_bookmarks"
+# The attribute of the PDF which holds the version it is written in, set before WeasyPrint builds its tree
+_VERSION = "_tagging_patch_version"
+
+# The ListNumbering values only PDF 2.0 knows; PDF 1.7 names an arbitrary label by None (ISO 32000-1, Table 347)
+PDF_2_LIST_NUMBERING = frozenset({"Ordered", "Unordered"})
 
 
 def _module(name: str) -> Any | None:
@@ -171,7 +176,7 @@ def _with_image_rules(build_box_tree: Callable[..., Any]) -> Callable[..., Any]:
             if first is None:
                 first = element
                 if own:
-                    set_list_numbering(box, element)
+                    set_list_numbering(box, element, getattr(pdf, _VERSION, None))
             yield element
         _record_anchor(box, first if own else None, parent, pdf)
         _record_bookmark(box, first if own else None, parent, pdf, page_number)
@@ -198,8 +203,8 @@ def _has_own_element(box: Any) -> bool:
     return getattr(box, "element_tag", None) not in ("html", "body")
 
 
-def set_list_numbering(box: Any, element: Any) -> None:
-    """State the ListNumbering of the L element of a list, by its list-style-type."""
+def set_list_numbering(box: Any, element: Any, pdf_version: Any = None) -> None:
+    """State the ListNumbering of the L element of a list, by its list-style-type, in the values its PDF version knows."""
     if getattr(box, "element_tag", None) not in ("ul", "ol") or element.get("S") != "/L":
         return
     style = box.style["list_style_type"]
@@ -210,7 +215,14 @@ def set_list_numbering(box: Any, element: Any) -> None:
     else:
         # A string or a counter style of its own: its kind is all a list states
         numbering = "Ordered" if box.element_tag == "ol" else "Unordered"
+    if numbering in PDF_2_LIST_NUMBERING and not _is_pdf_2(pdf_version):
+        numbering = "None"
     element["A"] = pydyf.Dictionary({"O": "/List", "ListNumbering": f"/{numbering}"})
+
+
+def _is_pdf_2(pdf_version: Any) -> bool:
+    """Whether a PDF is written in version 2.0 or later; cast for bytes and None, as WeasyPrint compares it."""
+    return str(pdf_version) >= "2.0"
 
 
 def _record_anchor(box: Any, element: Any, parent: Any, pdf: Any) -> None:
@@ -424,10 +436,10 @@ def _with_links_moved(add_tags: Callable[..., Any]) -> Callable[..., Any]:
     """Wrap add_tags so the link annotations end under their Link elements."""
 
     def wrapper(pdf: Any, document: Any, pdf_version: Any, *args: Any, **kwargs: Any) -> Any:
+        setattr(pdf, _VERSION, pdf_version)
         result = add_tags(pdf, document, pdf_version, *args, **kwargs)
         move_annotations_to_links(pdf, len(document.pages))
-        # Cast for bytes and None, as WeasyPrint compares the version
-        if str(pdf_version) >= "2.0":
+        if _is_pdf_2(pdf_version):
             root = pdf.objects[_number(pdf.catalog["StructTreeRoot"])]
             for kid in _kids(root):
                 wrap_inline_runs(pdf, pdf.objects[_number(kid)])

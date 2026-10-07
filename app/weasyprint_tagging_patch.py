@@ -166,32 +166,44 @@ def _with_image_rules(build_box_tree: Callable[..., Any]) -> Callable[..., Any]:
 
     def wrapper(box: Any, parent: Any, pdf: Any, page_number: int, nums: Any, annotations: list[Any], tags: Any) -> Iterator[Any]:
         if is_decorative(box):
-            # Drawn as an artifact, so it has no marked content to map. Its link annotation
-            # still needs a place in the tree: under the parent, until it moves to its Link.
-            annotation = getattr(box, "link_annotation", None)
-            if annotation is not None:
-                reference = pydyf.Dictionary({"Type": OBJR, "Obj": annotation.reference, "Pg": pdf.page_references[page_number]})
-                pdf.add_object(reference)
-                parent["K"].append(reference.reference)
-                annotations.append((parent.reference, annotation))
+            _place_decorative_annotation(box, parent, pdf, page_number, annotations)
             return
-        image = _image(box)
-        if image is not None and image.get("alt") is None and image.get("title"):
-            image.set("alt", image.get("title"))
-        own = _has_own_element(box)
-        first: Any = None
-        for element in build_box_tree(box, parent, pdf, page_number, nums, annotations, tags):
-            if first is None:
-                first = element
-                if own:
-                    set_list_numbering(box, element, getattr(pdf, _VERSION, None))
-                    set_header_scope(box, element)
-            yield element
-        _record_anchor(box, first if own else None, parent, pdf)
-        _record_bookmark(box, first if own else None, parent, pdf, page_number)
+        _name_image_by_its_title(box)
+        elements = build_box_tree(box, parent, pdf, page_number, nums, annotations, tags)
+        first: Any = next(elements, None)
+        own_element = first if _has_own_element(box) else None
+        if own_element is not None:
+            set_list_numbering(box, own_element, getattr(pdf, _VERSION, None))
+            set_header_scope(box, own_element)
+        if first is not None:
+            yield first
+            yield from elements
+        _record_anchor(box, own_element, parent, pdf)
+        _record_bookmark(box, own_element, parent, pdf, page_number)
 
     setattr(wrapper, _PATCH_FLAG, True)
     return wrapper
+
+
+def _place_decorative_annotation(box: Any, parent: Any, pdf: Any, page_number: int, annotations: list[Any]) -> None:
+    """Place the link annotation of a decorative image under the parent, until it moves to its Link.
+
+    The image is drawn as an artifact, so it has no marked content to map, but its annotation needs a place in the tree.
+    """
+    annotation = getattr(box, "link_annotation", None)
+    if annotation is None:
+        return
+    reference = pydyf.Dictionary({"Type": OBJR, "Obj": annotation.reference, "Pg": pdf.page_references[page_number]})
+    pdf.add_object(reference)
+    parent["K"].append(reference.reference)
+    annotations.append((parent.reference, annotation))
+
+
+def _name_image_by_its_title(box: Any) -> None:
+    """Give an image which has no alt the text of its title."""
+    image = _image(box)
+    if image is not None and image.get("alt") is None and image.get("title"):
+        image.set("alt", image.get("title"))
 
 
 def _move_object_reference(pdf: Any, holder: Any, link: Any, key: int) -> None:
@@ -302,42 +314,49 @@ def wrap_inline_runs(pdf: Any, element: Any) -> int:
 
     Returns how many paragraphs it made.
     """
-    made = 0
-    if element.get("S") in GROUPING:
-        kept = pydyf.Array()
-        run: list[Any] = []
-
-        def close_run() -> None:
-            nonlocal made
-            if not run:
-                return
-            first = pdf.objects[_number(run[0])]
-            paragraph = pydyf.Dictionary({"Type": "/StructElem", "S": "/P", "K": pydyf.Array(run), "P": element.reference})
-            if "Pg" in first:
-                paragraph["Pg"] = first["Pg"]
-            pdf.add_object(paragraph)
-            for kid in run:
-                pdf.objects[_number(kid)]["P"] = paragraph.reference
-            kept.append(paragraph.reference)
-            run.clear()
-            made += 1
-
-        for kid in _kids(element):
-            if _is_inline(pdf, kid):
-                run.append(kid)
-            else:
-                close_run()
-                kept.append(kid)
-        close_run()
-        if made:
-            element["K"] = kept
+    made = _wrap_own_inline_runs(pdf, element) if element.get("S") in GROUPING else 0
     for kid in _kids(element):
         # The text of an inline element is a paragraph's already, so it is not wrapped again
-        if not isinstance(kid, int) and not _is_inline(pdf, kid):
-            child = pdf.objects[_number(kid)]
-            if isinstance(child, pydyf.Dictionary) and "S" in child:
-                made += wrap_inline_runs(pdf, child)
+        if isinstance(kid, int) or _is_inline(pdf, kid):
+            continue
+        child = pdf.objects[_number(kid)]
+        if isinstance(child, pydyf.Dictionary) and "S" in child:
+            made += wrap_inline_runs(pdf, child)
     return made
+
+
+def _wrap_own_inline_runs(pdf: Any, element: Any) -> int:
+    """Wrap each run of inline kids standing straight in the element in a P, and return how many paragraphs it made."""
+    kept = pydyf.Array()
+    run: list[Any] = []
+    made = 0
+    for kid in _kids(element):
+        if _is_inline(pdf, kid):
+            run.append(kid)
+            continue
+        if run:
+            kept.append(_paragraph_of(pdf, element, run).reference)
+            made += 1
+            run = []
+        kept.append(kid)
+    if run:
+        kept.append(_paragraph_of(pdf, element, run).reference)
+        made += 1
+    if made:
+        element["K"] = kept
+    return made
+
+
+def _paragraph_of(pdf: Any, element: Any, run: list[Any]) -> Any:
+    """A P below the element which holds the run of inline kids, on the page of the first of them."""
+    first = pdf.objects[_number(run[0])]
+    paragraph = pydyf.Dictionary({"Type": "/StructElem", "S": "/P", "K": pydyf.Array(run), "P": element.reference})
+    if "Pg" in first:
+        paragraph["Pg"] = first["Pg"]
+    pdf.add_object(paragraph)
+    for kid in run:
+        pdf.objects[_number(kid)]["P"] = paragraph.reference
+    return paragraph
 
 
 def _named_destinations(pdf: Any) -> dict[str, Any]:
@@ -363,37 +382,40 @@ def add_structure_destinations(pdf: Any, page_count: int) -> int:
     """
     anchors: dict[str, Any] = getattr(pdf, _ANCHORS, {})
     destinations = _named_destinations(pdf)
+    changed = 0
+    for annotation in _annotations_in_the_tree(pdf, page_count):
+        if "Dest" not in annotation:
+            continue
+        name = _name(annotation["Dest"])
+        target, destination = anchors.get(name), destinations.get(name)
+        if target is None or destination is None:
+            continue
+        annotation["A"] = pydyf.Dictionary(
+            {
+                "Type": "/Action",
+                "S": "/GoTo",
+                "D": annotation["Dest"],
+                "SD": pydyf.Array([target.reference, *list(destination)[1:]]),
+            }
+        )
+        del annotation["Dest"]
+        changed += 1
+    return changed
+
+
+def _annotations_in_the_tree(pdf: Any, page_count: int) -> Iterator[Any]:
+    """The annotations the structure tree places by object references, under the parent tree keys past those of the pages."""
     root = pdf.objects[_number(pdf.catalog["StructTreeRoot"])]
     nums = pdf.objects[_number(root["ParentTree"])]["Nums"]
-    changed = 0
     for index in range(0, len(nums), 2):
         if nums[index] < page_count:
             continue
-        holder = pdf.objects[_number(nums[index + 1])]
-        for kid in _kids(holder):
+        for kid in _kids(pdf.objects[_number(nums[index + 1])]):
             if isinstance(kid, int):
                 continue
             reference = pdf.objects[_number(kid)]
-            if not isinstance(reference, pydyf.Dictionary) or reference.get("Type") != OBJR:
-                continue
-            annotation = pdf.objects[_number(reference["Obj"])]
-            if "Dest" not in annotation:
-                continue
-            name = _name(annotation["Dest"])
-            target, destination = anchors.get(name), destinations.get(name)
-            if target is None or destination is None:
-                continue
-            annotation["A"] = pydyf.Dictionary(
-                {
-                    "Type": "/Action",
-                    "S": "/GoTo",
-                    "D": annotation["Dest"],
-                    "SD": pydyf.Array([target.reference, *list(destination)[1:]]),
-                }
-            )
-            del annotation["Dest"]
-            changed += 1
-    return changed
+            if isinstance(reference, pydyf.Dictionary) and reference.get("Type") == OBJR:
+                yield pdf.objects[_number(reference["Obj"])]
 
 
 def _outlines(pdf: Any, first: Any) -> Iterator[Any]:

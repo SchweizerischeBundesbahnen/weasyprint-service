@@ -18,12 +18,13 @@ commandTests:
     args: [--version]
     expectedOutput: [70.0]
   - name: Chromium version is correct
+    # The image has the headless shell alone, which is what the service launches.
     # The browser directory carries the Playwright revision, and its inner directory
-    # carries the architecture (chrome-linux64 on amd64, chrome-linux-arm64 on arm64),
-    # so both are matched by a glob. The version string differs per build, so only the
-    # version number is asserted.
+    # carries the architecture (chrome-headless-shell-linux64 on amd64,
+    # chrome-headless-shell-linux-arm64 on arm64), so both are matched by a glob.
+    # The version string differs per build, so only the version number is asserted.
     command: sh
-    args: [-c, /opt/playwright/chromium-*/chrome-linux*/chrome --version]
+    args: [-c, /opt/playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell --version]
     expectedOutput: [153\.0\.8010\.12]
   - name: Tox should not be installed
     command: uv

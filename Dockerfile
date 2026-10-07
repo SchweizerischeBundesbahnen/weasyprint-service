@@ -26,8 +26,6 @@ RUN apt-get update && \
     libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
-    libcairo2 \
-    libcups2 \
     libdrm2 \
     libgbm1 \
     libnspr4 \
@@ -86,8 +84,10 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 # No --with-deps: it would add xvfb, an X server for headed browsers, while the
 # service runs Chromium headless. The libraries and fonts Playwright lists for
 # Chromium are installed with the system packages above.
+# --only-shell: the service launches the headless shell, the full browser is
+# never started and is the only one to need libcups2 and libcairo2.
 RUN uv sync --frozen --no-dev --no-install-project && \
-    uv run --no-sync playwright install chromium
+    uv run --no-sync playwright install --only-shell chromium
 
 # Create build timestamp
 RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \

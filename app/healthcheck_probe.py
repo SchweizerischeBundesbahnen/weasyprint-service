@@ -39,8 +39,8 @@ def probe(url: str, cert_file: str | None = None, key_file: str | None = None) -
     """
     if not url.startswith(ALLOWED_SCHEMES):
         raise ValueError(f"The healthcheck only probes http and https, not {url}")
-    with build_opener(cert_file, key_file).open(url):
-        pass
+    # The status is all the probe asks for, so the response is closed unread
+    build_opener(cert_file, key_file).open(url).close()
 
 
 def main(argv: list[str]) -> int:

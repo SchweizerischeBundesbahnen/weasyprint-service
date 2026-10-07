@@ -45,6 +45,11 @@ commandTests:
     command: uv
     args: [run, --no-sync, pre-commit, --version]
     exitCode: 2
+  # The healthcheck probes with Python, curl would be in the image for it alone
+  - name: Curl should not be installed
+    command: sh
+    args: [-c, '! command -v curl']
+    exitCode: 0
   - name: Log directory exists
     command: test
     args: [-d, /opt/weasyprint/logs]

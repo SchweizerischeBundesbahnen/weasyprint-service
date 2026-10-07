@@ -13,7 +13,6 @@ ARG ENABLE_VSDX_SUPPORT=false
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
-    curl \
     fonts-dejavu \
     fonts-liberation \
     fonts-noto-cjk \

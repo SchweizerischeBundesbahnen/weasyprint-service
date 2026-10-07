@@ -8,21 +8,22 @@ from pathlib import Path
 import pytest
 
 HEALTHCHECK = Path(__file__).parent.parent / "healthcheck.sh"
+PROBE = Path(__file__).parent.parent / "app" / "healthcheck_probe.py"
 
-FAKE_CURL = """#!/bin/sh
-printf '%s\\n' "$@" > "${CURL_ARGS_FILE}"
+FAKE_PYTHON = """#!/bin/sh
+printf '%s\\n' "$@" > "${PROBE_ARGS_FILE}"
 """
 
 
 @pytest.fixture
 def run_healthcheck(tmp_path: Path):
-    """Run the script with curl replaced by a recorder, and return its result and arguments."""
+    """Run the script with python replaced by a recorder, and return its result and the arguments of the probe."""
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    fake_curl = bin_dir / "curl"
-    fake_curl.write_text(FAKE_CURL, encoding="utf-8")
-    fake_curl.chmod(0o755)
-    args_file = tmp_path / "curl-args"
+    fake_python = bin_dir / "python"
+    fake_python.write_text(FAKE_PYTHON, encoding="utf-8")
+    fake_python.chmod(0o755)
+    args_file = tmp_path / "probe-args"
 
     def run(env: dict[str, str]) -> tuple[subprocess.CompletedProcess[str], list[str]]:
         completed = subprocess.run(
@@ -30,10 +31,13 @@ def run_healthcheck(tmp_path: Path):
             capture_output=True,
             text=True,
             check=False,
-            env={"PATH": f"{bin_dir}:/usr/bin:/bin", "CURL_ARGS_FILE": str(args_file), **env},
+            env={"PATH": f"{bin_dir}:/usr/bin:/bin", "PROBE_ARGS_FILE": str(args_file), **env},
         )
         recorded = args_file.read_text(encoding="utf-8").split() if args_file.exists() else []
-        return completed, recorded
+        # python -I <probe> URL [CERT KEY]: return what the probe receives
+        if recorded:
+            assert recorded[:2] == ["-I", str(PROBE)]
+        return completed, recorded[2:]
 
     return run
 
@@ -42,22 +46,20 @@ def test_plain_http_by_default(run_healthcheck) -> None:
     completed, args = run_healthcheck({})
 
     assert completed.returncode == 0
-    assert args[-1] == "http://localhost:9080/health"
-    assert "--insecure" not in args
+    assert args == ["http://localhost:9080/health"]
 
 
 def test_port_is_taken_from_the_environment(run_healthcheck) -> None:
     _, args = run_healthcheck({"PORT": "9999"})
 
-    assert args[-1] == "http://localhost:9999/health"
+    assert args == ["http://localhost:9999/health"]
 
 
 def test_configured_certificate_switches_the_scheme(run_healthcheck) -> None:
     completed, args = run_healthcheck({"TLS_CERT_FILE": "/tls/server.pem"})
 
     assert completed.returncode == 0
-    assert args[-1] == "https://localhost:9080/health"
-    assert "--insecure" in args
+    assert args == ["https://localhost:9080/health"]
 
 
 @pytest.mark.parametrize("blank", ["", "   ", "\t"])
@@ -65,10 +67,10 @@ def test_blank_certificate_stays_on_http(run_healthcheck, blank: str) -> None:
     """app/tls.py reads a blank value as unset, so the probe has to agree."""
     _, args = run_healthcheck({"TLS_CERT_FILE": blank})
 
-    assert args[-1] == "http://localhost:9080/health"
+    assert args == ["http://localhost:9080/health"]
 
 
-def test_client_certificate_is_passed_to_curl(run_healthcheck) -> None:
+def test_client_certificate_is_passed_to_the_probe(run_healthcheck) -> None:
     completed, args = run_healthcheck(
         {
             "TLS_CERT_FILE": "/tls/server.pem",
@@ -78,10 +80,7 @@ def test_client_certificate_is_passed_to_curl(run_healthcheck) -> None:
     )
 
     assert completed.returncode == 0
-    assert "--cert" in args
-    assert "/tls/probe.pem" in args
-    assert "--key" in args
-    assert "/tls/probe.key" in args
+    assert args == ["https://localhost:9080/health", "/tls/probe.pem", "/tls/probe.key"]
 
 
 @pytest.mark.parametrize("configured", ["TLS_HEALTHCHECK_CERT_FILE", "TLS_HEALTHCHECK_KEY_FILE"])

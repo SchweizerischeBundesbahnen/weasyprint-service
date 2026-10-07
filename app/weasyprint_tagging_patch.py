@@ -85,11 +85,15 @@ LIST_NUMBERING = {
     "upper-latin": "UpperAlpha",
 }
 
+# The structure type of a link, and the type of the object reference which places an annotation in the tree
+LINK = "/Link"
+OBJR = "/OBJR"
+
 # Grouping elements, which hold blocks, and through which PDF 2.0 sees the one above (ISO 32000-2, 14.8.4.4)
 GROUPING = frozenset({"/Document", "/Part", "/Art", "/Sect", "/Div", "/NonStruct", "/BlockQuote"})
 
 # Inline elements, which a paragraph holds; a NonStruct is inline when it holds nothing else
-INLINE = frozenset({"/Span", "/Link", "/Annot", "/Em", "/Strong", "/Code", "/Sub", "/Quote", "/Reference", "/Note"})
+INLINE = frozenset({"/Span", LINK, "/Annot", "/Em", "/Strong", "/Code", "/Sub", "/Quote", "/Reference", "/Note"})
 
 # The attributes of the PDF under which the anchors and the bookmarks of a conversion map to their elements
 _ANCHORS = "_tagging_patch_anchors"
@@ -166,7 +170,7 @@ def _with_image_rules(build_box_tree: Callable[..., Any]) -> Callable[..., Any]:
             # still needs a place in the tree: under the parent, until it moves to its Link.
             annotation = getattr(box, "link_annotation", None)
             if annotation is not None:
-                reference = pydyf.Dictionary({"Type": "/OBJR", "Obj": annotation.reference, "Pg": pdf.page_references[page_number]})
+                reference = pydyf.Dictionary({"Type": OBJR, "Obj": annotation.reference, "Pg": pdf.page_references[page_number]})
                 pdf.add_object(reference)
                 parent["K"].append(reference.reference)
                 annotations.append((parent.reference, annotation))
@@ -196,7 +200,7 @@ def _move_object_reference(pdf: Any, holder: Any, link: Any, key: int) -> None:
         if isinstance(kid, int):
             continue
         kid_object = pdf.objects[_number(kid)]
-        if isinstance(kid_object, pydyf.Dictionary) and kid_object.get("Type") == "/OBJR" and pdf.objects[_number(kid_object["Obj"])].get("StructParent") == key:
+        if isinstance(kid_object, pydyf.Dictionary) and kid_object.get("Type") == OBJR and pdf.objects[_number(kid_object["Obj"])].get("StructParent") == key:
             holder["K"].remove(kid)
             link["K"].append(kid)
 
@@ -370,7 +374,7 @@ def add_structure_destinations(pdf: Any, page_count: int) -> int:
             if isinstance(kid, int):
                 continue
             reference = pdf.objects[_number(kid)]
-            if not isinstance(reference, pydyf.Dictionary) or reference.get("Type") != "/OBJR":
+            if not isinstance(reference, pydyf.Dictionary) or reference.get("Type") != OBJR:
                 continue
             annotation = pdf.objects[_number(reference["Obj"])]
             if "Dest" not in annotation:
@@ -442,7 +446,7 @@ def merge_nested_links(pdf: Any) -> int:
         element = pending.pop()
         if not isinstance(element, pydyf.Dictionary) or "S" not in element:
             continue
-        if element["S"] == "/Link":
+        if element["S"] == LINK:
             _absorb_links(pdf, element, replaced)
         pending.extend(pdf.objects[_number(kid)] for kid in _kids(element) if not isinstance(kid, int))
     if replaced:
@@ -458,7 +462,7 @@ def _absorb_links(pdf: Any, link: Any, replaced: dict[bytes, Any]) -> None:
         kept = pydyf.Array()
         for kid in _kids(link):
             inner = None if isinstance(kid, int) else pdf.objects[_number(kid)]
-            if isinstance(inner, pydyf.Dictionary) and inner.get("S") == "/Link":
+            if isinstance(inner, pydyf.Dictionary) and inner.get("S") == LINK:
                 kept.extend(_moved_content(pdf, inner, link))
                 replaced[bytes(inner.reference)] = link
                 absorbed = True
@@ -524,9 +528,9 @@ def move_annotations_to_links(pdf: Any, page_count: int) -> int:
             continue
         holder = pdf.objects[_number(nums[index + 1])]
         link = holder
-        while link["S"] != "/Link" and "P" in link and link["S"] != "/Document":
+        while link["S"] != LINK and "P" in link and link["S"] != "/Document":
             link = pdf.objects[_number(link["P"])]
-        if link is holder or link["S"] != "/Link":
+        if link is holder or link["S"] != LINK:
             continue
         _move_object_reference(pdf, holder, link, key)
         nums[index + 1] = link.reference

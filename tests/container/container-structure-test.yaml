@@ -50,6 +50,11 @@ commandTests:
     command: sh
     args: [-c, '! command -v curl']
     exitCode: 0
+  # Chromium runs headless, playwright install --with-deps would add an X server
+  - name: Xvfb should not be installed
+    command: sh
+    args: [-c, '! command -v Xvfb']
+    exitCode: 0
   - name: Log directory exists
     command: test
     args: [-d, /opt/weasyprint/logs]

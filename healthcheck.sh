@@ -24,16 +24,16 @@ if [ -n "${cert_file}" ]; then
     url="https://localhost:${port}/health"
     # The certificate is verified by the caller of the service, not here: this
     # probe talks to its own process over the loopback interface and asks one
-    # question, whether that process still answers.
-    set -- --insecure
+    # question, whether that process still answers. The probe does not verify.
     # A server demanding a client certificate rejects the probe without one.
     if [ -n "${probe_cert}" ] || [ -n "${probe_key}" ]; then
         if [ -z "${probe_cert}" ] || [ -z "${probe_key}" ]; then
             echo "TLS_HEALTHCHECK_CERT_FILE and TLS_HEALTHCHECK_KEY_FILE have to be set together" >&2
             exit 1
         fi
-        set -- "$@" --cert "${probe_cert}" --key "${probe_key}"
+        set -- "${probe_cert}" "${probe_key}"
     fi
 fi
 
-exec curl --fail --silent --show-error "$@" "${url}"
+# Python is in the image for the service; curl was there for this probe alone.
+exec python -I "$(dirname "$0")/app/healthcheck_probe.py" "${url}" "$@"

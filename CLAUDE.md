@@ -206,7 +206,7 @@ grype weasyprint-service:0.0.0
 **TLS (see `app/tls.py`):**
 - `TLS_CERT_FILE`, `TLS_KEY_FILE`, `TLS_KEY_PASSWORD`, `TLS_CLIENT_CA_FILE`, `TLS_CLIENT_AUTH` (none/optional/required): serve the API over HTTPS. Unset means plain HTTP (default).
 - `METRICS_TLS_*`: the same five for the metrics server, configured independently. Neither set inherits from the other.
-- Incomplete configuration fails at startup, it never falls back to plain HTTP. The material is loaded before either server listens (`load_tls_options`), so a mismatched key or a wrong password also stops the start. The container healthcheck (`healthcheck.sh`) follows the configured scheme.
+- Incomplete configuration fails at startup, it never falls back to plain HTTP. The material is loaded before either server listens (`load_tls_options`), so a mismatched key or a wrong password also stops the start. The container healthcheck (`healthcheck.sh`) follows the configured scheme and probes with `app/healthcheck_probe.py` (standard library only, no proxy, no certificate verification). The image has no curl: it carried 16 of the 17 critical findings of the image scans, for this probe alone.
 
 **Authentication:**
 - `API_KEY`: API key(s) protecting the `/convert/*` endpoints. Unset or empty disables authentication (default). Comma-separated list allows key rotation. Clients send `X-API-Key: <key>` or `Authorization: Bearer <key>`. Invalid or missing keys return 401.
@@ -419,7 +419,7 @@ The repository uses extensive pre-commit hooks including:
 - Includes fonts and Playwright Chromium for complete PDF rendering capabilities
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
-- Playwright Chromium browser installed via `playwright install chromium --with-deps`
+- Playwright Chromium browser installed via `playwright install --only-shell chromium`: the service launches the headless shell, the full browser (which alone needs libcups2 and libcairo2) is not in the image. No `--with-deps` either: that would add xvfb, an X server the headless service never uses. The libraries and fonts Playwright lists for Chromium are in the apt list of the Dockerfile; keep them in step when Playwright changes its list (`playwright install-deps --dry-run chromium` in a fresh `debian:trixie-slim` shows it)
 - pip is removed from the uv-installed Python in `/opt/python`, in the layer that installs it. Nothing in the image uses pip, and image scanners report the packages it vendors. The container structure test asserts it is absent.
 - Every `uv run` in the Dockerfile needs `--no-sync`: without it uv syncs the default groups again and puts the `dev` group (ruff, mypy, pre-commit) into the image. The container structure test asserts they are absent.
 - **OCI labels**: Security metadata labels for container scanning tools

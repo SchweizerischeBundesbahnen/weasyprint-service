@@ -18,7 +18,7 @@ services:
     networks:
       - monitoring
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9080/health"]
+      test: ["CMD", "./healthcheck.sh"]
       interval: 10s
       timeout: 5s
       retries: 3

@@ -528,7 +528,11 @@ The material is loaded before either server listens, so a key which does not mat
 
 **Mutual TLS.** With `TLS_CLIENT_AUTH=required` the service accepts only clients presenting a certificate signed by `TLS_CLIENT_CA_FILE`. That authenticates the caller, which the API key below does not: the certificate says who connected, the key says who may convert. The two combine.
 
-**The healthcheck of the container** follows the configured scheme. It talks to its own process over loopback, so it does not verify the certificate. Where client certificates are required, give the probe one with `TLS_HEALTHCHECK_CERT_FILE` and `TLS_HEALTHCHECK_KEY_FILE`, otherwise the container reports itself unhealthy. The two go together: one without the other fails the probe with a message naming them, rather than an opaque handshake error.
+**The healthcheck of the container** follows the configured scheme, and over TLS it verifies the service the way a client does. It trusts the certificate in `TLS_CERT_FILE` itself, so the image needs no CA for it, and checks it against the first name of its subjectAltName (a DNS name, or an IP address where it names no host; a wildcard is checked with a concrete label). The connection goes to the loopback interface of the container, whatever that name resolves to. Consequences:
+
+- The certificate has to name the host in its subjectAltName. A common name alone fails the healthcheck, as it fails browsers and most clients.
+- A certificate which has expired, or which the server does not present, makes the container unhealthy. The service keeps serving, but its clients would fail on that certificate as well.
+- Where client certificates are required, give the probe one with `TLS_HEALTHCHECK_CERT_FILE` and `TLS_HEALTHCHECK_KEY_FILE`, otherwise the container reports itself unhealthy. The two go together: one without the other fails the probe with a message naming them, rather than an opaque handshake error.
 
 **Certificate renewal.** The certificate is read once, at startup. A renewed certificate takes effect when the container restarts.
 

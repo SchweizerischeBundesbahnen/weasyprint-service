@@ -107,15 +107,15 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
     if metrics_server:
         try:
             await metrics_server.stop()
-        except Exception as e:  # noqa: BLE001
-            lifespan_logger.error("Error stopping metrics server: %s", e)
+        except Exception:
+            lifespan_logger.exception("Error stopping metrics server")
 
     try:
         lifespan_logger.info("Stopping Chromium browser...")
         await chromium_manager.stop()
         lifespan_logger.info("Chromium browser stopped successfully")
-    except Exception as e:  # noqa: BLE001
-        lifespan_logger.error("Error stopping Chromium browser: %s", e)
+    except Exception:
+        lifespan_logger.exception("Error stopping Chromium browser")
 
     # Drop the renderings which are still queued. One already under way keeps its thread:
     # a worker cannot be interrupted, and the process leaves once it returns.

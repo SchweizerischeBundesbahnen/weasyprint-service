@@ -1,5 +1,14 @@
 # Changelog
 
+## [70.0.4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.3...v70.0.4) (2026-10-08)
+
+
+### Bug Fixes
+
+* **docker:** drop curl, xvfb and the full chromium from the image ([#387](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/387)) ([adab98c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/adab98ccf333cfdeb46a36a3bf1edf61609fa585))
+* resolve the SonarCloud findings of the new code ([#389](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/389)) ([4b5f699](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/4b5f699bc0407e71099f3ab9a42c7bd3c146b9d8))
+* verify the server certificate in the healthcheck ([#390](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/390)) ([f061555](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/f061555c71978a0b194914ac4a4825e41799bef5))
+
 ## [70.0.3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.2...v70.0.3) (2026-10-06)
 
 

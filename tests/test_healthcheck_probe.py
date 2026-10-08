@@ -144,6 +144,16 @@ def test_chain_file_passes(server, pki: Pki, tmp_path: Path) -> None:
     assert healthcheck_probe.main([str(port), str(chain)]) == 0
 
 
+def test_text_around_the_certificate_is_ignored(server, pki: Pki, tmp_path: Path) -> None:
+    """openssl pkcs12 writes attributes before each block, and a friendly name may be no ASCII. OpenSSL skips them."""
+    cert, key = pki.self_signed("server", "DNS:weasyprint.example.com")
+    exported = tmp_path / "exported.pem"
+    exported.write_bytes("Bag Attributes\n    friendlyName: Zürich\n".encode() + cert.read_bytes())
+    port = server(context=_server_context(exported, key))
+
+    assert healthcheck_probe.main([str(port), str(exported)]) == 0
+
+
 def test_expired_certificate_fails(server, pki: Pki, capsys: pytest.CaptureFixture[str]) -> None:
     """A client of the service would fail on it, so the container is unhealthy."""
     cert, key = pki.expired("server", "DNS:old.example.com")
@@ -195,9 +205,18 @@ def test_unreadable_client_certificate_fails(pki: Pki, tmp_path: Path, capsys: p
     assert capsys.readouterr().err
 
 
-@pytest.mark.parametrize("content", [None, "no certificate here\n", "-----BEGIN CERTIFICATE-----\nAAAA\n", "\xe4\n"])
+@pytest.mark.parametrize(
+    "content",
+    [
+        None,
+        "no certificate here\n",
+        "-----BEGIN CERTIFICATE-----\nAAAA\n",
+        "\xe4\n",
+        "-----BEGIN CERTIFICATE-----\n\xe4\n-----END CERTIFICATE-----\n",  # no ASCII inside the block
+    ],
+)
 def test_unusable_server_certificate_fails(tmp_path: Path, content: str | None, capsys: pytest.CaptureFixture[str]) -> None:
-    """A missing file, one without a PEM certificate, a broken one and one which is not text."""
+    """A missing file, one without a PEM certificate, a broken one, one which is not text and a block which is not ASCII."""
     cert = tmp_path / "server.pem"
     if content is not None:
         cert.write_text(content, encoding="latin-1")

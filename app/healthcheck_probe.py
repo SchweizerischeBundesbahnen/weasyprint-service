@@ -36,8 +36,8 @@ HEALTH_PATH = "/health"
 TIMEOUT_SECONDS = 3.0
 USAGE = "Usage: healthcheck_probe.py PORT [SERVER_CERT_FILE [CLIENT_CERT_FILE CLIENT_KEY_FILE]]\n"
 
-PEM_BEGIN = "-----BEGIN CERTIFICATE-----"
-PEM_END = "-----END CERTIFICATE-----"
+PEM_BEGIN = b"-----BEGIN CERTIFICATE-----"
+PEM_END = b"-----END CERTIFICATE-----"
 
 # DER tags of the parts of a certificate the probe reads
 SEQUENCE = 0x30
@@ -130,13 +130,17 @@ def subject_alt_names(der: bytes) -> list[tuple[str, str]]:
 
 
 def read_certificate(cert_file: str) -> bytes:
-    """Return the first certificate of a PEM file as DER. A chain starts with the certificate of the server."""
-    text = Path(cert_file).read_text(encoding="ascii")
-    start = text.find(PEM_BEGIN)
-    end = text.find(PEM_END, start)
+    """Return the first certificate of a PEM file as DER. A chain starts with the certificate of the server.
+
+    Only the block is decoded. OpenSSL skips the text around it, which need not be ASCII:
+    openssl pkcs12 writes the attributes of each certificate there, a friendly name among them.
+    """
+    data = Path(cert_file).read_bytes()
+    start = data.find(PEM_BEGIN)
+    end = data.find(PEM_END, start)
     if start < 0 or end < 0:
         raise ValueError(f"{cert_file} holds no PEM certificate")
-    return ssl.PEM_cert_to_DER_cert(text[start : end + len(PEM_END)])
+    return ssl.PEM_cert_to_DER_cert(data[start : end + len(PEM_END)].decode("ascii"))
 
 
 def server_name(cert_file: str) -> str:

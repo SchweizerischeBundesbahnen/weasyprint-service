@@ -1,5 +1,13 @@
 # Changelog
 
+## [70.0.5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.4...v70.0.5) (2026-10-10)
+
+
+### Bug Fixes
+
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.12.24 ([b22f523](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b22f523f537d4d484a80497fad0fe44b4acf8fbc))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.13.0 ([14e3e52](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/14e3e52d7c98641e9697694144871918b961aeef))
+
 ## [70.0.4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.3...v70.0.4) (2026-10-08)
 
 

@@ -7,7 +7,7 @@ authors = [
 ]
 license = "Apache-2.0"
 readme = "README.md"
-requires-python = ">=3.14,<3.15"
+requires-python = ">=3.15,<3.16"
 # Standard [project.dependencies] format - now supported by Renovate with uv
 dependencies = [
     "weasyprint==70.0",

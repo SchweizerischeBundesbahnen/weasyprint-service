@@ -25,7 +25,7 @@ commandTests:
     # The version string differs per build, so only the version number is asserted.
     command: sh
     args: [-c, /opt/playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell --version]
-    expectedOutput: [153\.0\.8010\.12]
+    expectedOutput: [156\.0\.8078\.4]
   - name: Tox should not be installed
     command: uv
     args: [run, --no-sync, tox, --version]

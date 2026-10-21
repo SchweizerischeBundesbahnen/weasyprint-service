@@ -81,6 +81,36 @@ curl -X POST "http://localhost:9080/convert/html?full_fonts=true" \
 
 > **Note:** This increases PDF file size but avoids font subsetting errors.
 
+### SVG Renderer
+
+The `SVG_RENDERER` environment variable selects who draws the SVG of a document.
+
+**Valid values:** `chromium` (default), `weasysvg`. The value is case-insensitive.
+
+- `chromium`: Chromium rasterizes each SVG to PNG, and the PNG goes into the PDF. This is the behavior of earlier versions.
+- `weasysvg`: WeasyPrint draws the SVG natively through the [weasysvg](https://github.com/grigoriev/weasysvg) plugin. The SVG stays vector in the PDF. The service does not start Chromium.
+
+To let WeasyPrint draw the SVG:
+
+```bash
+docker run --detach \
+  --init \
+  --publish 9080:9080 \
+  --name weasyprint-service \
+  --env SVG_RENDERER=weasysvg \
+  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
+```
+
+With `weasysvg`:
+- `DEVICE_SCALE_FACTOR`, the `scale_factor` query parameter, `MAX_CONCURRENT_CONVERSIONS` and all `CHROMIUM_*` variables have no effect.
+- `/health` does not depend on Chromium. `/health?detailed=true` reports `chromium_running: false` and `svg_renderer: weasysvg`.
+- `/version` reports `chromium: null`, `svgRenderer: weasysvg` and the weasysvg version.
+- The HTML to PDF metrics keep counting. The SVG to PNG and Chromium metrics stay at zero.
+
+The image takes its default from the `SVG_RENDERER` build argument (`chromium`): `docker build --build-arg SVG_RENDERER=weasysvg ...`.
+
+**Note:** An invalid value falls back to the default (`chromium`) with a warning logged.
+
 ### Device Scaling
 
 Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.

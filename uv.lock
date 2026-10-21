@@ -1307,6 +1307,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "uvicorn" },
     { name = "weasyprint" },
+    { name = "weasysvg" },
 ]
 
 [package.dev-dependencies]
@@ -1344,6 +1345,7 @@ requires-dist = [
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "weasyprint", specifier = "==70.0" },
+    { name = "weasysvg", specifier = "==0.2.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1365,6 +1367,19 @@ test = [
     { name = "requests", specifier = "==2.34.2" },
     { name = "tox", specifier = "==4.67.1" },
     { name = "tox-uv", specifier = "==1.37.0" },
+]
+
+[[package]]
+name = "weasysvg"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fonttools" },
+    { name = "weasyprint" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/39/c8/87d65fdc994f11ff131dfbbf2a57ad97e7621990799e6b0367abdbfa1547/weasysvg-0.2.0.tar.gz", hash = "sha256:c7b3ddb7c6206f5d875467ec5fc6a18b952e1882138641997c81f6069d2668dd", size = 172155, upload-time = "2026-10-21T19:10:17.567Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/af/56/68f9e2f0f33c18b184083dbf8d21522bd31eb1284e7820c398fbf8a5abb1/weasysvg-0.2.0-py3-none-any.whl", hash = "sha256:0438571164ef82ea18f49997f246247f6faea5fdf9bf90047bbae3cf69f31aa2", size = 112912, upload-time = "2026-10-21T19:10:16.209Z" },
 ]
 
 [[package]]

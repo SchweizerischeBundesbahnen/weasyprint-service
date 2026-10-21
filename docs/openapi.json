@@ -237,6 +237,18 @@
                       "title": "Health Monitoring Enabled",
                       "type": "boolean"
                     },
+                    "svg_renderer": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Who draws SVG: chromium (PNG) or weasysvg (vector, no Chromium started)",
+                      "title": "SVG Renderer"
+                    },
                     "metrics": {
                       "$ref": "#/$defs/ChromiumMetricsSchema",
                       "description": "Performance and health metrics",
@@ -449,6 +461,18 @@
                       "description": "Whether background health monitoring is active",
                       "title": "Health Monitoring Enabled",
                       "type": "boolean"
+                    },
+                    "svg_renderer": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Who draws SVG: chromium (PNG) or weasysvg (vector, no Chromium started)",
+                      "title": "SVG Renderer"
                     },
                     "metrics": {
                       "$ref": "#/$defs/ChromiumMetricsSchema",
@@ -1014,6 +1038,30 @@
             ],
             "title": "Chromium",
             "description": "Chromium version"
+          },
+          "svgRenderer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "SVG Renderer",
+            "description": "Who draws SVG: chromium (PNG) or weasysvg (vector)"
+          },
+          "weasysvg": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "weasysvg",
+            "description": "weasysvg version, when it draws SVG"
           }
         },
         "type": "object",

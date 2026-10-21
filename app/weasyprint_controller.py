@@ -45,6 +45,7 @@ from app.prometheus_metrics import (
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
+from app.svg_renderer import CHROMIUM, WEASYSVG, configure_svg_renderer, get_weasysvg_version
 from app.vsdx_processor import VsdxProcessor
 from app.weasyprint_actual_text_patch import apply_actual_text_patch
 from app.weasyprint_running_width_patch import apply_running_width_patch
@@ -65,6 +66,15 @@ apply_actual_text_patch()
 # See app/weasyprint_tagging_patch.py.
 apply_tagging_patch()
 
+# SVG_RENDERER picks who draws the SVG of a document: chromium (default) or weasysvg.
+# weasysvg patches WeasyPrint for the process, so it is installed here, once. See app/svg_renderer.py.
+SVG_RENDERER = configure_svg_renderer()
+
+
+def uses_chromium() -> bool:
+    """Tell whether Chromium draws the SVG. With weasysvg the service starts no browser."""
+    return SVG_RENDERER == CHROMIUM
+
 
 @contextlib.asynccontextmanager
 async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
@@ -76,6 +86,7 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
 
     If Chromium fails to start, the application will not start and the
     service will terminate (fail-fast behavior for containerized environments).
+    With SVG_RENDERER=weasysvg, WeasyPrint draws the SVG and no browser is started.
 
     The metrics server is started on a dedicated port (default: 9180) for
     security isolation from the main application API.
@@ -83,9 +94,12 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
     chromium_manager = get_chromium_manager()
     lifespan_logger = logging.getLogger(__name__)
 
-    lifespan_logger.info("Prepare Chromium browser for SVG conversion...")
-    await chromium_manager.start()
-    lifespan_logger.info("Chromium browser prepared successfully")
+    if uses_chromium():
+        lifespan_logger.info("Prepare Chromium browser for SVG conversion...")
+        await chromium_manager.start()
+        lifespan_logger.info("Chromium browser prepared successfully")
+    else:
+        lifespan_logger.info("SVG renderer is weasysvg %s: SVG stays vector, Chromium is not started", get_weasysvg_version())
 
     # The renderings run in this pool, sized to the configured limit. A pool of its own,
     # rather than the default executor of the loop: that one is sized from the CPU count,
@@ -110,12 +124,13 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
         except Exception:
             lifespan_logger.exception("Error stopping metrics server")
 
-    try:
-        lifespan_logger.info("Stopping Chromium browser...")
-        await chromium_manager.stop()
-        lifespan_logger.info("Chromium browser stopped successfully")
-    except Exception:
-        lifespan_logger.exception("Error stopping Chromium browser")
+    if uses_chromium():
+        try:
+            lifespan_logger.info("Stopping Chromium browser...")
+            await chromium_manager.stop()
+            lifespan_logger.info("Chromium browser stopped successfully")
+        except Exception:
+            lifespan_logger.exception("Error stopping Chromium browser")
 
     # Drop the renderings which are still queued. One already under way keeps its thread:
     # a worker cannot be interrupted, and the process leaves once it returns.
@@ -264,23 +279,25 @@ async def health(
 
     Note: If Chromium is not healthy, the service should have failed to start.
     This endpoint primarily serves as a runtime health verification.
+    With SVG_RENDERER=weasysvg the service runs no browser, so Chromium does not decide the health.
     """
-    chromium_healthy = chromium_manager.health_check()
+    healthy = chromium_manager.health_check() if uses_chromium() else True
 
     if detailed:
         # Return detailed JSON response with metrics
         metrics_data = chromium_manager.get_metrics()
         health_response = HealthSchema(
-            status="healthy" if chromium_healthy else "unhealthy",
+            status="healthy" if healthy else "unhealthy",
             version=os.environ.get("WEASYPRINT_SERVICE_VERSION", "unknown"),
             weasyprint_version=weasyprint.__version__,
             chromium_running=chromium_manager.is_running(),
             chromium_version=chromium_manager.get_version(),
-            health_monitoring_enabled=chromium_manager.health_check_enabled,
+            health_monitoring_enabled=chromium_manager.health_check_enabled and uses_chromium(),
+            svg_renderer=SVG_RENDERER,
             metrics=ChromiumMetricsSchema(**metrics_data),  # type: ignore[arg-type]
         )
         # Return with appropriate status code
-        status_code = 200 if chromium_healthy else 503
+        status_code = 200 if healthy else 503
         return Response(
             content=health_response.model_dump_json(),
             media_type="application/json",
@@ -288,7 +305,7 @@ async def health(
         )
 
     # Return simple text response
-    if chromium_healthy:
+    if healthy:
         return Response("OK", media_type="text/plain", status_code=200)
     return Response("Service Unavailable", media_type="text/plain", status_code=503)
 
@@ -313,6 +330,8 @@ async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chrom
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),
         "timestamp": os.environ.get("WEASYPRINT_SERVICE_BUILD_TIMESTAMP"),
         "chromium": chromium_manager.get_version(),
+        "svgRenderer": SVG_RENDERER,
+        "weasysvg": get_weasysvg_version() if SVG_RENDERER == WEASYSVG else None,
     }
     logger.debug("Version info: %s", version_info)
     return version_info
@@ -543,9 +562,10 @@ async def __generate_pdf_from_parsed_html(
     notes_processor = NotesProcessor()
     notes = notes_processor.replace_notes(parsed_html)
 
-    # Use CDP-based async SVG processing
-    svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
-    parsed_html = await svg_processor.process_svg(parsed_html)
+    # Use CDP-based async SVG processing; with weasysvg, WeasyPrint draws the SVG itself
+    if uses_chromium():
+        svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
+        parsed_html = await svg_processor.process_svg(parsed_html)
 
     # Use LibreOffice-based async VSDX processing
     vsdx_processor = VsdxProcessor()

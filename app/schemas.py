@@ -12,6 +12,8 @@ class VersionSchema(BaseModel):
     weasyprintService: str | None = Field(title="WeasyPrint Service", description="Service version")  # noqa: N815
     timestamp: str | None = Field(title="Build Timestamp", description="Build timestamp")
     chromium: str | None = Field(title="Chromium", description="Chromium version")
+    svgRenderer: str | None = Field(default=None, title="SVG Renderer", description="Who draws SVG: chromium (PNG) or weasysvg (vector)")  # noqa: N815
+    weasysvg: str | None = Field(default=None, title="weasysvg", description="weasysvg version, when it draws SVG")
 
 
 class ChromiumMetricsSchema(BaseModel):
@@ -61,4 +63,5 @@ class HealthSchema(BaseModel):
     chromium_running: bool = Field(title="Chromium Running", description="Whether Chromium browser is running")
     chromium_version: str | None = Field(title="Chromium Version", description="Chromium version if available")
     health_monitoring_enabled: bool = Field(title="Health Monitoring Enabled", description="Whether background health monitoring is active")
+    svg_renderer: str | None = Field(default=None, title="SVG Renderer", description="Who draws SVG: chromium (PNG) or weasysvg (vector, no Chromium started)")
     metrics: ChromiumMetricsSchema = Field(title="Metrics", description="Performance and health metrics")

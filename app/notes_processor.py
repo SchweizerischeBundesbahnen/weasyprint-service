@@ -172,7 +172,13 @@ class NotesProcessor:
         annots_to_keep = []
         raw_annots = page[PDF_ANNOTS]
         # Type check: ensure annots_array is iterable
-        annots_array: list[PdfObject] = raw_annots if isinstance(raw_annots, list) else list(cast("Iterable[PdfObject]", raw_annots)) if hasattr(raw_annots, "__iter__") else []
+        annots_array: list[PdfObject]
+        if isinstance(raw_annots, list):
+            annots_array = raw_annots
+        elif hasattr(raw_annots, "__iter__"):
+            annots_array = list(cast("Iterable[PdfObject]", raw_annots))
+        else:
+            annots_array = []
 
         for annot in annots_array:
             annot_obj = cast("DictionaryObject", annot.get_object())

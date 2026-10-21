@@ -580,6 +580,11 @@ def _with_links_moved(add_tags: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+def _target(targets: dict[str, Any], name: str) -> Callable[..., Any]:
+    """The WeasyPrint callable found under *name*, which the caller has checked to be present."""
+    return cast("Callable[..., Any]", targets[name])
+
+
 def apply_tagging_patch() -> bool:
     """Monkey-patch WeasyPrint so links and images are tagged as PDF/UA requires.
 
@@ -603,9 +608,9 @@ def apply_tagging_patch() -> bool:
         logger.warning("WeasyPrint internals not found (%s); tagging patch skipped", ", ".join(missing))
         return False
 
-    add_tags = _with_links_moved(cast("Callable[..., Any]", targets["tags.add_tags"]))
-    setattr(stream_class, "marked", _with_decorative_artifacts(cast("Callable[..., Any]", targets["Stream.marked"])))  # noqa: B010 - a private method of WeasyPrint
-    setattr(weasyprint_tags, "_build_box_tree", _with_image_rules(cast("Callable[..., Any]", targets["tags._build_box_tree"])))  # noqa: B010 - a private function of WeasyPrint
+    add_tags = _with_links_moved(_target(targets, "tags.add_tags"))
+    setattr(stream_class, "marked", _with_decorative_artifacts(_target(targets, "Stream.marked")))  # noqa: B010 - a private method of WeasyPrint
+    setattr(weasyprint_tags, "_build_box_tree", _with_image_rules(_target(targets, "tags._build_box_tree")))  # noqa: B010 - a private function of WeasyPrint
     setattr(weasyprint_tags, "add_tags", add_tags)  # noqa: B010 - replaced in both modules which bind it
     setattr(weasyprint_pdf, "add_tags", add_tags)  # noqa: B010 - replaced in both modules which bind it
 

@@ -15,7 +15,7 @@ import math
 import os
 import re
 import xml.etree.ElementTree as ET
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from bs4 import BeautifulSoup, Tag
 
@@ -206,7 +206,7 @@ class SvgProcessor:
         if not own_width or not own_height:
             return None
         if width is None:
-            width = math.ceil(height * own_width / own_height)  # type: ignore[operator]
+            width = math.ceil(cast("float", height) * own_width / own_height)
         if height is None:
             height = math.ceil(width * own_height / own_width)
 

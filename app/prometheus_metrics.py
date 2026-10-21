@@ -182,7 +182,7 @@ def update_gauges_from_chromium_manager(chromium_manager: ChromiumManager) -> No
     try:
         metrics = chromium_manager.get_metrics()
 
-        # Update gauges only - convert to float to satisfy mypy type checking
+        # Update gauges only - convert to float to satisfy type checking
         pdf_generation_error_rate_percent.set(float(metrics["error_pdf_generation_rate_percent"]))
         svg_conversion_error_rate_percent.set(float(metrics["error_svg_conversion_rate_percent"]))
         uptime_seconds.set(float(metrics["uptime_seconds"]))

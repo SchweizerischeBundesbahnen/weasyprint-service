@@ -33,7 +33,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-import pydyf  # type: ignore[import-untyped]
+import pydyf
 
 if TYPE_CHECKING:
     from collections.abc import Callable

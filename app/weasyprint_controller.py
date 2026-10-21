@@ -11,10 +11,10 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Any, cast
 from urllib.parse import unquote
 
-import weasyprint  # type: ignore[import-untyped]
+import weasyprint
 from fastapi import Depends, FastAPI, Query, Request, Response
 
 if TYPE_CHECKING:
@@ -277,7 +277,7 @@ async def health(
             chromium_running=chromium_manager.is_running(),
             chromium_version=chromium_manager.get_version(),
             health_monitoring_enabled=chromium_manager.health_check_enabled,
-            metrics=ChromiumMetricsSchema(**metrics_data),  # type: ignore[arg-type]
+            metrics=ChromiumMetricsSchema(**cast("dict[str, Any]", metrics_data)),
         )
         # Return with appropriate status code
         status_code = 200 if chromium_healthy else 503

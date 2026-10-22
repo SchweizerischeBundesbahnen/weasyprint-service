@@ -1,5 +1,26 @@
 # Changelog
 
+## [70.0.6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.5...v70.0.6) (2026-10-22)
+
+
+### Features
+
+* **svg:** draw SVG with weasysvg by default ([#413](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/413)) ([136b336](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/136b3365dce35b87a51de34bf7cb4bbbe68f6471))
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.147.0 ([#401](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/401)) ([42fe6a4](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/42fe6a4b25ff28c2ff2b3df8ba836107995d74a8))
+* **deps:** update dependency fastapi to v0.148.0 ([e78d360](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/e78d360195add89e1be4a9b6061b4b769a89260d))
+* **deps:** update python to v3.15.0 ([#394](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/394)) ([217cc8a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/217cc8a7dd9461975f2603b693292516ded59396))
+* **deps:** update weasysvg to 0.3.1 ([#411](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/411)) ([fbb8cb8](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/fbb8cb875099fe1049dd0942c9efe99fb0bec44b))
+* **svg:** keep the alignment of a shortened SVG image ([#412](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/412)) ([ca90d8e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ca90d8e1db3f3be0416d453b09938b9d06eda484))
+
+
+### Miscellaneous Chores
+
+* release 70.0.6 ([#414](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/414)) ([061deab](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/061deab92abe57717a0afa91892a01d59ecdaa22))
+
 ## [70.0.5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.4...v70.0.5) (2026-10-22)
 
 

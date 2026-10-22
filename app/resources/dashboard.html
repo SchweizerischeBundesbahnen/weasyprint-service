@@ -604,7 +604,12 @@
                 document.getElementById('chromiumVersion').textContent = data.chromium_version || 'N/A';
 
                 // Update cards
-                document.getElementById('status').textContent = data.chromium_running ? 'Running' : 'Stopped';
+                // With SVG_RENDERER=weasysvg the service starts no Chromium
+                let chromiumStatus = data.chromium_running ? 'Running' : 'Stopped';
+                if (!data.chromium_running && data.svg_renderer === 'weasysvg') {
+                    chromiumStatus = 'Not used';
+                }
+                document.getElementById('status').textContent = chromiumStatus;
 
                 const metrics = data.metrics;
 

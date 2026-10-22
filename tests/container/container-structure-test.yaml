@@ -77,6 +77,11 @@ commandTests:
     command: python
     args: [-c, 'import subprocess, sys; sys.exit(subprocess.run([sys.base_prefix + "/bin/python3", "-I", "-c", "import pip"]).returncode == 0)']
     exitCode: 0
+# The default image keeps Chromium as the SVG renderer
+metadataTest:
+  envVars:
+    - key: SVG_RENDERER
+      value: chromium
 fileExistenceTests:
   - name: Log directory
     path: /opt/weasyprint/logs

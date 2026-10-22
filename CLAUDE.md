@@ -216,6 +216,11 @@ grype weasyprint-service:0.0.0
 - `FORM_MAX_FILES`: Maximum number of file uploads (default: 1000)
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)
 
+**SVG Renderer (see `app/svg_renderer.py`):**
+- `SVG_RENDERER`: who draws SVG. `chromium` (default) rasterizes it to PNG, as before. `weasysvg` lets WeasyPrint draw it natively through the weasysvg plugin, vector in the PDF. Case-insensitive; an invalid value falls back to `chromium` with a warning. The Dockerfile sets the default through `ARG SVG_RENDERER=chromium`.
+- The controller reads it once at import (`configure_svg_renderer()`). `weasysvg.install()` patches WeasyPrint for the whole process, so it runs only in weasysvg mode. `tests/conftest.py` removes `SVG_RENDERER` before any import, so the suite runs in the default mode in any environment. Tests switch modes by patching `weasyprint_controller.SVG_RENDERER`; a real conversion with weasysvg runs in a child process (`tests/test_svg_renderer.py`).
+- With `weasysvg` the lifespan does not start Chromium and `SvgProcessor` is never called. `DEVICE_SCALE_FACTOR`, the `scale_factor` parameter, `MAX_CONCURRENT_CONVERSIONS` and all `CHROMIUM_*` variables have no effect. `/health` is 200 without Chromium, `/health?detailed=true` adds `svg_renderer`, `/version` adds `svgRenderer` and `weasysvg`. HTML to PDF metrics keep counting through the unstarted `ChromiumManager`.
+
 **Chromium/SVG Processing:**
 - `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor via CDP (float, 1.0-10.0, default: 1.0)
 - `MAX_CONCURRENT_CONVERSIONS`: Max concurrent SVG conversions (1-100, default: 10)

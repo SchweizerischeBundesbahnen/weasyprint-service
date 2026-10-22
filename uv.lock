@@ -1171,7 +1171,7 @@ requires-dist = [
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "weasyprint", specifier = "==70.0" },
-    { name = "weasysvg", specifier = "==0.3.0" },
+    { name = "weasysvg", specifier = "==0.3.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -1197,15 +1197,15 @@ test = [
 
 [[package]]
 name = "weasysvg"
-version = "0.3.0"
+version = "0.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fonttools" },
     { name = "weasyprint" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/de/623c62492f8cfaf1b1e8bf267ecd4cec972ea8b913a3c5edf58f91f3ed46/weasysvg-0.3.0.tar.gz", hash = "sha256:b2fee14b7e1bb347deee6c1911d643372eb44b64bd58795f5b0aee0a099ac62e", size = 189699, upload-time = "2026-10-22T09:52:41.833Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/37/c2/a2a4826d92a61b720fdff9ce4033af406f9d6c5f6597ebbc51c8ba88d792/weasysvg-0.3.1.tar.gz", hash = "sha256:b1ec76998f9449fdcb9ad421e2f4e1c003b5ee830add0565632780691d7edcc3", size = 191608, upload-time = "2026-10-22T13:33:15.112Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/86/1f/338dbabbe0fbfea4385e6eacd61e4360c9f6f52f92fdcae3d57093b8c7f3/weasysvg-0.3.0-py3-none-any.whl", hash = "sha256:056ddbc9c6151254eff320b6e2457869794c6d892b07c5bb6841df6593726fef", size = 122681, upload-time = "2026-10-22T09:52:40.237Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/1c/f819d5a27bf6c169ad8a104296f533dcbf59d7ad2104fabe08dbfe663ae3/weasysvg-0.3.1-py3-none-any.whl", hash = "sha256:789e8f5c9a52964cab74216963c0da7302fe30729d0217f218ea9e5235049833", size = 123554, upload-time = "2026-10-22T13:33:13.644Z" },
 ]
 
 [[package]]

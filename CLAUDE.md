@@ -413,7 +413,7 @@ The repository uses extensive pre-commit hooks including:
 - Lock file: `uv.lock`
 - Renovate handles automated dependency updates
 - Renovate updates the Python version in `.tool-versions` through its `asdf` manager, which the shared preset enables.
-- Python 3.14 required
+- Python 3.15 required
 
 ### Docker Considerations
 - Multi-architecture support (amd64/arm64)
@@ -425,6 +425,7 @@ The repository uses extensive pre-commit hooks including:
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
 - Playwright Chromium browser installed via `playwright install --only-shell chromium`: the service launches the headless shell, the full browser (which alone needs libcups2 and libcairo2) is not in the image. No `--with-deps` either: that would add xvfb, an X server the headless service never uses. The libraries and fonts Playwright lists for Chromium are in the apt list of the Dockerfile; keep them in step when Playwright changes its list (`playwright install-deps --dry-run chromium` in a fresh `debian:trixie-slim` shows it)
+- Python and the venv are built in the `venv` stage of the Dockerfile, which has gcc: brotli has no wheel for Python 3.15 yet and builds from source. The final image copies `/opt/python` and `.venv` and has no compiler. Once brotli ships a cp315 wheel, the stage and its gcc can go.
 - pip is removed from the uv-installed Python in `/opt/python`, in the layer that installs it. Nothing in the image uses pip, and image scanners report the packages it vendors. The container structure test asserts it is absent.
 - Every `uv run` in the Dockerfile needs `--no-sync`: without it uv syncs the default groups again and puts the `dev` group (ruff, ty, pre-commit) into the image. The container structure test asserts they are absent.
 - **OCI labels**: Security metadata labels for container scanning tools

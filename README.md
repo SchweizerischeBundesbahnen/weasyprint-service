@@ -751,7 +751,7 @@ docker run --detach \
 
 The Docker image uses a multi-stage build with the following components:
 
-- **Base image**: `debian:trixie-slim` (same base as `python:3.14-slim`)
+- **Base image**: `debian:trixie-slim` (same base as `python:3.15-slim`)
 - **Python**: Installed via [uv](https://github.com/astral-sh/uv) from `.tool-versions` file
 - **Package manager**: uv for fast, reproducible dependency management
 - **Runtime user**: Non-root `appuser` (uid 1000)

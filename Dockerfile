@@ -1,7 +1,35 @@
 # Copy uv from official image (version matches .tool-versions)
 FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv-source
 
-# Use debian:trixie-slim as base (same base as python:3.14-slim)
+# Python and the virtual environment are built in a stage of their own, which has
+# a C compiler: a package without a wheel for this Python (brotli for 3.15)
+# builds from source here. The final image takes only the result.
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS venv
+COPY --from=uv-source /uv /usr/local/bin/uv
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get --yes --no-install-recommends install gcc libc6-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV WORKING_DIR="/opt/weasyprint"
+WORKDIR ${WORKING_DIR}
+
+# Copy Python version file and dependency files
+COPY .tool-versions pyproject.toml uv.lock ./
+
+# Install Python via uv to /opt/python (version from .tool-versions file).
+# pip comes with it, and nothing in the image uses it: uv installs the packages.
+# Removed here, so the scanners do not report the packages it vendors.
+ENV UV_PYTHON_INSTALL_DIR=/opt/python
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
+    uv python install "${PYTHON_VERSION}" && \
+    rm -rf /opt/python/*/lib/python3.*/site-packages/pip* /opt/python/*/lib/python3.*/ensurepip/_bundled /opt/python/*/bin/pip*
+
+# The venv links to the Python in /opt/python, so both keep their paths below
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Use debian:trixie-slim as base (same base as python:3.15-slim)
 FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
 
 # Copy uv binary from source stage
@@ -66,19 +94,16 @@ WORKDIR ${WORKING_DIR}
 # Copy Python version file and dependency files
 COPY .tool-versions pyproject.toml uv.lock ./
 
-# Install Python via uv to /opt/python (version from .tool-versions file).
-# pip comes with it, and nothing in the image uses it: uv installs the packages.
-# Removed in the same layer, so the scanners do not report the packages it vendors.
+# Python and the venv from the venv stage, without its compiler
 ENV UV_PYTHON_INSTALL_DIR=/opt/python
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
-    uv python install "${PYTHON_VERSION}" && \
-    rm -rf /opt/python/*/lib/python3.*/site-packages/pip* /opt/python/*/lib/python3.*/ensurepip/_bundled /opt/python/*/bin/pip*
+COPY --from=venv /opt/python /opt/python
+COPY --from=venv ${WORKING_DIR}/.venv ${WORKING_DIR}/.venv
 
 # Set Playwright browser path to a shared location (accessible by both root and appuser)
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
-# Install dependencies (as root - venv will be world-readable)
+# Install the browser (as root - it will be world-readable)
 # Playwright runs with --no-sync: a plain "uv run" syncs the default groups
 # again and would put the dev group (ruff, ty, pre-commit) into the image.
 # No --with-deps: it would add xvfb, an X server for headed browsers, while the
@@ -86,8 +111,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 # Chromium are installed with the system packages above.
 # --only-shell: the service launches the headless shell, the full browser is
 # never started and is the only one to need libcups2 and libcairo2.
-RUN uv sync --frozen --no-dev --no-install-project && \
-    uv run --no-sync playwright install --only-shell chromium
+RUN uv run --no-sync playwright install --only-shell chromium
 
 # Create build timestamp
 RUN BUILD_TIMESTAMP="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" && \

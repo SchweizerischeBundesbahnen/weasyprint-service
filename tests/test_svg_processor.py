@@ -397,16 +397,17 @@ def test_ensure_mandatory_attributes(svg_input):
         ('<img style="width: inherit;">', "width: inherit; image-resolution: 2dppx"),
         ('<img style="height: inherit;">', "height: inherit; image-resolution: 2dppx"),
         ('<img style="width: auto;">', "width: auto; image-resolution: 2dppx"),
-        # And where the document sizes it nowhere, the width of the SVG says the size, exactly
-        ("<img>", "width: 100px"),
-        ('<img style="color: red;">', "color: red; width: 100px"),
-        ('<img style="max-width: 650px;">', "max-width: 650px; width: 100px"),
+        # And where the document sizes it nowhere, the density too: no width, which would hold the box at the
+        # width of the SVG while a limit such as max-height shortens the drawing; #409
+        ("<img>", "image-resolution: 2dppx"),
+        ('<img style="color: red;">', "color: red; image-resolution: 2dppx"),
+        ('<img style="max-width: 650px;">', "max-width: 650px; image-resolution: 2dppx"),
         # A density of the document sizes nothing by itself, and the scale factor must not size it either
         ('<img style="image-resolution: 3dppx;">', "image-resolution: 3dppx; width: 100px"),
     ],
 )
 def test_apply_img_dimensions_from_svg(html, expected_style):
-    """The image comes out at the size of the SVG it replaced, however the document sizes it; #375."""
+    """The image comes out at the size of the SVG it replaced, however the document sizes it; #375, #409."""
     from bs4 import BeautifulSoup
 
     node = BeautifulSoup(html, "html.parser").find("img")
@@ -675,3 +676,37 @@ async def test_replace_svg_with_png_keeps_the_svg_without_a_browser_to_rasterize
 
     assert content_type == processor.IMAGE_SVG
     assert "<svg" in content
+
+
+@pytest.mark.parametrize(
+    "png_width,expected_style",
+    [
+        # The density the PNG has over the width of the SVG, so that width comes out exactly whatever the rounding
+        (313, "image-resolution: 3.13dppx"),
+        (200, "image-resolution: 2dppx"),
+        # A PNG of the size of its SVG needs none
+        (100, None),
+        # Without a PNG to read, the scale factor
+        (None, "image-resolution: 2dppx"),
+    ],
+)
+def test_apply_img_dimensions_says_the_density_the_png_has(png_width, expected_style):
+    """An image the document sizes nowhere gets no width, which a limit could not shorten with its drawing; #409."""
+    from bs4 import BeautifulSoup
+
+    node = BeautifulSoup('<img style="max-height: 50px;">', "html.parser").find("img")
+
+    SvgProcessor(device_scale_factor=2.0)._apply_img_dimensions_from_svg(node, det.fromstring('<svg width="100" height="200"></svg>'), png_width)
+
+    assert node.get("style") == ("max-height: 50px; " + expected_style if expected_style else "max-height: 50px;")
+    assert "width" not in node.attrs
+
+
+def test_png_width_reads_the_header():
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (313).to_bytes(4, "big") + (100).to_bytes(4, "big")
+
+    assert SvgProcessor._png_width(png) == 313
+    assert SvgProcessor._png_width(b"<svg/>") is None
+    assert SvgProcessor._png_width("<svg/>") is None
+    # The SVG a failed conversion falls back to, as a string, with text no single-byte charset holds
+    assert SvgProcessor._png_width("<svg><text>Preis 5 € — 价格</text></svg>") is None

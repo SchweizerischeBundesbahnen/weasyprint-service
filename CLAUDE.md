@@ -440,15 +440,15 @@ The repository uses extensive pre-commit hooks including:
 
 ### Request/Response Flow
 1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → WeasyPrint renders, drawing SVG through weasysvg (with `SVG_RENDERER=chromium`, SvgProcessor first converts SVG to PNG via CDP) → PDF returned
-2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → SvgProcessor converts SVG → WeasyPrint renders → PDF returned
-3. **SVG Processing via CDP**: SVG detected → SvgProcessor uses ChromiumManager (persistent Chromium instance) → CDP creates browser tab → Renders SVG → Screenshots as PNG → Tab closed → PNG embedded in PDF
-4. **Application Lifecycle**:
+2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → WeasyPrint renders, drawing SVG through weasysvg (with `SVG_RENDERER=chromium`, SvgProcessor first converts SVG to PNG) → PDF returned
+3. **SVG Processing via CDP** (`SVG_RENDERER=chromium` only): SVG detected → SvgProcessor uses ChromiumManager (persistent Chromium instance) → CDP creates browser tab → Renders SVG → Screenshots as PNG → Tab closed → PNG embedded in PDF
+4. **Application Lifecycle** (the browser parts with `SVG_RENDERER=chromium` only; the default weasysvg mode starts no browser and no health monitor):
    - FastAPI startup → ChromiumManager starts persistent Chromium browser
    - Background health monitor starts (if enabled) → Periodic health checks every 30s (configurable)
    - Handles all SVG conversions with automatic retry and metrics collection
    - Auto-restart on health degradation (3 consecutive failures)
    - FastAPI shutdown → Health monitor stops → Chromium stops gracefully
-5. **Shutdown on SIGTERM**: `docker stop` sends SIGTERM → `entrypoint.sh` runs the server via `exec`, so the signal reaches it → uvicorn stops accepting requests, waits up to `GRACEFUL_SHUTDOWN_TIMEOUT` → lifespan shutdown closes the metrics server and Chromium → last log line is `Service shutdown complete` → exit code 143 (uvicorn re-raises the signal), which is a normal stop
+5. **Shutdown on SIGTERM**: `docker stop` sends SIGTERM → `entrypoint.sh` runs the server via `exec`, so the signal reaches it → uvicorn stops accepting requests, waits up to `GRACEFUL_SHUTDOWN_TIMEOUT` → lifespan shutdown closes the metrics server and, in chromium mode, Chromium → last log line is `Service shutdown complete` → exit code 143 (uvicorn re-raises the signal), which is a normal stop
 
 ### Chromium Health Monitoring
 

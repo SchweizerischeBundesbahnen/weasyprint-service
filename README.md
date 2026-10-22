@@ -117,6 +117,8 @@ The image takes its default from the `SVG_RENDERER` build argument (`weasysvg`):
 
 ### Device Scaling
 
+> Only with `SVG_RENDERER=chromium`. The default `weasysvg` mode starts no browser, and this setting has no effect there.
+
 Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.
 
 **Valid range:** 1.0 - 10.0 (default: 1.0)
@@ -128,6 +130,7 @@ docker run --detach \
   --init \
   --publish 9080:9080 \
   --name weasyprint-service \
+  --env SVG_RENDERER=chromium \
   --env DEVICE_SCALE_FACTOR=2.0 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
@@ -135,6 +138,8 @@ docker run --detach \
 **Note:** Invalid values will fall back to default (1.0) with a warning logged.
 
 ### Concurrency Control
+
+> Only with `SVG_RENDERER=chromium`. The default `weasysvg` mode starts no browser, and this setting has no effect there.
 
 The service limits concurrent SVG to PNG conversions to prevent memory leaks and resource exhaustion.
 
@@ -147,6 +152,7 @@ docker run --detach \
   --init \
   --publish 9080:9080 \
   --name weasyprint-service \
+  --env SVG_RENDERER=chromium \
   --env MAX_CONCURRENT_CONVERSIONS=20 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
@@ -154,6 +160,8 @@ docker run --detach \
 **Note:** Invalid values will fall back to default (10) with a warning logged.
 
 ### Automatic Chromium Restart
+
+> Only with `SVG_RENDERER=chromium`. The default `weasysvg` mode starts no browser, and this setting has no effect there.
 
 The service can automatically restart the Chromium browser after a specified number of conversions to prevent memory accumulation and ensure long-term stability.
 
@@ -166,6 +174,7 @@ docker run --detach \
   --init \
   --publish 9080:9080 \
   --name weasyprint-service \
+  --env SVG_RENDERER=chromium \
   --env CHROMIUM_RESTART_AFTER_N_CONVERSIONS=1000 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
@@ -181,7 +190,9 @@ docker run --detach \
 
 ### Chromium Requirements and Recovery
 
-The service requires a persistent Chromium browser instance for SVG to PNG conversion.
+> Only with `SVG_RENDERER=chromium`. In the default `weasysvg` mode the service starts no browser, starts without one, and `/health` does not depend on it.
+
+In the `chromium` mode the service requires a persistent Chromium browser instance for SVG to PNG conversion.
 
 **Startup Behavior (Fail-Fast):**
 - The service will terminate if Chromium cannot be initialized during startup
@@ -202,6 +213,7 @@ docker run --detach \
   --init \
   --publish 9080:9080 \
   --name weasyprint-service \
+  --env SVG_RENDERER=chromium \
   --env CHROMIUM_MAX_CONVERSION_RETRIES=3 \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```

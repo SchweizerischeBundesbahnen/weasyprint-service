@@ -18,7 +18,7 @@ def test_static_files_serve_openapi_json():
         assert "application/json" in result.headers["content-type"]
         # Check it's valid JSON with expected OpenAPI structure
         json_data = result.json()
-        assert "openapi" in json_data
+        assert json_data["openapi"] == "3.1.0"
         assert "info" in json_data
         assert "paths" in json_data
 

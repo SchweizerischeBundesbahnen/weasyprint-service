@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
 from urllib.request import getproxies, proxy_bypass, url2pathname
 
-from weasyprint.urls import URLFetcher, URLFetcherResponse  # type: ignore[import-untyped]
+from weasyprint.urls import URLFetcher, URLFetcherResponse
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

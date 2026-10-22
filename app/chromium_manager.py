@@ -17,7 +17,7 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import psutil
 from playwright.async_api import ViewportSize, async_playwright
@@ -760,7 +760,7 @@ class ChromiumManager:
         page: Page | None = None
 
         try:
-            context = await self._browser.new_context(  # type: ignore[union-attr]
+            context = await cast("Browser", self._browser).new_context(
                 device_scale_factor=scale_factor,
                 viewport=ViewportSize(width=800, height=600),
             )

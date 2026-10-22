@@ -16,10 +16,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 from bs4 import BeautifulSoup, Tag
-from PIL import Image  # type: ignore[import-untyped]
-from pypdf import PdfReader, PdfWriter
+from PIL import Image
+from pypdf import PageObject, PdfReader, PdfWriter
 from pypdf.annotations import Text
 from pypdf.generic import (
     ArrayObject,
@@ -27,8 +28,12 @@ from pypdf.generic import (
     DictionaryObject,
     NameObject,
     NumberObject,
+    PdfObject,
     TextStringObject,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -157,21 +162,26 @@ class NotesProcessor:
         writer.write(output)
         return output.getvalue()
 
-    def _extract_note_annotations(self, page: object, note_map: dict[str, Note]) -> list[tuple[Note, tuple[float, float, float, float]]]:
+    def _extract_note_annotations(self, page: PageObject, note_map: dict[str, Note]) -> list[tuple[Note, tuple[float, float, float, float]]]:
         """Extract note annotations from page and remove fake links."""
         notes_to_create: list[tuple[Note, tuple[float, float, float, float]]] = []
 
-        if PDF_ANNOTS not in page:  # type: ignore[operator]
+        if PDF_ANNOTS not in page:
             return notes_to_create
 
         annots_to_keep = []
-        annots_array = page[PDF_ANNOTS]  # type: ignore[index]
+        raw_annots = page[PDF_ANNOTS]
         # Type check: ensure annots_array is iterable
-        if not isinstance(annots_array, list):
-            annots_array = list(annots_array) if hasattr(annots_array, "__iter__") else []  # type: ignore[assignment]
+        annots_array: list[PdfObject]
+        if isinstance(raw_annots, list):
+            annots_array = raw_annots
+        elif hasattr(raw_annots, "__iter__"):
+            annots_array = list(cast("Iterable[PdfObject]", raw_annots))
+        else:
+            annots_array = []
 
-        for annot in annots_array:  # type: ignore[attr-defined]
-            annot_obj = annot.get_object()
+        for annot in annots_array:
+            annot_obj = cast("DictionaryObject", annot.get_object())
             # Check if this is a sticky note link
             note_data = self._extract_note_from_annotation(annot_obj, note_map)
             if note_data:
@@ -183,19 +193,19 @@ class NotesProcessor:
 
         # Update annotations list with kept annotations
         if annots_to_keep:
-            page[NameObject(PDF_ANNOTS)] = ArrayObject(annots_to_keep)  # type: ignore[index]
+            page[NameObject(PDF_ANNOTS)] = ArrayObject(annots_to_keep)
         else:
-            del page[PDF_ANNOTS]  # type: ignore[attr-defined]
+            del page[PDF_ANNOTS]
 
         return notes_to_create
 
-    def _extract_note_from_annotation(self, annot_obj: object, note_map: dict[str, Note]) -> tuple[Note, tuple[float, float, float, float]] | None:
+    def _extract_note_from_annotation(self, annot_obj: DictionaryObject, note_map: dict[str, Note]) -> tuple[Note, tuple[float, float, float, float]] | None:
         """Extract note data from a link annotation if it's a sticky note link."""
-        if annot_obj.get(PDF_SUBTYPE) != "/Link" or "/A" not in annot_obj:  # type: ignore[attr-defined,operator]
+        if annot_obj.get(PDF_SUBTYPE) != "/Link" or "/A" not in annot_obj:
             return None
 
-        action = annot_obj["/A"]  # type: ignore[index]
-        if "/URI" not in action:  # type: ignore[operator]
+        action = cast("DictionaryObject", annot_obj["/A"])
+        if "/URI" not in action:
             return None
 
         uri = str(action["/URI"])
@@ -209,7 +219,7 @@ class NotesProcessor:
 
         # Store note and rect for later processing
         note = note_map[note_uuid]
-        rect = annot_obj["/Rect"]  # type: ignore[index]
+        rect = cast("ArrayObject", annot_obj["/Rect"])
         rect_tuple = (float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3]))
         return (note, rect_tuple)
 
@@ -226,7 +236,7 @@ class NotesProcessor:
         """
         try:
             # Load and process the PNG image
-            img = Image.open(png_path)  # type: ignore[assignment]
+            img = Image.open(png_path)
 
             # Convert to RGB if necessary (PDF XObjects require RGB or L)
             if img.mode == "RGBA":
@@ -236,9 +246,9 @@ class NotesProcessor:
                 channels = img.split()
                 alpha_mask = channels[3] if len(channels) == RGBA_CHANNEL_COUNT else None
                 background.paste(img, mask=alpha_mask)
-                img = background  # type: ignore[assignment]
+                img = background
             elif img.mode not in ("RGB", "L"):
-                img = img.convert("RGB")  # type: ignore[assignment]
+                img = img.convert("RGB")
 
             # Get image dimensions
             width, height = img.size
@@ -265,7 +275,7 @@ class NotesProcessor:
             # a public API for adding custom XObject streams. This is the standard
             # approach for advanced PDF manipulation with pypdf.
             # Pypdf exposes no public API for this.
-            return writer._add_object(xobject)  # type: ignore[attr-defined]  # noqa: SLF001
+            return writer._add_object(xobject)  # noqa: SLF001
 
         except Exception as e:
             logger.exception("Failed to embed PNG icon from %s: %s", png_path, e)
@@ -307,7 +317,7 @@ class NotesProcessor:
         # Note: Using private method _add_object() as pypdf 6.1.1 doesn't provide
         # a public API for adding custom appearance streams.
         # Pypdf exposes no public API for this.
-        appearance_ref = writer._add_object(appearance_stream)  # type: ignore[attr-defined]  # noqa: SLF001
+        appearance_ref = writer._add_object(appearance_stream)  # noqa: SLF001
 
         # Create the appearance dictionary
         appearance_dict = DictionaryObject()

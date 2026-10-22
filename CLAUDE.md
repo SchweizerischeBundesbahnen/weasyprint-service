@@ -50,7 +50,7 @@ uv run pytest tests/test_svg_processor.py::test_process_valid_svg -v
 # Manual linting/formatting (if needed outside of tox/pre-commit)
 uv run ruff format
 uv run ruff check --fix
-uv run mypy .
+uv run ty check
 
 # Generate/update OpenAPI schema (auto-runs in pre-commit)
 scripts/precommit_generate_openapi.sh
@@ -303,7 +303,7 @@ grype weasyprint-service:0.0.0
 - Trailing commas
 - Line breaks and blank lines
 
-**Type Checking** (handled by MyPy):
+**Type Checking** (handled by ty):
 - Type annotations and hints
 - Type compatibility
 - Return type correctness
@@ -369,7 +369,7 @@ grype weasyprint-service:0.0.0
 
 ### Code Quality Standards
 - **Python Standards**: Follows PEP 8, enforced via Ruff (replaces Black/Flake8)
-- **Type Checking**: MyPy with strict typing (`disallow_untyped_defs = true`)
+- **Type Checking**: ty (Astral); missing annotations are enforced by ruff `ANN` rules
 - **Line Length**: 240 characters (configured in pyproject.toml)
 - **Coverage Requirement**: 90% minimum test coverage
 - **Pre-commit Hooks**: Automatic formatting, linting, security checks, and OpenAPI generation
@@ -377,7 +377,7 @@ grype weasyprint-service:0.0.0
 ### Pre-commit Hook Integration
 The repository uses extensive pre-commit hooks including:
 - Ruff formatting and linting (automatically fixes issues)
-- MyPy type checking (strict mode)
+- ty type checking
 - OpenAPI schema auto-generation (`scripts/precommit_generate_openapi.sh`)
 - Security checks (gitleaks, sensitive data detection)
 - Docker security (hadolint for Dockerfile linting)
@@ -421,7 +421,7 @@ The repository uses extensive pre-commit hooks including:
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
 - Playwright Chromium browser installed via `playwright install --only-shell chromium`: the service launches the headless shell, the full browser (which alone needs libcups2 and libcairo2) is not in the image. No `--with-deps` either: that would add xvfb, an X server the headless service never uses. The libraries and fonts Playwright lists for Chromium are in the apt list of the Dockerfile; keep them in step when Playwright changes its list (`playwright install-deps --dry-run chromium` in a fresh `debian:trixie-slim` shows it)
 - pip is removed from the uv-installed Python in `/opt/python`, in the layer that installs it. Nothing in the image uses pip, and image scanners report the packages it vendors. The container structure test asserts it is absent.
-- Every `uv run` in the Dockerfile needs `--no-sync`: without it uv syncs the default groups again and puts the `dev` group (ruff, mypy, pre-commit) into the image. The container structure test asserts they are absent.
+- Every `uv run` in the Dockerfile needs `--no-sync`: without it uv syncs the default groups again and puts the `dev` group (ruff, ty, pre-commit) into the image. The container structure test asserts they are absent.
 - **OCI labels**: Security metadata labels for container scanning tools
 
 ### Security and Compliance
@@ -430,7 +430,7 @@ The repository uses extensive pre-commit hooks including:
 - Sensitive data leak prevention (URLs, ticket numbers, UE numbers)
 - No secrets or credentials should be committed
 - Vulnerability scanning via Grype
-- Static analysis via MyPy with strict typing
+- Static analysis via ty
 
 ### Request/Response Flow
 1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → SvgProcessor converts SVG to PNG via CDP → WeasyPrint renders → PDF returned

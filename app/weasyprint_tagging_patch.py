@@ -59,12 +59,12 @@ from __future__ import annotations
 import contextlib
 import importlib
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-import pydyf  # type: ignore[import-untyped]
+import pydyf
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Generator, Iterator
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ def _with_decorative_artifacts(marked: Callable[..., Any]) -> Callable[..., Any]
     """Wrap Stream.marked so a decorative image is drawn as an artifact, not as a Figure."""
 
     @contextlib.contextmanager
-    def wrapper(stream: Any, box: Any, tag: str) -> Iterator[None]:
+    def wrapper(stream: Any, box: Any, tag: str) -> Generator[None]:
         if tag == "Figure" and is_decorative(box):
             with stream.artifact():
                 yield
@@ -580,6 +580,11 @@ def _with_links_moved(add_tags: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+def _target(targets: dict[str, Any], name: str) -> Callable[..., Any]:
+    """The WeasyPrint callable found under *name*, which the caller has checked to be present."""
+    return cast("Callable[..., Any]", targets[name])
+
+
 def apply_tagging_patch() -> bool:
     """Monkey-patch WeasyPrint so links and images are tagged as PDF/UA requires.
 
@@ -603,9 +608,9 @@ def apply_tagging_patch() -> bool:
         logger.warning("WeasyPrint internals not found (%s); tagging patch skipped", ", ".join(missing))
         return False
 
-    add_tags = _with_links_moved(targets["tags.add_tags"])
-    setattr(stream_class, "marked", _with_decorative_artifacts(targets["Stream.marked"]))  # noqa: B010 - a private method of WeasyPrint
-    setattr(weasyprint_tags, "_build_box_tree", _with_image_rules(targets["tags._build_box_tree"]))  # noqa: B010 - a private function of WeasyPrint
+    add_tags = _with_links_moved(_target(targets, "tags.add_tags"))
+    setattr(stream_class, "marked", _with_decorative_artifacts(_target(targets, "Stream.marked")))  # noqa: B010 - a private method of WeasyPrint
+    setattr(weasyprint_tags, "_build_box_tree", _with_image_rules(_target(targets, "tags._build_box_tree")))  # noqa: B010 - a private function of WeasyPrint
     setattr(weasyprint_tags, "add_tags", add_tags)  # noqa: B010 - replaced in both modules which bind it
     setattr(weasyprint_pdf, "add_tags", add_tags)  # noqa: B010 - replaced in both modules which bind it
 

@@ -32,7 +32,7 @@ Repository = "https://github.com/SchweizerischeBundesbahnen/weasyprint-service"
 dev = [
     "pre-commit==4.7.0",
     "ruff==0.17.1",
-    "mypy==2.4.0",
+    "ty==0.0.89",
     "types-defusedxml==0.7.0.20260504",
     "types-psutil==7.2.2.20260906",
 ]
@@ -169,9 +169,14 @@ line-ending = "lf"
 # The format half. Changing this means changing flake8-quotes above in step.
 quote-style = "double"
 
-[tool.mypy]
-explicit_package_bases = true
-disallow_untyped_defs = true
-exclude = ["tests/.*", "examples/.*", "scripts/.*", "repro/.*"]
-install_types = true
-non_interactive = true
+[tool.ty.src]
+exclude = ["tests/", "examples/", "scripts/", "repro/"]
+
+[tool.ty.terminal]
+# Fail on warning-level diagnostics too, as mypy did, so the gate does not depend on the ty default.
+error-on-warning = true
+
+[tool.ty.rules]
+unused-ignore-comment = "error"  # mypy's warn_unused_ignores: a stale "# ty: ignore" fails the check
+
+# ty has no disallow_untyped_defs equivalent: missing annotations are enforced by ruff's ANN rules (select = ["ALL"]).

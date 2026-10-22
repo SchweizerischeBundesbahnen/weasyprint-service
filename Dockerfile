@@ -80,7 +80,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 # Install dependencies (as root - venv will be world-readable)
 # Playwright runs with --no-sync: a plain "uv run" syncs the default groups
-# again and would put the dev group (ruff, mypy, pre-commit) into the image.
+# again and would put the dev group (ruff, ty, pre-commit) into the image.
 # No --with-deps: it would add xvfb, an X server for headed browsers, while the
 # service runs Chromium headless. The libraries and fonts Playwright lists for
 # Chromium are installed with the system packages above.

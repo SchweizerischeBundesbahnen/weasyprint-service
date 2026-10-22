@@ -154,10 +154,10 @@ class SvgProcessor:
     @staticmethod
     def _png_width(content: str | bytes) -> int | None:
         """The width in pixels a PNG states in its header, or None for anything else."""
-        data = content.encode("latin-1") if isinstance(content, str) else content
-        if len(data) < PNG_HEADER_SIZE or not data.startswith(PNG_SIGNATURE):
+        # A PNG comes as bytes; a string is the SVG a failed conversion falls back to
+        if not isinstance(content, bytes) or len(content) < PNG_HEADER_SIZE or not content.startswith(PNG_SIGNATURE):
             return None
-        return int.from_bytes(data[16:20], "big")
+        return int.from_bytes(content[16:20], "big")
 
     def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element, png_width: int | None = None) -> None:
         """Best-effort: give the <img> the size of the SVG it replaced, in the way the document allows.

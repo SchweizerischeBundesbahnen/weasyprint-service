@@ -708,3 +708,5 @@ def test_png_width_reads_the_header():
     assert SvgProcessor._png_width(png) == 313
     assert SvgProcessor._png_width(b"<svg/>") is None
     assert SvgProcessor._png_width("<svg/>") is None
+    # The SVG a failed conversion falls back to, as a string, with text no single-byte charset holds
+    assert SvgProcessor._png_width("<svg><text>Preis 5 € — 价格</text></svg>") is None

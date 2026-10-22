@@ -141,7 +141,7 @@ grype weasyprint-service:0.0.0
 - **AttachmentManager** (`app/attachment_manager.py`): Handles multipart form data and file attachments for HTML conversion
 - **FormParser** (`app/form_parser.py`): Parses multipart/form-data with configurable limits via environment variables
 - **HtmlParser** (`app/html_parser.py`): Processes HTML content and handles embedded resources
-- **SvgProcessor** (`app/svg_processor.py`): Converts SVG to PNG via CDP (Chrome DevTools Protocol) with configurable device scaling (`DEVICE_SCALE_FACTOR` env var)
+- **SvgProcessor** (`app/svg_processor.py`, `SVG_RENDERER=chromium` only): Converts SVG to PNG via CDP (Chrome DevTools Protocol) with configurable device scaling (`DEVICE_SCALE_FACTOR` env var)
 - **ChromiumManager** (`app/chromium_manager.py`): Manages persistent Chromium browser instance for SVG to PNG conversion via CDP with proactive health monitoring
   - Background health monitoring: Periodic checks (configurable interval) to detect browser issues
   - Auto-restart on degraded health: Automatically restarts browser after 3 consecutive health check failures
@@ -217,8 +217,8 @@ grype weasyprint-service:0.0.0
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)
 
 **SVG Renderer (see `app/svg_renderer.py`):**
-- `SVG_RENDERER`: who draws SVG. `chromium` (default) rasterizes it to PNG, as before. `weasysvg` lets WeasyPrint draw it natively through the weasysvg plugin, vector in the PDF. Case-insensitive; an invalid value falls back to `chromium` with a warning. The Dockerfile sets the default through `ARG SVG_RENDERER=chromium`.
-- The controller reads it once at import (`configure_svg_renderer()`). `weasysvg.install()` patches WeasyPrint for the whole process, so it runs only in weasysvg mode. `tests/conftest.py` removes `SVG_RENDERER` before any import, so the suite runs in the default mode in any environment. Tests switch modes by patching `weasyprint_controller.SVG_RENDERER`; a real conversion with weasysvg runs in a child process (`tests/test_svg_renderer.py`).
+- `SVG_RENDERER`: who draws SVG. `weasysvg` (default) lets WeasyPrint draw it natively through the weasysvg plugin, vector in the PDF. `chromium` rasterizes it to PNG, the default of earlier versions, and stays as a fallback. Case-insensitive; an invalid value falls back to `weasysvg` with a warning. The Dockerfile sets the default through `ARG SVG_RENDERER=weasysvg`.
+- The controller reads it once at import (`configure_svg_renderer()`). `weasysvg.install()` patches WeasyPrint for the whole process, so it runs only in weasysvg mode. `tests/conftest.py` sets `SVG_RENDERER=chromium` before any import, so the suite runs in the chromium mode in any environment; the weasysvg tests switch the mode themselves. The container tests that check Chromium PNGs run the container with `SVG_RENDERER=chromium`; `tests/test_container_default_mode.py` checks the shipped default. Tests switch modes by patching `weasyprint_controller.SVG_RENDERER`; a real conversion with weasysvg runs in a child process (`tests/test_svg_renderer.py`).
 - With `weasysvg` the lifespan does not start Chromium and `SvgProcessor` is never called. `DEVICE_SCALE_FACTOR`, the `scale_factor` parameter, `MAX_CONCURRENT_CONVERSIONS` and all `CHROMIUM_*` variables have no effect. `/health` is 200 without Chromium, `/health?detailed=true` adds `svg_renderer`, `/version` adds `svgRenderer` and `weasysvg`. HTML to PDF metrics keep counting through the unstarted `ChromiumManager`.
 
 **Chromium/SVG Processing:**
@@ -439,7 +439,7 @@ The repository uses extensive pre-commit hooks including:
 - Static analysis via ty
 
 ### Request/Response Flow
-1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → SvgProcessor converts SVG to PNG via CDP → WeasyPrint renders → PDF returned
+1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → WeasyPrint renders, drawing SVG through weasysvg (with `SVG_RENDERER=chromium`, SvgProcessor first converts SVG to PNG via CDP) → PDF returned
 2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → SvgProcessor converts SVG → WeasyPrint renders → PDF returned
 3. **SVG Processing via CDP**: SVG detected → SvgProcessor uses ChromiumManager (persistent Chromium instance) → CDP creates browser tab → Renders SVG → Screenshots as PNG → Tab closed → PNG embedded in PDF
 4. **Application Lifecycle**:

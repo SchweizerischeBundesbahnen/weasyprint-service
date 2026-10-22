@@ -69,6 +69,8 @@ def weasyprint_container():
         ports={"9080": 9080},
         init=True,  # Enable Docker's init process (equivalent to tini)
         auto_remove=True,  # Ensure container is automatically removed after it stops
+        # These tests check the PNG Chromium makes of an SVG; test_container_default_mode covers the default
+        environment={"SVG_RENDERER": "chromium"},
         labels={"test-suite": "weasyprint-service"},
     )
 

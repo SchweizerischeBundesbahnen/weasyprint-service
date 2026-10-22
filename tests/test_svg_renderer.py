@@ -1,4 +1,4 @@
-"""Tests for the SVG_RENDERER switch: chromium (default) or weasysvg."""
+"""Tests for the SVG_RENDERER switch: weasysvg (default) or chromium."""
 
 import importlib.metadata
 import json
@@ -32,8 +32,8 @@ INLINE_SVG_HTML = '<html><body><p>Vector</p><svg width="120" height="80" viewBox
         ("WeasySVG", "weasysvg"),
         ("  weasysvg \n", "weasysvg"),
         (" CHROMIUM ", "chromium"),
-        ("", "chromium"),
-        ("   ", "chromium"),
+        ("", "weasysvg"),
+        ("   ", "weasysvg"),
     ],
 )
 def test_get_svg_renderer_reads_the_variable(value, expected):
@@ -41,25 +41,26 @@ def test_get_svg_renderer_reads_the_variable(value, expected):
         assert svg_renderer.get_svg_renderer() == expected
 
 
-def test_get_svg_renderer_defaults_to_chromium():
+def test_get_svg_renderer_defaults_to_weasysvg():
     with patch.dict(os.environ, {}, clear=False):
         os.environ.pop("SVG_RENDERER", None)
-        assert svg_renderer.get_svg_renderer() == "chromium"
+        assert svg_renderer.get_svg_renderer() == "weasysvg"
 
 
 def test_get_svg_renderer_rejects_an_unknown_value(caplog):
     with patch.dict(os.environ, {"SVG_RENDERER": "resvg"}), caplog.at_level("WARNING", logger="app.svg_renderer"):
-        assert svg_renderer.get_svg_renderer() == "chromium"
-    assert "Invalid SVG_RENDERER value 'resvg', using default: chromium" in caplog.text
+        assert svg_renderer.get_svg_renderer() == "weasysvg"
+    assert "Invalid SVG_RENDERER value 'resvg', using default: weasysvg" in caplog.text
 
 
-def test_configure_installs_weasysvg_once_in_weasysvg_mode():
-    with patch.dict(os.environ, {"SVG_RENDERER": "weasysvg"}), patch.object(svg_renderer.weasysvg, "install") as install:
+@pytest.mark.parametrize("value", ["weasysvg", "", "unknown"])
+def test_configure_installs_weasysvg_once_in_weasysvg_mode(value):
+    with patch.dict(os.environ, {"SVG_RENDERER": value}), patch.object(svg_renderer.weasysvg, "install") as install:
         assert svg_renderer.configure_svg_renderer() == "weasysvg"
     install.assert_called_once_with()
 
 
-@pytest.mark.parametrize("value", ["chromium", "", "unknown"])
+@pytest.mark.parametrize("value", ["chromium", " CHROMIUM "])
 def test_configure_never_installs_weasysvg_in_chromium_mode(value):
     with patch.dict(os.environ, {"SVG_RENDERER": value}), patch.object(svg_renderer.weasysvg, "install") as install:
         assert svg_renderer.configure_svg_renderer() == "chromium"

@@ -85,21 +85,25 @@ curl -X POST "http://localhost:9080/convert/html?full_fonts=true" \
 
 The `SVG_RENDERER` environment variable selects who draws the SVG of a document.
 
-**Valid values:** `chromium` (default), `weasysvg`. The value is case-insensitive.
+**Valid values:** `weasysvg` (default), `chromium`. The value is case-insensitive.
 
-- `chromium`: Chromium rasterizes each SVG to PNG, and the PNG goes into the PDF. This is the behavior of earlier versions.
 - `weasysvg`: WeasyPrint draws the SVG natively through the [weasysvg](https://github.com/grigoriev/weasysvg) plugin. The SVG stays vector in the PDF. The service does not start Chromium.
+- `chromium`: Chromium rasterizes each SVG to PNG, and the PNG goes into the PDF. This was the default of earlier versions, and stays available as a fallback.
 
-To let WeasyPrint draw the SVG:
+To go back to Chromium:
 
 ```bash
 docker run --detach \
   --init \
   --publish 9080:9080 \
   --name weasyprint-service \
-  --env SVG_RENDERER=weasysvg \
+  --env SVG_RENDERER=chromium \
   ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
+
+What changes against `chromium`:
+- An image without a width of its own keeps the place a browser gives it. In `chromium` mode of earlier versions, a shortened diagram stood centered in a box as wide as its SVG (#409).
+- Text in a diagram can be selected and searched, and the PDF is usually smaller.
 
 With `weasysvg`:
 - `DEVICE_SCALE_FACTOR`, the `scale_factor` query parameter, `MAX_CONCURRENT_CONVERSIONS` and all `CHROMIUM_*` variables have no effect.
@@ -107,9 +111,9 @@ With `weasysvg`:
 - `/version` reports `chromium: null`, `svgRenderer: weasysvg` and the weasysvg version.
 - The HTML to PDF metrics keep counting. The SVG to PNG and Chromium metrics stay at zero.
 
-The image takes its default from the `SVG_RENDERER` build argument (`chromium`): `docker build --build-arg SVG_RENDERER=weasysvg ...`.
+The image takes its default from the `SVG_RENDERER` build argument (`weasysvg`): `docker build --build-arg SVG_RENDERER=chromium ...`.
 
-**Note:** An invalid value falls back to the default (`chromium`) with a warning logged.
+**Note:** An invalid value falls back to the default (`weasysvg`) with a warning logged.
 
 ### Device Scaling
 

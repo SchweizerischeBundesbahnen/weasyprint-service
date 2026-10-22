@@ -68,6 +68,8 @@ def stopped_container():
         # health probe runs inside it. This keeps the test off a possibly busy host port.
         init=True,
         auto_remove=False,
+        # The chromium mode, which has a browser to close
+        environment={"SVG_RENDERER": "chromium"},
         labels={"test-suite": "weasyprint-service-shutdown"},
     )
     try:

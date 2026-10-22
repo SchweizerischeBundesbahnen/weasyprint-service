@@ -1,9 +1,9 @@
 """
 Selection of the SVG renderer.
 
-SVG_RENDERER picks who draws the SVG of a document. ``chromium`` (default) rasterizes it to PNG
-through the browser. ``weasysvg`` lets WeasyPrint draw it natively, so it stays vector in the PDF,
-and the service starts no browser.
+SVG_RENDERER picks who draws the SVG of a document. ``weasysvg`` (default) lets WeasyPrint draw it
+natively, so it stays vector in the PDF, and the service starts no browser. ``chromium`` rasterizes
+it to PNG through the browser, as the service did before.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import weasysvg
 CHROMIUM = "chromium"
 WEASYSVG = "weasysvg"
 SVG_RENDERERS = (CHROMIUM, WEASYSVG)
-DEFAULT_SVG_RENDERER = CHROMIUM
+DEFAULT_SVG_RENDERER = WEASYSVG
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ def get_svg_renderer() -> str:
 
     Returns:
         ``chromium`` or ``weasysvg``. The value is case-insensitive and may carry whitespace.
-        An unset, empty or unknown value falls back to ``chromium``.
+        An unset, empty or unknown value falls back to ``weasysvg``.
     """
     value = os.environ.get("SVG_RENDERER", DEFAULT_SVG_RENDERER).strip().lower()
     if not value:

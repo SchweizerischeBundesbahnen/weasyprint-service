@@ -66,7 +66,7 @@ apply_actual_text_patch()
 # See app/weasyprint_tagging_patch.py.
 apply_tagging_patch()
 
-# SVG_RENDERER picks who draws the SVG of a document: chromium (default) or weasysvg.
+# SVG_RENDERER picks who draws the SVG of a document: weasysvg (default) or chromium.
 # weasysvg patches WeasyPrint for the process, so it is installed here, once. See app/svg_renderer.py.
 SVG_RENDERER = configure_svg_renderer()
 

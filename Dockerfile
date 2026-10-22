@@ -147,7 +147,7 @@ RUN DICT_DIR="$(python -c 'import os, pyphen; print(os.path.dirname(str(pyphen.L
 RUN weasyprint --version
 
 # Who draws SVG by default: chromium (PNG through the browser) or weasysvg (vector, by WeasyPrint)
-ARG SVG_RENDERER=chromium
+ARG SVG_RENDERER=weasysvg
 ENV SVG_RENDERER=${SVG_RENDERER}
 
 # Switch to non-root user (numeric uid:gid of appuser, resolvable by any host)

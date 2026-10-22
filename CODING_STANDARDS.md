@@ -54,7 +54,7 @@ We recommend using the following linters to enforce coding standards and best pr
 
 3. [black](https://black.readthedocs.io/en/stable/) - Black is an opinionated code formatter for Python that automatically reformats your code to ensure consistent style adherence.
 
-4. [mypy](http://mypy-lang.org/) - Mypy is a static type checker for Python that helps detect and prevent type-related errors using optional static typing.
+4. [ty](https://docs.astral.sh/ty/) - ty is an extremely fast static type checker for Python from Astral that helps detect and prevent type-related errors.
 
 
 ## Docker Best Practices and Guidelines

@@ -68,7 +68,7 @@ This project uses [uv](https://github.com/astral-sh/uv) for fast and modern Pyth
    ```bash
    uv run ruff format
    uv run ruff check
-   uv run mypy .
+   uv run ty check
    ```
 
 ### <a id="design-decisions"></a>Design Decisions

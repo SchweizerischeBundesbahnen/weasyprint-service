@@ -1,5 +1,5 @@
 # Copy uv from official image (version matches .tool-versions)
-FROM ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421e930bfbdc563c00740466603f8723158e90297d07957c2294640262b AS uv-source
+FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv-source
 
 # Use debian:trixie-slim as base (same base as python:3.14-slim)
 FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
@@ -80,7 +80,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 
 # Install dependencies (as root - venv will be world-readable)
 # Playwright runs with --no-sync: a plain "uv run" syncs the default groups
-# again and would put the dev group (ruff, mypy, pre-commit) into the image.
+# again and would put the dev group (ruff, ty, pre-commit) into the image.
 # No --with-deps: it would add xvfb, an X server for headed browsers, while the
 # service runs Chromium headless. The libraries and fonts Playwright lists for
 # Chromium are installed with the system packages above.

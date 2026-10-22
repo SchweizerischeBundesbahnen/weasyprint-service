@@ -38,9 +38,9 @@ commandTests:
     command: uv
     args: [run, --no-sync, ruff, --version]
     exitCode: 2
-  - name: Mypy should not be installed
+  - name: ty should not be installed
     command: uv
-    args: [run, --no-sync, mypy, --version]
+    args: [run, --no-sync, ty, --version]
     exitCode: 2
   - name: Pre-commit should not be installed
     command: uv

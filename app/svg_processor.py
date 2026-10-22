@@ -28,6 +28,11 @@ if TYPE_CHECKING:  # used only for type hints
     from app.chromium_manager import ChromiumManager
 
 
+# A PNG starts with its signature and the IHDR chunk, whose width is the 4 bytes at offset 16
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+PNG_HEADER_SIZE = 24
+
+
 class SvgProcessor:
     """
     Class for processing SVG images in HTML and converting them to PNG via CDP.
@@ -136,8 +141,8 @@ class SvgProcessor:
             if replaced_content_base64 == content_base64:
                 continue
 
-            # Preserve original rendered size by setting explicit width on <img>
-            self._apply_img_dimensions_from_svg(node, svg)
+            # Preserve original rendered size: the density of the PNG on <img>
+            self._apply_img_dimensions_from_svg(node, svg, self._png_width(image_content))
 
             node["src"] = f"data:{image_type};base64,{replaced_content_base64}"
             converted_count += 1
@@ -146,15 +151,25 @@ class SvgProcessor:
             self.log.info("Converted %d SVG data URLs to PNG", converted_count)
         return parsed_html
 
-    def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element) -> None:
+    @staticmethod
+    def _png_width(content: str | bytes) -> int | None:
+        """The width in pixels a PNG states in its header, or None for anything else."""
+        data = content.encode("latin-1") if isinstance(content, str) else content
+        if len(data) < PNG_HEADER_SIZE or not data.startswith(PNG_SIGNATURE):
+            return None
+        return int.from_bytes(data[16:20], "big")
+
+    def _apply_img_dimensions_from_svg(self, node: Tag, svg: Element, png_width: int | None = None) -> None:
         """Best-effort: give the <img> the size of the SVG it replaced, in the way the document allows.
 
         The PNG carries the pixels of the SVG times the scale factor, so an image left to size itself
-        would come out that many times too large. Where the document sizes the image nowhere, the width
-        of the SVG says the size, exactly - said as a density it would leave the layout to follow the
-        scale factor, which is there for the detail of a raster rather than for the size of anything. Where it does - a width, a height, one of them inherited or
-        `auto` - the density of the PNG is said instead, so the size the document gives lands where it
-        would have with the SVG, and with the ratio the SVG has.
+        would come out that many times too large. The density of the PNG is said instead, so the PNG
+        has the size of the SVG as its own, and the document sizes it as it would have sized the SVG:
+        a width, a height, a limit such as max-height, with the ratio the SVG has. A width written
+        on an image the document sizes nowhere would hold its box at the width of the SVG while a limit
+        shortened the drawing, which object-fit then centered in that box, off the edge the column
+        aligns it to; #409. Where the document sizes it nowhere, the density is the one the PNG has over
+        the width of the SVG, so that width comes out exactly, whatever rounding the pixels took.
         """
         try:
             scale = self.device_scale_factor or 1.0
@@ -162,17 +177,22 @@ class SvgProcessor:
             style_val = self._get_attr_str(node, "style") or ""
             style_parts = [part.strip() for part in style_val.split(";") if part.strip()]
 
-            if "width" in declarations or "height" in declarations:
-                # A density the document gives is the one that counts, and it needs no help from this
-                if math.isclose(scale, 1.0) or "image-resolution" in declarations:
-                    return
-                style_parts.append(f"image-resolution: {scale:g}dppx")
-            else:
-                w, _, _ = self.extract_svg_dimensions_as_px(svg)
-                if not isinstance(w, int):
-                    return
+            sized = "width" in declarations or "height" in declarations
+            w, _, _ = self.extract_svg_dimensions_as_px(svg) if not sized else (None, None, None)
+            if not sized and not isinstance(w, int):
+                # Neither the document nor the SVG gives a size: there is nothing to say
+                return
+            if "image-resolution" in declarations and not sized:
+                # A density of the document sizes nothing by itself, and is not the one of the PNG: the width of
+                # the SVG says the size instead
                 node["width"] = f"{w}px"
                 style_parts.append(f"width: {w}px")
+            else:
+                # A density the document gives is the one that counts, and a PNG of the size of its SVG needs none
+                density = png_width / w if not sized and png_width and isinstance(w, int) and w > 0 else scale
+                if math.isclose(density, 1.0) or "image-resolution" in declarations:
+                    return
+                style_parts.append(f"image-resolution: {density:.8g}dppx")
 
             node["style"] = "; ".join(style_parts)
 

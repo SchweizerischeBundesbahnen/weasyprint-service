@@ -36,8 +36,7 @@ FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20b
 COPY --from=uv-source /uv /usr/local/bin/uv
 
 # Install dependencies
-ARG ENABLE_VSDX_SUPPORT=false
-# hadolint ignore=DL3008,SC2046
+# hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
@@ -67,11 +66,22 @@ RUN apt-get update && \
     libxkbcommon0 \
     libxrandr2 \
     procps \
-    xfonts-scalable \
-    $(if [ "$ENABLE_VSDX_SUPPORT" = "true" ]; then echo "libreoffice"; fi) && \
+    xfonts-scalable && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*
+
+# Optional VSDX support: LibreOffice converts VSDX drawings to PNG. The published image
+# leaves it out, as it adds about 730 MB and several hundred scan findings. Enable it with
+# --build-arg ENABLE_VSDX_SUPPORT=true (see "VSDX Support" in README.md).
+ARG ENABLE_VSDX_SUPPORT=false
+# hadolint ignore=DL3008
+RUN if [ "${ENABLE_VSDX_SUPPORT}" = "true" ]; then \
+        apt-get update && \
+        apt-get --yes --no-install-recommends install libreoffice && \
+        apt-get clean autoclean && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
 
 ARG APP_IMAGE_VERSION=0.0.0
 ENV WORKING_DIR="/opt/weasyprint" \

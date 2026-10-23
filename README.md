@@ -793,17 +793,21 @@ Replace 0.0.0 with the desired version number.
 
 #### VSDX Support
 
-To enable VSDX (Microsoft Visio) file conversion support, add the `ENABLE_VSDX_SUPPORT=true` build argument:
+The service converts VSDX (Microsoft Visio) images to PNG with LibreOffice. **The published image does not contain LibreOffice.** LibreOffice adds about 730 MB to the image and several hundred findings to vulnerability scans, so the image leaves it out.
+
+Without LibreOffice the service leaves VSDX images unchanged and logs a warning. WeasyPrint cannot draw VSDX, so these images are missing from the PDF.
+
+To convert VSDX images, build the image yourself with the `ENABLE_VSDX_SUPPORT=true` build argument:
 
 ```bash
 docker build \
   --build-arg APP_IMAGE_VERSION=0.0.0 \
   --build-arg ENABLE_VSDX_SUPPORT=true \
   --file Dockerfile \
-  --tag weasyprint-service:0.0.0 .
+  --tag weasyprint-service:0.0.0-vsdx .
 ```
 
-This installs LibreOffice (~200MB additional size) for VSDX to PNG conversion. Without this flag, VSDX images will remain unchanged in the output.
+With the first conversion the service logs `LibreOffice available: <version>` when VSDX conversion works, and `LibreOffice not available, skipping VSDX conversion` when it does not.
 
 ### Running the Development Container
 

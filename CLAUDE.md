@@ -422,6 +422,7 @@ The repository uses extensive pre-commit hooks including:
 - **Python via uv**: Python version installed from `.tool-versions` file (single source of truth)
 - **Base image**: `debian:trixie-slim` with uv for Python management
 - Includes fonts and Playwright Chromium for complete PDF rendering capabilities
+- LibreOffice (VSDX to PNG) is not in the published image: about 730 MB and several hundred scan findings. Its own `RUN` step installs it only with `--build-arg ENABLE_VSDX_SUPPORT=true`; keep it out of the main apt list. Without it the service leaves VSDX images unchanged, and they are missing from the PDF
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
 - Playwright Chromium browser installed via `playwright install --only-shell chromium`: the service launches the headless shell, the full browser (which alone needs libcups2 and libcairo2) is not in the image. No `--with-deps` either: that would add xvfb, an X server the headless service never uses. The libraries and fonts Playwright lists for Chromium are in the apt list of the Dockerfile; keep them in step when Playwright changes its list (`playwright install-deps --dry-run chromium` in a fresh `debian:trixie-slim` shows it)

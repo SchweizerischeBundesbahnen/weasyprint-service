@@ -581,6 +581,17 @@ def test_convert_html_with_unicode_symbols(test_parameters: TestParameters) -> N
         pytest.skip(str(e))
 
 
+def test_fonts_are_subset_with_harfbuzz(test_parameters: TestParameters) -> None:
+    """WeasyPrint subsets fonts with HarfBuzz; without libharfbuzz-subset0 it falls back to fontTools and warns."""
+    html = __load_test_html("tests/test-data/html-with-unicode-symbols.html")
+    response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
+    assert response.status_code == 200
+
+    logs = test_parameters.container.logs().decode("utf-8")
+    fallbacks = [line for line in logs.splitlines() if "Using fontTools instead of HarfBuzz-Subset" in line]
+    assert not fallbacks, f"WeasyPrint fell back to fontTools: {fallbacks[0]}"
+
+
 def test_convert_html_with_bad_font_succeeds_without_full_fonts(test_parameters: TestParameters) -> None:
     """Test that HTML with a font containing reserved OS/2 Unicode range bits subsets without full_fonts=true.
 

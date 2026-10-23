@@ -57,6 +57,7 @@ RUN apt-get update && \
     libgbm1 \
     libnspr4 \
     libnss3 \
+    libharfbuzz-subset0 \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     libxcomposite1 \

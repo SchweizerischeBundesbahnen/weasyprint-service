@@ -11,6 +11,7 @@ import logging
 import subprocess
 import time
 from collections.abc import Iterator
+from pathlib import Path
 
 import docker
 import pymupdf
@@ -19,12 +20,15 @@ import requests
 from docker.models.containers import Container
 from PIL import Image
 
-from tests.vsdx_fixture import FILL_RGB, rectangle_vsdx
-
 logger = logging.getLogger(__name__)
 
 IMAGE_TAG = "weasyprint_service_vsdx_test"
 CONTAINER_NAME = "weasyprint_service_vsdx_test"
+
+# A drawing of Apache POI, see tests/test-data/vsdx/README.md
+DRAWING = Path("tests/test-data/vsdx/apache-poi-test.vsdx")
+# The header bar of the drawing, the same in LibreOffice 25.2 and 26.8
+HEADER_RGB = (0x41, 0x71, 0x9C)
 
 
 def _wait_for_healthy(container: Container, max_wait: int = 120) -> None:
@@ -77,7 +81,7 @@ def vsdx_container() -> Iterator[tuple[Container, str]]:
 def test_vsdx_is_converted_to_an_image_of_the_drawing(vsdx_container: tuple[Container, str]) -> None:
     """The VSDX image arrives in the PDF as a picture of the drawing, drawn by LibreOffice."""
     container, base_url = vsdx_container
-    data_url = "data:application/vnd.ms-visio.drawing;base64," + base64.b64encode(rectangle_vsdx()).decode("ascii")
+    data_url = "data:application/vnd.ms-visio.drawing;base64," + base64.b64encode(DRAWING.read_bytes()).decode("ascii")
     html = f'<html><head><meta charset="utf-8"></head><body><img src="{data_url}"/></body></html>'
 
     response = requests.post(f"{base_url}/convert/html", data=html.encode("utf-8"), headers={"Content-Type": "text/html"}, timeout=120)
@@ -91,4 +95,4 @@ def test_vsdx_is_converted_to_an_image_of_the_drawing(vsdx_container: tuple[Cont
         images = [document.extract_image(xref) for page in document for xref, *_ in page.get_images(full=True)]
     assert len(images) == 1, f"Expected the drawing as one image, found {len(images)}"
     picture = Image.open(io.BytesIO(images[0]["image"])).convert("RGB")
-    assert FILL_RGB in {color for _, color in picture.getcolors(maxcolors=picture.width * picture.height)}, "The rectangle of the drawing is missing"
+    assert HEADER_RGB in {color for _, color in picture.getcolors(maxcolors=picture.width * picture.height)}, "The header bar of the drawing is missing"

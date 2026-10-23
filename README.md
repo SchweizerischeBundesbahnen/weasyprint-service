@@ -804,7 +804,7 @@ docker build \
   --build-arg APP_IMAGE_VERSION=0.0.0 \
   --build-arg ENABLE_VSDX_SUPPORT=true \
   --file Dockerfile \
-  --tag weasyprint-service:0.0.0-vsdx .
+  --tag weasyprint-service:0.0.0 .
 ```
 
 With the first conversion the service logs `LibreOffice available: <version>` when VSDX conversion works, and `LibreOffice not available, skipping VSDX conversion` when it does not.

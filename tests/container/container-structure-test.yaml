@@ -56,6 +56,11 @@ commandTests:
     command: sh
     args: [-c, '! command -v Xvfb']
     exitCode: 0
+  # Every package installs from a wheel, the image needs no compiler
+  - name: A C compiler should not be installed
+    command: sh
+    args: [-c, '! command -v gcc && ! command -v cc']
+    exitCode: 0
   - name: Log directory exists
     command: test
     args: [-d, /opt/weasyprint/logs]

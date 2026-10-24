@@ -89,9 +89,18 @@ commandTests:
     command: sh
     args: [-c, 'fc-list Selawik | grep -q . && fc-list Carlito | grep -q . && fc-list Caladea | grep -q .']
     exitCode: 0
-  - name: The licenses of the fonts of Visio drawings travel with them
+  - name: The license of Selawik travels with it
     command: sh
-    args: [-c, 'grep -q "SIL OPEN FONT LICENSE" /usr/local/share/fonts/selawik/LICENSE.txt && test -s /usr/share/doc/fonts-crosextra-carlito/copyright && test -s /usr/share/doc/fonts-crosextra-caladea/copyright']
+    args: [-c, 'grep -q "SIL OPEN FONT LICENSE" /usr/local/share/fonts/selawik/LICENSE.txt']
+    exitCode: 0
+  # The slim image drops the documentation of packages, but keeps their copyright files
+  - name: Every font package keeps its license
+    command: sh
+    args: [-c, 'for package in $(dpkg-query --show --showformat="\${Package}\n" "fonts-*"); do test -s "/usr/share/doc/$package/copyright" || { echo "$package has no copyright file"; exit 1; }; done']
+    exitCode: 0
+  - name: Noto draws the scripts beyond CJK, Symbola the symbols of Word documents
+    command: sh
+    args: [-c, 'fc-list "Noto Sans Arabic" | grep -q . && fc-list "Noto Sans Devanagari" | grep -q . && fc-list Symbola | grep -q .']
     exitCode: 0
 # The default image draws SVG with weasysvg; Chromium stays in it for SVG_RENDERER=chromium
 metadataTest:

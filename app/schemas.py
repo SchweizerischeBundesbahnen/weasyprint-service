@@ -14,6 +14,8 @@ class VersionSchema(BaseModel):
     chromium: str | None = Field(title="Chromium", description="Chromium version")
     svgRenderer: str | None = Field(default=None, title="SVG Renderer", description="Who draws SVG: chromium (PNG) or weasysvg (vector)")  # noqa: N815
     weasysvg: str | None = Field(default=None, title="weasysvg", description="weasysvg version, when it draws SVG")
+    weasyvsdx: str | None = Field(default=None, title="weasyvsdx", description="weasyvsdx version, when it draws Visio drawings")
+    libvisio: str | None = Field(default=None, title="libvisio", description="libvisio version weasyvsdx runs, when it finds vsd2xhtml")
 
 
 class ChromiumMetricsSchema(BaseModel):

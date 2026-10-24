@@ -461,6 +461,15 @@ wheels = [
 ]
 
 [[package]]
+name = "olefile"
+version = "0.47"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/69/1b/077b508e3e500e1629d366249c3ccb32f95e50258b231705c09e3c7a4366/olefile-0.47.zip", hash = "sha256:599383381a0bf3dfbd932ca0ca6515acd174ed48870cbf7fee123d698c192c1c", size = 112240, upload-time = "2023-12-01T16:22:53.025Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/17/d3/b64c356a907242d719fc668b71befd73324e47ab46c8ebbbede252c154b2/olefile-0.47-py2.py3-none-any.whl", hash = "sha256:543c7da2a7adadf21214938bb79c83ea12b473a4b6ee4ad4bf854e7715e13d1f", size = 114565, upload-time = "2023-12-01T16:22:51.518Z" },
+]
+
+[[package]]
 name = "opentelemetry-api"
 version = "1.45.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1134,6 +1143,7 @@ dependencies = [
     { name = "uvicorn" },
     { name = "weasyprint" },
     { name = "weasysvg" },
+    { name = "weasyvsdx" },
 ]
 
 [package.dev-dependencies]
@@ -1172,6 +1182,7 @@ requires-dist = [
     { name = "uvicorn", specifier = "==0.54.0" },
     { name = "weasyprint", specifier = "==70.0" },
     { name = "weasysvg", specifier = "==0.3.1" },
+    { name = "weasyvsdx", specifier = "==0.2.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1206,6 +1217,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/37/c2/a2a4826d92a61b720fdff9ce4033af406f9d6c5f6597ebbc51c8ba88d792/weasysvg-0.3.1.tar.gz", hash = "sha256:b1ec76998f9449fdcb9ad421e2f4e1c003b5ee830add0565632780691d7edcc3", size = 191608, upload-time = "2026-10-22T13:33:15.112Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/1b/1c/f819d5a27bf6c169ad8a104296f533dcbf59d7ad2104fabe08dbfe663ae3/weasysvg-0.3.1-py3-none-any.whl", hash = "sha256:789e8f5c9a52964cab74216963c0da7302fe30729d0217f218ea9e5235049833", size = 123554, upload-time = "2026-10-22T13:33:13.644Z" },
+]
+
+[[package]]
+name = "weasyvsdx"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "olefile" },
+    { name = "weasyprint" },
+    { name = "weasysvg" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f8/27/da78da56e6bc47fad450efb2c2823829cc52083b6b35ea201dac6a241392/weasyvsdx-0.2.0.tar.gz", hash = "sha256:82d508701f83c72a8aa298d041a966b15e95f9c118ec30858d77f3196dfb3bdf", size = 83255, upload-time = "2026-10-24T19:21:10.398Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/98/bb0bfa49938ce743bd1c651eb1b313484bffb58f9a5d06215f778247cf8d/weasyvsdx-0.2.0-py3-none-any.whl", hash = "sha256:e10cf2ce1741e5341b1e262f9898fa76036a82d8436b3393e7e1806bacd0fbb0", size = 60014, upload-time = "2026-10-24T19:21:08.796Z" },
 ]
 
 [[package]]

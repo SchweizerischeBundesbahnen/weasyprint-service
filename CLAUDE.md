@@ -141,6 +141,7 @@ grype weasyprint-service:0.0.0
 - **AttachmentManager** (`app/attachment_manager.py`): Handles multipart form data and file attachments for HTML conversion
 - **FormParser** (`app/form_parser.py`): Parses multipart/form-data with configurable limits via environment variables
 - **HtmlParser** (`app/html_parser.py`): Processes HTML content and handles embedded resources
+- **Visio drawings** (`app/vsdx_renderer.py`): weasyvsdx draws VSDX and VSD natively in WeasyPrint, as vector; `/version` adds `weasyvsdx` and `libvisio`
 - **SvgProcessor** (`app/svg_processor.py`, `SVG_RENDERER=chromium` only): Converts SVG to PNG via CDP (Chrome DevTools Protocol) with configurable device scaling (`DEVICE_SCALE_FACTOR` env var)
 - **ChromiumManager** (`app/chromium_manager.py`): Manages persistent Chromium browser instance for SVG to PNG conversion via CDP with proactive health monitoring
   - Background health monitoring: Periodic checks (configurable interval) to detect browser issues
@@ -423,7 +424,7 @@ The repository uses extensive pre-commit hooks including:
 - **Base image**: `debian:trixie-slim` with uv for Python management
 - Includes fonts and Playwright Chromium for complete PDF rendering capabilities
 - `libharfbuzz-subset0` lets WeasyPrint subset fonts with HarfBuzz. Without it WeasyPrint falls back to fontTools, warns once per font, and renders small documents about 40% slower. `test_fonts_are_subset_with_harfbuzz` asserts it
-- LibreOffice (VSDX to PNG) is not in the published image: about 730 MB and several hundred scan findings. Its own `RUN` step installs it only with `--build-arg ENABLE_VSDX_SUPPORT=true`; keep it out of the main apt list. Without it the service leaves VSDX images unchanged, and they are missing from the PDF
+- Visio drawings: weasyvsdx draws VSDX and VSD as vector through `vsd2xhtml` of libvisio (`app/vsdx_renderer.py`, installed at import of the controller). libvisio-tools is 0.1.11 from Debian testing, pinned at priority 100 and added only after the packages of trixie are installed: added before, its providers make virtual packages such as `libasound2` ambiguous. The Dockerfile checks `vsd2xhtml --version`. `emf2svg`, Carlito, Caladea and Selawik (from its GitHub release, by checksum) serve the drawings. With `SVG_RENDERER=chromium` only the `foreign_object` feature of weasysvg is installed, which weasyvsdx needs for text. Without `vsd2xhtml` nothing is patched and Visio images are left out. LibreOffice is gone
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
 - Playwright Chromium browser installed via `playwright install --only-shell chromium`: the service launches the headless shell, the full browser (which alone needs libcups2 and libcairo2) is not in the image. No `--with-deps` either: that would add xvfb, an X server the headless service never uses. The libraries and fonts Playwright lists for Chromium are in the apt list of the Dockerfile; keep them in step when Playwright changes its list (`playwright install-deps --dry-run chromium` in a fresh `debian:trixie-slim` shows it)

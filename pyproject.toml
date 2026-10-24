@@ -23,6 +23,7 @@ dependencies = [
     "pypdf==6.21.2",
     "prometheus-fastapi-instrumentator==8.1.0",
     "weasysvg==0.3.1",
+    "weasyvsdx==0.2.0",
 ]
 
 [project.urls]

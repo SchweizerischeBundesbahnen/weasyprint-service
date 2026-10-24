@@ -46,7 +46,7 @@ from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
 from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
 from app.svg_processor import SvgProcessor
 from app.svg_renderer import CHROMIUM, WEASYSVG, configure_svg_renderer, get_weasysvg_version
-from app.vsdx_processor import VsdxProcessor
+from app.vsdx_renderer import configure_vsdx, get_libvisio_version, get_weasyvsdx_version
 from app.weasyprint_actual_text_patch import apply_actual_text_patch
 from app.weasyprint_running_width_patch import apply_running_width_patch
 from app.weasyprint_tagging_patch import apply_tagging_patch
@@ -69,6 +69,10 @@ apply_tagging_patch()
 # SVG_RENDERER picks who draws the SVG of a document: weasysvg (default) or chromium.
 # weasysvg patches WeasyPrint for the process, so it is installed here, once. See app/svg_renderer.py.
 SVG_RENDERER = configure_svg_renderer()
+
+# weasyvsdx draws the Visio drawings of a document. It patches WeasyPrint for the process, so it is
+# installed here, once. See app/vsdx_renderer.py.
+VSDX = configure_vsdx(SVG_RENDERER)
 
 
 def uses_chromium() -> bool:
@@ -331,6 +335,8 @@ async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chrom
         "chromium": chromium_manager.get_version(),
         "svgRenderer": SVG_RENDERER,
         "weasysvg": get_weasysvg_version() if SVG_RENDERER == WEASYSVG else None,
+        "weasyvsdx": get_weasyvsdx_version() if VSDX else None,
+        "libvisio": get_libvisio_version() if VSDX else None,
     }
     logger.debug("Version info: %s", version_info)
     return version_info
@@ -565,10 +571,6 @@ async def __generate_pdf_from_parsed_html(
     if uses_chromium():
         svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
         parsed_html = await svg_processor.process_svg(parsed_html)
-
-    # Use LibreOffice-based async VSDX processing
-    vsdx_processor = VsdxProcessor()
-    parsed_html = await vsdx_processor.process_vsdx(parsed_html)
 
     processed_html = html_parser.serialize(parsed_html)
 

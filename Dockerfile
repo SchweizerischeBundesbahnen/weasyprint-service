@@ -36,10 +36,16 @@ FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20b
 COPY --from=uv-source /uv /usr/local/bin/uv
 
 # Install dependencies
+# libvisio-tools and emf2svg let weasyvsdx draw Visio drawings, Carlito and Caladea replace the Calibri and
+# Cambria they ask for. libvisio-tools is 0.1.11 of Debian testing: trixie has 0.1.7, which lacks its fixes
+# of memory safety. Testing is added after the packages of trixie, and its pin keeps it to libvisio-tools.
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
+    emf2svg \
+    fonts-crosextra-caladea \
+    fonts-crosextra-carlito \
     fonts-dejavu \
     fonts-freefont-ttf \
     fonts-ipafont-gothic \
@@ -67,21 +73,14 @@ RUN apt-get update && \
     libxrandr2 \
     procps \
     xfonts-scalable && \
+    echo 'deb http://deb.debian.org/debian testing main' > /etc/apt/sources.list.d/testing.list && \
+    printf 'Package: *\nPin: release a=testing\nPin-Priority: 100\n' > /etc/apt/preferences.d/testing && \
+    apt-get update && \
+    apt-get --yes --no-install-recommends --target-release testing install libvisio-tools && \
+    test "$(vsd2xhtml --version)" = "vsd2xhtml 0.1.11" && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*
-
-# Optional VSDX support: LibreOffice converts VSDX drawings to PNG. The published image
-# leaves it out, as it adds about 730 MB and several hundred scan findings. Enable it with
-# --build-arg ENABLE_VSDX_SUPPORT=true (see "VSDX Support" in README.md).
-ARG ENABLE_VSDX_SUPPORT=false
-# hadolint ignore=DL3008
-RUN if [ "${ENABLE_VSDX_SUPPORT}" = "true" ]; then \
-        apt-get update && \
-        apt-get --yes --no-install-recommends install libreoffice && \
-        apt-get clean autoclean && \
-        rm -rf /var/lib/apt/lists/*; \
-    fi
 
 ARG APP_IMAGE_VERSION=0.0.0
 ENV WORKING_DIR="/opt/weasyprint" \
@@ -156,6 +155,15 @@ RUN DICT_DIR="$(python -c 'import os, pyphen; print(os.path.dirname(str(pyphen.L
 
 # Verify WeasyPrint is installed and working
 RUN weasyprint --version
+
+# Selawik, the open fallback Microsoft made for Segoe UI, which Visio drawings ask for. Debian has no
+# package of it: the release of microsoft/Selawik, checked by its SHA-256.
+ADD --checksum=sha256:3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423 \
+    https://github.com/microsoft/Selawik/releases/download/1.01/Selawik_Release.zip /tmp/selawik.zip
+RUN python -c "import zipfile; zipfile.ZipFile('/tmp/selawik.zip').extractall('/usr/local/share/fonts/selawik')" && \
+    rm /tmp/selawik.zip && \
+    fc-cache --force && \
+    test -n "$(fc-list Selawik)" && test -n "$(fc-list Carlito)"
 
 # Who draws SVG by default: chromium (PNG through the browser) or weasysvg (vector, by WeasyPrint)
 ARG SVG_RENDERER=weasysvg

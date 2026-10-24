@@ -89,6 +89,24 @@ commandTests:
     command: sh
     args: [-c, 'fc-list Selawik | grep -q . && fc-list Carlito | grep -q . && fc-list Caladea | grep -q .']
     exitCode: 0
+  - name: The license of Selawik travels with it
+    command: sh
+    args: [-c, 'grep -q "SIL OPEN FONT LICENSE" /usr/local/share/fonts/selawik/LICENSE.txt']
+    exitCode: 0
+  # The slim image drops the documentation of packages, but keeps their copyright files
+  - name: Every font package keeps its license
+    command: sh
+    args: [-c, 'for package in $(dpkg-query --show --showformat="\${Package}\n" "fonts-*"); do test -s "/usr/share/doc/$package/copyright" || { echo "$package has no copyright file"; exit 1; }; done']
+    exitCode: 0
+  - name: Symbola draws the symbols of Word documents
+    command: sh
+    args: [-c, 'fc-list Symbola | grep -q .']
+    exitCode: 0
+  # The generic families stay on DejaVu: a document which names no installed font keeps its line breaks
+  - name: The generic families are DejaVu
+    command: sh
+    args: [-c, 'fc-match serif | grep -q "DejaVu Serif" && fc-match sans-serif | grep -q "DejaVu Sans"']
+    exitCode: 0
 # The default image draws SVG with weasysvg; Chromium stays in it for SVG_RENDERER=chromium
 metadataTest:
   envVars:

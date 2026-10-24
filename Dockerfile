@@ -78,12 +78,13 @@ COPY .tool-versions pyproject.toml uv.lock ./
 ENV UV_PYTHON_INSTALL_DIR=/opt/python
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN PYTHON_VERSION=$(awk '/^python / {print $2}' .tool-versions) && \
-    uv python install "${PYTHON_VERSION}" && \
+    uv python install --no-cache "${PYTHON_VERSION}" && \
     rm -rf /opt/python/*/lib/python3.*/site-packages/pip* /opt/python/*/lib/python3.*/ensurepip/_bundled /opt/python/*/bin/pip*
 
 # The image has no compiler, so every package installs from a wheel: --no-build
-# fails the build on a package without one for this Python.
-RUN uv sync --frozen --no-dev --no-install-project --no-build
+# fails the build on a package without one for this Python. --no-cache keeps the
+# downloads out of the image, the venv holds what runs.
+RUN uv sync --frozen --no-dev --no-install-project --no-build --no-cache
 
 # Set Playwright browser path to a shared location (accessible by both root and appuser)
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright

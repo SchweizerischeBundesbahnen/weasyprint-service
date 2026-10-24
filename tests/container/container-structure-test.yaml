@@ -89,6 +89,10 @@ commandTests:
     command: sh
     args: [-c, 'fc-list Selawik | grep -q . && fc-list Carlito | grep -q . && fc-list Caladea | grep -q .']
     exitCode: 0
+  - name: The licenses of the fonts of Visio drawings travel with them
+    command: sh
+    args: [-c, 'grep -q "SIL OPEN FONT LICENSE" /usr/local/share/fonts/selawik/LICENSE.txt && test -s /usr/share/doc/fonts-crosextra-carlito/copyright && test -s /usr/share/doc/fonts-crosextra-caladea/copyright']
+    exitCode: 0
 # The default image draws SVG with weasysvg; Chromium stays in it for SVG_RENDERER=chromium
 metadataTest:
   envVars:

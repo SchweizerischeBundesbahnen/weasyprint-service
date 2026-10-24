@@ -38,8 +38,8 @@ COPY --from=uv-source /uv /usr/local/bin/uv
 # Install dependencies
 # libvisio-tools and emf2svg let weasyvsdx draw Visio drawings, Carlito and Caladea replace the Calibri and
 # Cambria they ask for. weasyvsdx is tested with libvisio 0.1.7 of trixie; the build checks the release.
-# Noto covers the scripts beyond Latin, Greek, Cyrillic and CJK; Symbola the symbols Word documents take from
-# Wingdings and Symbol. Each font package keeps its license in /usr/share/doc/<package>/copyright.
+# Symbola draws the symbols Word documents take from Wingdings and Symbol. Each font package keeps its license
+# in /usr/share/doc/<package>/copyright.
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -54,7 +54,6 @@ RUN apt-get update && \
     fonts-noto-cjk \
     fonts-noto-cjk-extra \
     fonts-noto-color-emoji \
-    fonts-noto-core \
     fonts-symbola \
     fonts-tlwg-loma-otf \
     fonts-unifont \

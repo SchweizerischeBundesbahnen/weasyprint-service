@@ -797,7 +797,7 @@ The service draws Visio drawings (VSDX, VSD and the other formats of Visio) thro
 
 weasyvsdx runs `vsd2xhtml` of libvisio. The image has libvisio 0.1.7 of Debian trixie, which weasyvsdx is tested with. `emf2svg` draws the EMF images inside drawings. Carlito, Caladea and Selawik replace Calibri, Cambria and Segoe UI, the fonts Visio drawings ask for most. All three are under the SIL Open Font License 1.1, which allows them in the image as long as their license travels with them: Carlito and Caladea carry it in `/usr/share/doc/<package>/copyright`, Selawik in `/usr/local/share/fonts/selawik/LICENSE.txt`.
 
-Beyond these, Noto (`fonts-noto-core`) draws the scripts the other fonts lack, such as Arabic, Hebrew and Devanagari, and Symbola (`fonts-symbola`) the symbols Word documents take from Wingdings and Symbol. Every font package of the image keeps its license in `/usr/share/doc/<package>/copyright`, and a container structure test asserts it.
+Beyond these, Symbola (`fonts-symbola`) draws the symbols Word documents take from Wingdings and Symbol. Every font package of the image keeps its license in `/usr/share/doc/<package>/copyright`, and a container structure test asserts it.
 
 `/version` reports the `weasyvsdx` and `libvisio` versions. Without `vsd2xhtml` the service logs `vsd2xhtml not found` at startup, both are `null`, and Visio images are missing from the PDF.
 

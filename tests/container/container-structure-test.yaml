@@ -77,10 +77,10 @@ commandTests:
     command: python
     args: [-c, 'import subprocess, sys; sys.exit(subprocess.run([sys.base_prefix + "/bin/python3", "-I", "-c", "import pip"]).returncode == 0)']
     exitCode: 0
-  - name: libvisio is 0.1.11, which weasyvsdx is tested with
+  - name: libvisio is 0.1.7 of trixie, which weasyvsdx is tested with
     command: vsd2xhtml
     args: [--version]
-    expectedOutput: [vsd2xhtml 0\.1\.11]
+    expectedOutput: [vsd2xhtml 0\.1\.7]
   - name: emf2svg draws the EMF images of Visio drawings
     command: sh
     args: [-c, command -v emf2svg-conv]
@@ -89,10 +89,6 @@ commandTests:
     command: sh
     args: [-c, 'fc-list Selawik | grep -q . && fc-list Carlito | grep -q . && fc-list Caladea | grep -q .']
     exitCode: 0
-  - name: Only libvisio comes from Debian testing
-    command: sh
-    args: [-c, 'cat /etc/apt/preferences.d/testing']
-    expectedOutput: [Pin-Priority. 100]
 # The default image draws SVG with weasysvg; Chromium stays in it for SVG_RENDERER=chromium
 metadataTest:
   envVars:

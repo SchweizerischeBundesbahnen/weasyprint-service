@@ -795,7 +795,7 @@ Replace 0.0.0 with the desired version number.
 
 The service draws Visio drawings (VSDX, VSD and the other formats of Visio) through [weasyvsdx](https://github.com/grigoriev/weasyvsdx). WeasyPrint draws them natively, so they stay vector in the PDF, with their text selectable. An image counts as a Visio drawing by its media type, `application/vnd.ms-visio.drawing` for VSDX or `application/vnd.visio` for VSD, or by the suffix of a file or URL without a type. This works for `<img>`, `<object>`, `<embed>` and CSS images. The service draws the first page of a drawing.
 
-weasyvsdx runs `vsd2xhtml` of libvisio. The image has libvisio 0.1.11 from Debian testing: trixie has 0.1.7, which lacks its fixes of memory safety. A pin keeps every other package on trixie. `emf2svg` draws the EMF images inside drawings. Carlito, Caladea and Selawik replace Calibri, Cambria and Segoe UI, the fonts Visio drawings ask for most.
+weasyvsdx runs `vsd2xhtml` of libvisio. The image has libvisio 0.1.7 of Debian trixie, which weasyvsdx is tested with. `emf2svg` draws the EMF images inside drawings. Carlito, Caladea and Selawik replace Calibri, Cambria and Segoe UI, the fonts Visio drawings ask for most.
 
 `/version` reports the `weasyvsdx` and `libvisio` versions. Without `vsd2xhtml` the service logs `vsd2xhtml not found` at startup, both are `null`, and Visio images are missing from the PDF.
 

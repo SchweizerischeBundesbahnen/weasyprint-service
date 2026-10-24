@@ -37,8 +37,7 @@ COPY --from=uv-source /uv /usr/local/bin/uv
 
 # Install dependencies
 # libvisio-tools and emf2svg let weasyvsdx draw Visio drawings, Carlito and Caladea replace the Calibri and
-# Cambria they ask for. libvisio-tools is 0.1.11 of Debian testing: trixie has 0.1.7, which lacks its fixes
-# of memory safety. Testing is added after the packages of trixie, and its pin keeps it to libvisio-tools.
+# Cambria they ask for. weasyvsdx is tested with libvisio 0.1.7 of trixie; the build checks the release.
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get upgrade -y && \
@@ -66,6 +65,7 @@ RUN apt-get update && \
     libharfbuzz-subset0 \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
+    libvisio-tools \
     libxcomposite1 \
     libxdamage1 \
     libxfixes3 \
@@ -73,11 +73,7 @@ RUN apt-get update && \
     libxrandr2 \
     procps \
     xfonts-scalable && \
-    echo 'deb http://deb.debian.org/debian testing main' > /etc/apt/sources.list.d/testing.list && \
-    printf 'Package: *\nPin: release a=testing\nPin-Priority: 100\n' > /etc/apt/preferences.d/testing && \
-    apt-get update && \
-    apt-get --yes --no-install-recommends --target-release testing install libvisio-tools && \
-    test "$(vsd2xhtml --version)" = "vsd2xhtml 0.1.11" && \
+    test "$(vsd2xhtml --version)" = "vsd2xhtml 0.1.7" && \
     apt-get clean autoclean && \
     apt-get --yes autoremove && \
     rm -rf /var/lib/apt/lists/*

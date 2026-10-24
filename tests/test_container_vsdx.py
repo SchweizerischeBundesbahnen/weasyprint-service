@@ -77,12 +77,12 @@ def vsdx_container() -> Iterator[tuple[Container, str]]:
 
 
 def test_version_names_weasyvsdx_and_libvisio(vsdx_container: tuple[Container, str]) -> None:
-    """The image runs weasyvsdx with libvisio 0.1.11."""
+    """The image runs weasyvsdx with libvisio 0.1.7 of trixie."""
     _, base_url = vsdx_container
     version = requests.get(f"{base_url}/version", timeout=10).json()
 
     assert version["weasyvsdx"]
-    assert version["libvisio"] == "0.1.11"
+    assert version["libvisio"] == "0.1.7"
 
 
 def test_vsdx_is_drawn_as_vector(vsdx_container: tuple[Container, str]) -> None:

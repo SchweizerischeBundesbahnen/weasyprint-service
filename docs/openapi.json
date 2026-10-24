@@ -1062,6 +1062,30 @@
             ],
             "title": "weasysvg",
             "description": "weasysvg version, when it draws SVG"
+          },
+          "weasyvsdx": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "weasyvsdx",
+            "description": "weasyvsdx version, when it draws Visio drawings"
+          },
+          "libvisio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "libvisio",
+            "description": "libvisio version weasyvsdx runs, when it finds vsd2xhtml"
           }
         },
         "type": "object",

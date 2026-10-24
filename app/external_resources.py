@@ -13,7 +13,7 @@ Every load therefore goes through :class:`PolicyUrlFetcher`:
 - ``http`` and ``https`` are vetted address by address, and the request is bound
   to what was vetted, so a second name lookup cannot answer differently. Every
   redirect hop is vetted again. The body is capped, and its kind has to be an
-  image, a font or a stylesheet.
+  image, a font, a stylesheet or a Visio drawing.
 - Every other scheme, ``ftp:`` among them, is refused.
 
 Three variables configure it: ``EXTERNAL_RESOURCES_POLICY``,
@@ -33,7 +33,7 @@ import ssl
 import time
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urljoin, urlsplit, urlunsplit
 from urllib.request import getproxies, proxy_bypass, url2pathname
@@ -59,10 +59,16 @@ HTTP_REDIRECT_RANGE = range(300, 400)
 DEFAULT_PORTS = {"http": 80, "https": 443}
 MAX_PORT = 65535
 
-# What a document may load: an image, a font or a stylesheet. Anything else is
-# not a resource of a page, it is a body someone wants read back.
-ALLOWED_CONTENT_TYPES = ("image/", "font/", "application/font", "application/x-font", "application/vnd.ms-fontobject", "text/css")
+# What a document may load: an image, a font, a stylesheet or a Visio drawing,
+# which weasyvsdx draws as an image. Anything else is not a resource of a page,
+# it is a body someone wants read back.
+ALLOWED_CONTENT_TYPES = ("image/", "font/", "application/font", "application/x-font", "application/vnd.ms-fontobject", "text/css", "application/vnd.ms-visio", "application/vnd.visio")
 UNDECLARED_CONTENT_TYPES = ("application/octet-stream", "binary/octet-stream", "")
+
+# A Visio drawing a server declares nothing about counts by the suffix of its
+# path, as weasyvsdx takes it, and by the ZIP of a VSDX or the OLE file of a VSD.
+VISIO_SUFFIXES = frozenset({".vsd", ".vsdx", ".vsdm", ".vst", ".vstx", ".vstm", ".vss", ".vssx", ".vssm"})
+VISIO_SIGNATURES = (b"PK\x03\x04", b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
 
 # Signatures of the kinds above, for a server which declares nothing useful.
 CONTENT_SIGNATURES = (
@@ -520,14 +526,14 @@ class PolicyUrlFetcher(URLFetcher):
 
             declared = (response.getheader("Content-Type") or "").split(";")[0].strip().lower()
             if declared and not declared.startswith(ALLOWED_CONTENT_TYPES) and declared not in UNDECLARED_CONTENT_TYPES:
-                raise ExternalResourceError(f"'{url}' is served as '{declared}', which is not an image, a font or a stylesheet")
+                raise ExternalResourceError(f"'{url}' is served as '{declared}', which is not an image, a font, a stylesheet or a Visio drawing")
 
             body = self._read_body(url, response, connection, deadline)
             if len(body) > self.max_size_bytes:
                 raise ExternalResourceError(f"'{url}' is larger than the {self.max_size_bytes // (1024 * 1024)} MB a resource may reach")
 
-            if declared in UNDECLARED_CONTENT_TYPES and not _looks_like_a_resource(body):
-                raise ExternalResourceError(f"'{url}' declares no usable content type and its body is not an image or a font")
+            if declared in UNDECLARED_CONTENT_TYPES and not _looks_like_a_resource(url, body):
+                raise ExternalResourceError(f"'{url}' declares no usable content type and its body is not an image, a font or a Visio drawing")
 
             # The declared type is what the rule is applied to; what is handed
             # on is what the server sent, so the charset of a stylesheet is
@@ -536,8 +542,10 @@ class PolicyUrlFetcher(URLFetcher):
             return URLFetcherResponse(url=url, body=body, headers=headers, status=response.status)
 
 
-def _looks_like_a_resource(body: bytes) -> bool:
-    """Whether a body a server declared nothing about is an image or a font."""
+def _looks_like_a_resource(url: str, body: bytes) -> bool:
+    """Whether a body a server declared nothing about is an image, a font or a Visio drawing."""
     if body.startswith(CONTENT_SIGNATURES):
+        return True
+    if body.startswith(VISIO_SIGNATURES) and PurePosixPath(urlsplit(url).path).suffix.lower() in VISIO_SUFFIXES:
         return True
     return body.startswith(RIFF_SIGNATURE) and body[8:12] == WEBP_SIGNATURE

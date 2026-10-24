@@ -521,7 +521,7 @@ The three policies:
 -e EXTERNAL_RESOURCES_POLICY=ALLOWLIST_ONLY
 ```
 
-**How a request is made.** The name is resolved, every address it answers with is checked, and the request is bound to what was checked, so a second lookup cannot answer differently. Every redirect hop is checked again, at most five of them. A loaded resource has to be an image, a font or a stylesheet, by the declared type and, where a server declares none, by the content itself. That last rule is what closes `<link rel="attachment">` as a way to read a body back, and it costs one thing: a stylesheet served without a content type is refused, because a stylesheet cannot be told from any other text by its first bytes, and it is text bodies which the rule is there to keep out. A server which declares `text/css` is loaded as before.
+**How a request is made.** The name is resolved, every address it answers with is checked, and the request is bound to what was checked, so a second lookup cannot answer differently. Every redirect hop is checked again, at most five of them. A loaded resource has to be an image, a font, a stylesheet or a Visio drawing, by the declared type and, where a server declares none, by the content itself. A Visio drawing without a type also needs a Visio suffix in its path, as a ZIP or an OLE file is not a drawing by its first bytes alone. That last rule is what closes `<link rel="attachment">` as a way to read a body back, and it costs one thing: a stylesheet served without a content type is refused, because a stylesheet cannot be told from any other text by its first bytes, and it is text bodies which the rule is there to keep out. A server which declares `text/css` is loaded as before.
 
 **Schemes.** `data:` passes, it carries its own content. `file:` is refused, except for the files uploaded with a request to `/convert/html-with-attachments`, which the service itself put in a temporary directory. `ftp:` and everything else are refused.
 
@@ -791,23 +791,13 @@ docker build \
 
 Replace 0.0.0 with the desired version number.
 
-#### VSDX Support
+#### Visio Drawings
 
-The service converts VSDX (Microsoft Visio) images to PNG with LibreOffice. **The published image does not contain LibreOffice.** LibreOffice adds about 730 MB to the image and several hundred findings to vulnerability scans, so the image leaves it out.
+The service draws Visio drawings (VSDX, VSD and the other formats of Visio) through [weasyvsdx](https://github.com/grigoriev/weasyvsdx). WeasyPrint draws them natively, so they stay vector in the PDF, with their text selectable. An image counts as a Visio drawing by its media type, `application/vnd.ms-visio.drawing` for VSDX or `application/vnd.visio` for VSD, or by the suffix of a file or URL without a type. This works for `<img>`, `<object>`, `<embed>` and CSS images. The service draws the first page of a drawing.
 
-Without LibreOffice the service leaves VSDX images unchanged and logs a warning. WeasyPrint cannot draw VSDX, so these images are missing from the PDF.
+weasyvsdx runs `vsd2xhtml` of libvisio. The image has libvisio 0.1.7 of Debian trixie, which weasyvsdx is tested with. `emf2svg` draws the EMF images inside drawings. Carlito, Caladea and Selawik replace Calibri, Cambria and Segoe UI, the fonts Visio drawings ask for most.
 
-To convert VSDX images, build the image yourself with the `ENABLE_VSDX_SUPPORT=true` build argument:
-
-```bash
-docker build \
-  --build-arg APP_IMAGE_VERSION=0.0.0 \
-  --build-arg ENABLE_VSDX_SUPPORT=true \
-  --file Dockerfile \
-  --tag weasyprint-service:0.0.0 .
-```
-
-With the first conversion the service logs `LibreOffice available: <version>` when VSDX conversion works, and `LibreOffice not available, skipping VSDX conversion` when it does not.
+`/version` reports the `weasyvsdx` and `libvisio` versions. Without `vsd2xhtml` the service logs `vsd2xhtml not found` at startup, both are `null`, and Visio images are missing from the PDF.
 
 ### Running the Development Container
 

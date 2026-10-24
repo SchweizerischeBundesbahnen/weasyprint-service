@@ -141,6 +141,7 @@ grype weasyprint-service:0.0.0
 - **AttachmentManager** (`app/attachment_manager.py`): Handles multipart form data and file attachments for HTML conversion
 - **FormParser** (`app/form_parser.py`): Parses multipart/form-data with configurable limits via environment variables
 - **HtmlParser** (`app/html_parser.py`): Processes HTML content and handles embedded resources
+- **Visio drawings** (`app/vsdx_renderer.py`): weasyvsdx draws VSDX and VSD natively in WeasyPrint, as vector; `/version` adds `weasyvsdx` and `libvisio`
 - **SvgProcessor** (`app/svg_processor.py`, `SVG_RENDERER=chromium` only): Converts SVG to PNG via CDP (Chrome DevTools Protocol) with configurable device scaling (`DEVICE_SCALE_FACTOR` env var)
 - **ChromiumManager** (`app/chromium_manager.py`): Manages persistent Chromium browser instance for SVG to PNG conversion via CDP with proactive health monitoring
   - Background health monitoring: Periodic checks (configurable interval) to detect browser issues
@@ -201,7 +202,7 @@ grype weasyprint-service:0.0.0
 
 **External resources (see `app/external_resources.py`):**
 - `EXTERNAL_RESOURCES_POLICY` (BLOCK_INTERNAL default / ALLOWLIST_ONLY / ALLOW_ALL), `EXTERNAL_RESOURCES_ALLOWED_ORIGINS` (`[scheme://]host[:port]`, comma separated), `EXTERNAL_RESOURCES_MAX_SIZE_MB` (16), `EXTERNAL_RESOURCES_TIMEOUT_SECONDS` (10).
-- `PolicyUrlFetcher` is passed to every `weasyprint.HTML(...)` call: addresses are vetted and pinned, redirects re-vetted, bodies capped and restricted to images, fonts and stylesheets. `file:` is refused outside the request temporary directory, which is what makes `/convert/html-with-attachments` keep working.
+- `PolicyUrlFetcher` is passed to every `weasyprint.HTML(...)` call: addresses are vetted and pinned, redirects re-vetted, bodies capped and restricted to images, fonts, stylesheets and Visio drawings (an untyped one by its Visio suffix and its ZIP or OLE signature). `file:` is refused outside the request temporary directory, which is what makes `/convert/html-with-attachments` keep working.
 
 **TLS (see `app/tls.py`):**
 - `TLS_CERT_FILE`, `TLS_KEY_FILE`, `TLS_KEY_PASSWORD`, `TLS_CLIENT_CA_FILE`, `TLS_CLIENT_AUTH` (none/optional/required): serve the API over HTTPS. Unset means plain HTTP (default).
@@ -423,7 +424,7 @@ The repository uses extensive pre-commit hooks including:
 - **Base image**: `debian:trixie-slim` with uv for Python management
 - Includes fonts and Playwright Chromium for complete PDF rendering capabilities
 - `libharfbuzz-subset0` lets WeasyPrint subset fonts with HarfBuzz. Without it WeasyPrint falls back to fontTools, warns once per font, and renders small documents about 40% slower. `test_fonts_are_subset_with_harfbuzz` asserts it
-- LibreOffice (VSDX to PNG) is not in the published image: about 730 MB and several hundred scan findings. Its own `RUN` step installs it only with `--build-arg ENABLE_VSDX_SUPPORT=true`; keep it out of the main apt list. Without it the service leaves VSDX images unchanged, and they are missing from the PDF
+- Visio drawings: weasyvsdx draws VSDX and VSD as vector through `vsd2xhtml` of libvisio (`app/vsdx_renderer.py`, installed at import of the controller). libvisio-tools is 0.1.7 of trixie, which weasyvsdx is tested with; the Dockerfile and the structure test check `vsd2xhtml --version`. `emf2svg`, Carlito, Caladea and Selawik (from its GitHub release, by checksum) serve the drawings. With `SVG_RENDERER=chromium` only the `foreign_object` feature of weasysvg is installed, which weasyvsdx needs for text. Without `vsd2xhtml` nothing is patched and Visio images are left out. LibreOffice is gone
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
 - Playwright Chromium browser installed via `playwright install --only-shell chromium`: the service launches the headless shell, the full browser (which alone needs libcups2 and libcairo2) is not in the image. No `--with-deps` either: that would add xvfb, an X server the headless service never uses. The libraries and fonts Playwright lists for Chromium are in the apt list of the Dockerfile; keep them in step when Playwright changes its list (`playwright install-deps --dry-run chromium` in a fresh `debian:trixie-slim` shows it)

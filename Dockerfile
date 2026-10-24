@@ -153,10 +153,14 @@ RUN DICT_DIR="$(python -c 'import os, pyphen; print(os.path.dirname(str(pyphen.L
 RUN weasyprint --version
 
 # Selawik, the open fallback Microsoft made for Segoe UI, which Visio drawings ask for. Debian has no
-# package of it: the release of microsoft/Selawik, checked by its SHA-256.
+# package of it: the release of microsoft/Selawik, checked by its SHA-256. Its fonts carry no license text,
+# which the SIL Open Font License asks to travel with each copy, so the license of the release goes along.
 ADD --checksum=sha256:3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423 \
     https://github.com/microsoft/Selawik/releases/download/1.01/Selawik_Release.zip /tmp/selawik.zip
-RUN python -c "import zipfile; zipfile.ZipFile('/tmp/selawik.zip').extractall('/usr/local/share/fonts/selawik')" && \
+ADD --checksum=sha256:77b7c2506d4efb22e09c8ccf10159f4956eab3ef7c007fef95de136bcf45300c \
+    https://raw.githubusercontent.com/microsoft/Selawik/1.01/LICENSE.txt /usr/local/share/fonts/selawik/LICENSE.txt
+RUN python -c "import zipfile; archive = zipfile.ZipFile('/tmp/selawik.zip'); archive.extractall('/usr/local/share/fonts/selawik', [name for name in archive.namelist() if name.endswith('.ttf')])" && \
+    chmod 644 /usr/local/share/fonts/selawik/LICENSE.txt && \
     rm /tmp/selawik.zip && \
     fc-cache --force && \
     test -n "$(fc-list Selawik)" && test -n "$(fc-list Carlito)"

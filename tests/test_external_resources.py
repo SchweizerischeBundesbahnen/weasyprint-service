@@ -62,6 +62,11 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
+# The first bytes of a VSDX, a ZIP, and of a VSD, an OLE file
+VSDX = b"PK\x03\x04" + b"\x00" * 16
+VSD = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 16
+
+
 class _Handler(http.server.BaseHTTPRequestHandler):
     """Serves the responses the tests need, on the loopback interface."""
 
@@ -72,6 +77,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             "/secret.txt": (200, "text/plain", b"top secret"),
             "/undeclared": (200, "application/octet-stream", PNG),
             "/undeclared-text": (200, "application/octet-stream", b"top secret"),
+            "/drawing.vsdx": (200, "application/vnd.ms-visio.drawing", VSDX),
+            "/drawing.vsd": (200, "application/vnd.visio", VSD),
+            "/undeclared.vsdx": (200, "application/octet-stream", VSDX),
+            "/undeclared.vsd": (200, "application/octet-stream", VSD),
+            "/undeclared.zip": (200, "application/octet-stream", VSDX),
+            "/undeclared-text.vsdx": (200, "application/octet-stream", b"top secret"),
             "/styles.css": (200, "text/css; charset=iso-8859-1", b"body { color: red }"),
             "/huge.png": (200, "image/png", PNG + b"\x00" * (2 * 1024 * 1024)),
             "/missing": (404, "text/plain", b"gone"),
@@ -323,7 +334,7 @@ def test_a_body_which_is_not_a_resource_is_refused(monkeypatch: pytest.MonkeyPat
 
     fetcher = PolicyUrlFetcher()
 
-    with pytest.raises(ExternalResourceError, match="not an image, a font or a stylesheet"):
+    with pytest.raises(ExternalResourceError, match="not an image, a font, a stylesheet or a Visio drawing"):
         fetcher.fetch(f"{local_server}/secret.txt")
 
 
@@ -334,8 +345,24 @@ def test_an_undeclared_body_is_sniffed(monkeypatch: pytest.MonkeyPatch, local_se
 
     fetcher = PolicyUrlFetcher()
 
-    with pytest.raises(ExternalResourceError, match="not an image or a font"):
+    with pytest.raises(ExternalResourceError, match="not an image, a font or a Visio drawing"):
         fetcher.fetch(f"{local_server}/undeclared-text")
+
+
+@pytest.mark.parametrize("path", ["/drawing.vsdx", "/drawing.vsd", "/undeclared.vsdx", "/undeclared.vsd"])
+def test_a_visio_drawing_is_loaded(monkeypatch: pytest.MonkeyPatch, local_server: str, path: str) -> None:
+    """weasyvsdx draws it as an image: by its type, or by its suffix and its body where the server declares none."""
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+
+    assert PolicyUrlFetcher().fetch(f"{local_server}{path}").status == 200
+
+
+@pytest.mark.parametrize("path", ["/undeclared.zip", "/undeclared-text.vsdx"])
+def test_an_undeclared_body_is_a_visio_drawing_only_by_its_suffix_and_its_body(monkeypatch: pytest.MonkeyPatch, local_server: str, path: str) -> None:
+    monkeypatch.setenv(POLICY_VAR, ResourcePolicy.ALLOW_ALL.value)
+
+    with pytest.raises(ExternalResourceError, match="not an image, a font or a Visio drawing"):
+        PolicyUrlFetcher().fetch(f"{local_server}{path}")
 
 
 def test_a_body_over_the_limit_is_refused(monkeypatch: pytest.MonkeyPatch, local_server: str) -> None:

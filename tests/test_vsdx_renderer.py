@@ -41,8 +41,7 @@ def test_configure_installs_only_the_foreign_object_of_weasysvg_in_chromium_mode
     assert vsdx_renderer.configure_vsdx("chromium") is True
     weasyvsdx_install.assert_called_once_with(converter="/usr/bin/vsd2xhtml")
     features = weasysvg_install.call_args.kwargs
-    assert features.pop("foreign_object") is True
-    assert not any(features.values())
+    assert {name for name, wanted in features.items() if wanted} == {"foreign_object"}
 
 
 @pytest.mark.parametrize("svg_renderer", ["weasysvg", "chromium"])

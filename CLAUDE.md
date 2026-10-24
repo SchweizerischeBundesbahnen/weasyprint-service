@@ -202,7 +202,7 @@ grype weasyprint-service:0.0.0
 
 **External resources (see `app/external_resources.py`):**
 - `EXTERNAL_RESOURCES_POLICY` (BLOCK_INTERNAL default / ALLOWLIST_ONLY / ALLOW_ALL), `EXTERNAL_RESOURCES_ALLOWED_ORIGINS` (`[scheme://]host[:port]`, comma separated), `EXTERNAL_RESOURCES_MAX_SIZE_MB` (16), `EXTERNAL_RESOURCES_TIMEOUT_SECONDS` (10).
-- `PolicyUrlFetcher` is passed to every `weasyprint.HTML(...)` call: addresses are vetted and pinned, redirects re-vetted, bodies capped and restricted to images, fonts and stylesheets. `file:` is refused outside the request temporary directory, which is what makes `/convert/html-with-attachments` keep working.
+- `PolicyUrlFetcher` is passed to every `weasyprint.HTML(...)` call: addresses are vetted and pinned, redirects re-vetted, bodies capped and restricted to images, fonts, stylesheets and Visio drawings (an untyped one by its Visio suffix and its ZIP or OLE signature). `file:` is refused outside the request temporary directory, which is what makes `/convert/html-with-attachments` keep working.
 
 **TLS (see `app/tls.py`):**
 - `TLS_CERT_FILE`, `TLS_KEY_FILE`, `TLS_KEY_PASSWORD`, `TLS_CLIENT_CA_FILE`, `TLS_CLIENT_AUTH` (none/optional/required): serve the API over HTTPS. Unset means plain HTTP (default).

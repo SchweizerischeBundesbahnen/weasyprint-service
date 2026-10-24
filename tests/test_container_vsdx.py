@@ -40,13 +40,8 @@ def _wait_for_healthy(container: Container, max_wait: int = 120) -> None:
 
 
 @pytest.fixture(scope="module")
-def vsdx_container() -> Iterator[tuple[Container, str]]:
-    """Build the image and start it on a free host port."""
-    client = docker.from_env()
-    # A container of an interrupted run holds the name, and the run below would fail on it.
-    with contextlib.suppress(docker.errors.NotFound):
-        client.containers.get(CONTAINER_NAME).remove(force=True)
-
+def vsdx_image() -> Iterator[str]:
+    """Build the image once for the tests of both SVG renderers."""
     result = subprocess.run(
         ["docker", "build", "--build-arg", "APP_IMAGE_VERSION=1.0.0", "--tag", IMAGE_TAG, "."],
         capture_output=True,
@@ -56,24 +51,39 @@ def vsdx_container() -> Iterator[tuple[Container, str]]:
     )
     if result.returncode != 0:
         pytest.fail(f"Docker build failed:\n{result.stderr}")
+    try:
+        yield IMAGE_TAG
+    finally:
+        # The image belongs to this test alone, so it goes too
+        try:
+            docker.from_env().images.remove(IMAGE_TAG, force=True)
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to remove image %s", IMAGE_TAG)
+
+
+# weasysvg draws the text of a drawing in both modes: wholly by default, its foreignObject alone with chromium
+@pytest.fixture(scope="module", params=["weasysvg", "chromium"])
+def vsdx_container(request: pytest.FixtureRequest, vsdx_image: str) -> Iterator[tuple[Container, str]]:
+    """Start the image with one SVG renderer, on a free host port."""
+    client = docker.from_env()
+    name = f"{CONTAINER_NAME}_{request.param}"
+    # A container of an interrupted run holds the name, and the run below would fail on it.
+    with contextlib.suppress(docker.errors.NotFound):
+        client.containers.get(name).remove(force=True)
 
     # Docker picks the host port, so the test never collides with a service already running
-    container = client.containers.run(image=IMAGE_TAG, detach=True, name=CONTAINER_NAME, init=True, ports={"9080/tcp": None})
+    container = client.containers.run(image=vsdx_image, detach=True, name=name, init=True, ports={"9080/tcp": None}, environment={"SVG_RENDERER": request.param})
     try:
         _wait_for_healthy(container)
         container.reload()
         host_port = container.ports["9080/tcp"][0]["HostPort"]
         yield container, f"http://localhost:{host_port}"
     finally:
-        # Teardown is best effort. The image belongs to this test alone, so it goes too.
+        # Teardown is best effort
         try:
             container.remove(force=True)
         except Exception:  # noqa: BLE001
             logger.warning("Failed to remove container %s", container.id[:12])
-        try:
-            client.images.remove(IMAGE_TAG, force=True)
-        except Exception:  # noqa: BLE001
-            logger.warning("Failed to remove image %s", IMAGE_TAG)
 
 
 def test_version_names_weasyvsdx_and_libvisio(vsdx_container: tuple[Container, str]) -> None:

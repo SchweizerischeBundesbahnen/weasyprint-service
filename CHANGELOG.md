@@ -1,5 +1,30 @@
 # Changelog
 
+## [70.0.7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.6...v70.0.7) (2026-10-24)
+
+
+### Features
+
+* **vsdx:** draw Visio drawings with weasyvsdx ([#421](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/421)) ([3ae0777](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/3ae07775367a982026b6c12adfc4ded9ce72bf35))
+
+
+### Bug Fixes
+
+* **deps:** update dependency fastapi to v0.149.0 ([b05dc9f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b05dc9f491512beb0fb1471ff9ed9b06160c20ff))
+* **deps:** update dependency fastapi to v0.150.0 ([e8684d7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/e8684d7ca5863a655ba33aca5d8ba75bdb17d066))
+* **deps:** update dependency fastapi to v0.151.0 ([792f4f0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/792f4f0b7321c3db49b63d96c6ade57046e60ae3))
+* **deps:** update dependency fastapi to v0.156.4 ([cefb78e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/cefb78ee00a7e7684e65c4805d829f126aa502f3))
+* **deps:** update dependency fastapi to v0.158.2 ([ca1cf9c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ca1cf9c5db0180ffcde8c4455455b09c56dc50cf))
+* **deps:** update dependency fastapi to v0.159.0 ([c5f929a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/c5f929a87f543d920259af5e8792d39be021de6b))
+* **deps:** update dependency pypdf to v6.21.2 [security] ([#420](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/420)) ([18fff83](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/18fff8361cbac336434faa91b0a09dbb6ee61160))
+* **deps:** update dependency python to v3.15.1 ([8aa9f0c](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/8aa9f0c8d01233d9bc40da779379b4d416e73d53))
+* **deps:** update dependency ty to v0.0.90 ([0e9545f](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/0e9545f76e5d358fa55b4100aff959527d9641dc))
+
+
+### Performance Improvements
+
+* subset fonts with HarfBuzz ([#417](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/417)) ([b6af9f2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b6af9f2efd1347f9022a5daead55c6d8c13c16d1)), closes [#416](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/416)
+
 ## [70.0.6](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.5...v70.0.6) (2026-10-22)
 
 

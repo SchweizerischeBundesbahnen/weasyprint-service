@@ -17,15 +17,6 @@ commandTests:
     command: weasyprint
     args: [--version]
     expectedOutput: [70.0]
-  - name: Chromium version is correct
-    # The image has the headless shell alone, which is what the service launches.
-    # The browser directory carries the Playwright revision, and its inner directory
-    # carries the architecture (chrome-headless-shell-linux64 on amd64,
-    # chrome-headless-shell-linux-arm64 on arm64), so both are matched by a glob.
-    # The version string differs per build, so only the version number is asserted.
-    command: sh
-    args: [-c, /opt/playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell --version]
-    expectedOutput: [156\.0\.8078\.4]
   - name: Tox should not be installed
     command: uv
     args: [run, --no-sync, tox, --version]
@@ -51,7 +42,12 @@ commandTests:
     command: sh
     args: [-c, '! command -v curl']
     exitCode: 0
-  # Chromium runs headless, playwright install --with-deps would add an X server
+  # weasysvg draws SVG, the service starts no browser
+  - name: Playwright and its Chromium should not be installed
+    command: sh
+    args: [-c, '! test -e /opt/playwright && ! python -c "import playwright" 2>/dev/null && test -z "$(find / -xdev \( -name chrome-headless-shell -o -name chromium -o -name chrome \) -print -quit 2>/dev/null)"']
+    exitCode: 0
+  # The service draws nothing on a screen, an X server has no use in it
   - name: Xvfb should not be installed
     command: sh
     args: [-c, '! command -v Xvfb']
@@ -112,11 +108,6 @@ commandTests:
     command: sh
     args: [-c, 'fc-match serif | grep -q "DejaVu Serif" && fc-match sans-serif | grep -q "DejaVu Sans"']
     exitCode: 0
-# The default image draws SVG with weasysvg; Chromium stays in it for SVG_RENDERER=chromium
-metadataTest:
-  envVars:
-    - key: SVG_RENDERER
-      value: weasysvg
 fileExistenceTests:
   - name: Log directory
     path: /opt/weasyprint/logs

@@ -12,7 +12,6 @@ import pypdf
 import pytest
 import requests
 from docker.models.containers import Container
-from PIL import Image, ImageChops
 
 from tests import utils_pdf
 
@@ -69,8 +68,6 @@ def weasyprint_container():
         ports={"9080": 9080},
         init=True,  # Enable Docker's init process (equivalent to tini)
         auto_remove=True,  # Ensure container is automatically removed after it stops
-        # These tests check the PNG Chromium makes of an SVG; test_container_default_mode covers the default
-        environment={"SVG_RENDERER": "chromium"},
         labels={"test-suite": "weasyprint-service"},
     )
 
@@ -118,13 +115,8 @@ def test_container_no_error_logs(test_parameters: TestParameters) -> None:
         "Metrics server listening port: 9180",
         "Started server process",
         "Waiting for application startup",
-        "Prepare Chromium browser for SVG conversion",
-        "Starting Chromium browser process via Playwright",
-        "Chromium browser started successfully",
-        "Background health monitoring started (interval: 30s)",
-        "Chromium browser prepared successfully",
+        "SVG renderer is weasysvg",
         "Metrics server started on port 9180",
-        "Health monitor loop started",
         # uvicorn logs through the root logger, so its own messages show up as well
         "Application startup complete",
         "Uvicorn running on",
@@ -346,17 +338,24 @@ def test_convert_svg_as_base64(test_parameters: TestParameters) -> None:
         pytest.skip(str(e))
 
 
-def __images_drawn(doc: pymupdf.Document) -> list[tuple[int, int]]:
-    """Every image of the document, top to bottom: the width it is drawn at and the width it carries, in px.
+# The fill of the rectangle in the SVG of svg-image-sized-by-the-document.html: 196 px of its 200 px width
+SIZED_SVG_FILL = (0xE8 / 255, 0xF0 / 255, 0xFE / 255)
+SIZED_SVG_RECT_SHARE = 196 / 200
+
+
+def __sized_svg_widths(doc: pymupdf.Document) -> list[int]:
+    """The width each SVG is drawn at, top to bottom, in px, read from the rectangle it draws as vector.
 
     A CSS px is 0.75 pt, the unit a PDF is laid out in.
     """
     drawn = []
     for page in doc:
-        for xref in {img[0] for img in page.get_images(full=True)}:
-            pixels = doc.extract_image(xref)["width"]
-            drawn.extend((rect.y0, rect.x0, round(rect.width / 0.75), pixels) for rect in page.get_image_rects(xref))
-    return [(width, pixels) for _, _, width, pixels in sorted(drawn)]
+        for drawing in page.get_drawings():
+            fill = drawing["fill"]
+            if fill and fill == pytest.approx(SIZED_SVG_FILL, abs=0.01):
+                rect = drawing["rect"]
+                drawn.append((page.number, rect.y0, round(rect.width / 0.75 / SIZED_SVG_RECT_SHARE)))
+    return [width for _, _, width in sorted(drawn)]
 
 
 def test_convert_svg_keeps_the_size_the_document_gives(test_parameters: TestParameters) -> None:
@@ -366,32 +365,13 @@ def test_convert_svg_keeps_the_size_the_document_gives(test_parameters: TestPara
     assert response.status_code == 200
 
     with pymupdf.open(stream=response.content, filetype="pdf") as doc:
-        widths = [width for width, _ in __images_drawn(doc)]
+        # weasysvg draws the SVG as vector, so the document holds no image
+        assert all(not page.get_images() for page in doc)
+        widths = __sized_svg_widths(doc)
 
     # The SVG is 200x100: its own size where the document gives none, then half of it, twice it, and
     # a width with a height.
     assert widths == [200, 100, 400, 300]
-
-
-@pytest.mark.parametrize("scale", [1.0, 2.0])
-def test_convert_svg_rasterizes_at_the_size_it_is_drawn(scale: float, test_parameters: TestParameters) -> None:
-    """The PNG carries the scale factor over the size the document draws the image at; #375."""
-    html = __load_test_html("tests/test-data/svg-image-sized-by-the-document.html")
-    response = __call_convert_html(
-        base_url=test_parameters.base_url,
-        request_session=test_parameters.request_session,
-        data=html,
-        print_error=True,
-        parameters=f"scale_factor={scale}",
-    )
-    assert response.status_code == 200
-
-    with pymupdf.open(stream=response.content, filetype="pdf") as doc:
-        drawn = __images_drawn(doc)
-
-    # Every image carries as many pixels as the scale factor asks for at the size it is drawn
-    assert drawn == [(width, round(width * scale)) for width, _ in drawn]
-    assert [width for width, _ in drawn] == [200, 100, 400, 300]
 
 
 def test_convert_svg_without_xmlns(test_parameters: TestParameters) -> None:
@@ -409,67 +389,6 @@ def test_convert_svg_without_xmlns(test_parameters: TestParameters) -> None:
         pytest.skip(f"Reference(s) {ref_base} were missing and have been generated (for all pages). Re-run tests.")
     except utils_pdf.ReferenceMissingError as e:
         pytest.skip(str(e))
-
-
-@pytest.mark.parametrize("scale", [1.0, 2.0, 3.125, 6.25])
-def test_convert_svg_with_scale_factor(scale: float, test_parameters: TestParameters) -> None:
-    """
-    Integration test: render svg-image.html with different scale_factor values and
-    compare rasterized first page PNGs with reference images.
-
-    If a reference image is missing and the environment variable UPDATE_EXPECTED_REFS=1
-    is set, the test will generate the reference PNG into tests/test-data/expected and skip
-    with an explanatory message.
-    """
-    html = __load_test_html("tests/test-data/svg-image.html")
-    params = f"scale_factor={scale}"
-    response = __call_convert_html(
-        base_url=test_parameters.base_url,
-        request_session=test_parameters.request_session,
-        data=html,
-        print_error=True,
-        parameters=params,
-    )
-    assert response.status_code == 200
-
-    # Render first page to PNG at high rasterization scale to reveal anti-aliasing differences
-    # 10x zoom to better visualize quality differences coming from device scale factor
-    zoom = 10.0
-    page_png_bytes = utils_pdf.pdf_bytes_to_png_pages(response.content, zoom=zoom)[0]
-
-    # Determine reference path
-    # Use a stable string format for floating point values in filenames
-    scale_str = (f"{scale:g}").rstrip("0").rstrip(".") if "." in f"{scale}" else f"{scale}"
-    # Ensure we keep at least one decimal for integer-like floats (e.g., 1.0 -> 1.0)
-    if scale.is_integer():
-        scale_str = f"{int(scale)}.0"
-    ref_path = Path(f"tests/test-data/expected/svg-image-ref-scale-{scale_str}.png")
-
-    # Open produced image
-    produced_img = Image.open(io.BytesIO(page_png_bytes))
-
-    if not ref_path.exists():
-        import os
-
-        if os.environ.get("UPDATE_EXPECTED_REFS", "0") == "1":
-            # Generate the missing reference files: hi-res PNG (10x) and matching PDF next to it
-            ref_path.parent.mkdir(parents=True, exist_ok=True)
-            ref_path.write_bytes(page_png_bytes)
-            pdf_ref_path = ref_path.with_suffix(".pdf")
-            pdf_ref_path.write_bytes(response.content)
-            pytest.skip(f"Reference {ref_path} (and {pdf_ref_path}) was missing and has been generated at 10x raster scale. Re-run tests.")
-        else:
-            pytest.skip(f"Missing reference image {ref_path}. Set UPDATE_EXPECTED_REFS=1 to generate references (PNG and PDF), then commit them under tests/test-data/expected.")
-
-    ref_image = Image.open(ref_path)
-    # Basic sanity: mode and size should match
-    assert produced_img.mode == ref_image.mode and produced_img.size == ref_image.size, (
-        f"Image mode/size mismatch for scale={scale}. Got mode={produced_img.mode}, size={produced_img.size}; expected mode={ref_image.mode}, size={ref_image.size} from {ref_path}"
-    )
-
-    # Pixel-by-pixel comparison
-    diff_bbox = ImageChops.difference(produced_img, ref_image).getbbox()
-    assert diff_bbox is None, f"Rendered image differs from reference for scale={scale} at bbox={diff_bbox}"
 
 
 def test_convert_incorrect_data(test_parameters: TestParameters) -> None:

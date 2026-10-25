@@ -305,7 +305,7 @@ class LoadTester:
 
                 <div class="description">
                     <strong>SVG Conversion Test:</strong> This page contains {self.svgs_per_page} SVG elements
-                    that are converted to PNG via Chromium CDP for PDF rendering. Page {page_num + 1} of {self.pages}.
+                    that WeasyPrint draws as vector through weasysvg. Page {page_num + 1} of {self.pages}.
                 </div>
 
                 <h2>SVG Graphics Grid</h2>
@@ -320,9 +320,8 @@ class LoadTester:
                 </div>
 
                 <p style="margin-top: 20px; color: #7f8c8d; font-size: 14px;">
-                    Each SVG element above is processed through the Chromium browser via CDP (Chrome DevTools Protocol),
-                    converted to PNG format, and then embedded into the final PDF document. This ensures consistent
-                    rendering across all platforms and PDF viewers.
+                    Each SVG element above is drawn by weasysvg, the SVG renderer of WeasyPrint, and stays
+                    vector in the final PDF document.
                 </p>
             </div>
             """

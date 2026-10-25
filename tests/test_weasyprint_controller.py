@@ -2,12 +2,13 @@ import os
 import platform
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
 from app import weasyprint_controller
+from app.conversion_metrics import ConversionMetrics
 from app.weasyprint_controller import app
 
 
@@ -22,8 +23,7 @@ def test_version():
         assert version["weasyprint"] is not None
         assert version["weasyprintService"] == "test1"
         assert version["timestamp"] == "test2"
-        # Chromium version is fetched from ChromiumManager, can be None if browser not started or a version string
-        assert version["chromium"] is None or isinstance(version["chromium"], str)
+        assert "chromium" not in version
 
 
 def test_convert_html():
@@ -100,270 +100,72 @@ def test_an_attachment_the_html_links_to_is_embedded():
     assert attachment_path.name in PdfReader(BytesIO(result.content)).attachments
 
 
-def test_health_with_chromium_unhealthy():
-    """Test /health endpoint returns 503 when Chromium health check fails at runtime."""
-    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
-
-    # Mock ChromiumManager to simulate Chromium health check failing at runtime
-    with patch("app.weasyprint_controller.get_chromium_manager") as mock_get_manager:
-        mock_manager = AsyncMock()
-        mock_manager.health_check = AsyncMock(return_value=False)
-        mock_get_manager.return_value = mock_manager
-
-        with TestClient(app) as test_client:
-            result = test_client.get("/health")
-
-            assert result.status_code == 503
-            assert result.text == "Service Unavailable"
-
-
 def test_health_detailed_healthy():
-    """Test /health?detailed=true returns JSON with metrics when healthy."""
+    """Test /health?detailed=true returns JSON with the conversion metrics."""
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
 
-    # Create mock manager
-    mock_manager = AsyncMock()
-    # Mock lifespan methods (start/stop are async)
-    mock_manager.start = AsyncMock()
-    mock_manager.stop = AsyncMock()
-    # health_check() and other sync methods use MagicMock
-    mock_manager.health_check = MagicMock(return_value=True)
-    mock_manager.is_running = MagicMock(return_value=True)
-    mock_manager.get_version = MagicMock(return_value="131.0.6778.33")
-    mock_manager.health_check_enabled = True
-    mock_manager.get_metrics = MagicMock(
-        return_value={
-            "pdf_generations": 42,
-            "failed_pdf_generations": 3,
-            "total_svg_conversions": 100,
-            "failed_svg_conversions": 5,
-            "error_pdf_generation_rate_percent": 7.14,
-            "error_svg_conversion_rate_percent": 5.0,
-            "total_chromium_restarts": 1,
-            "avg_pdf_generation_time_ms": 123.45,
-            "avg_svg_conversion_time_ms": 50.12,
-            "last_health_check": "12:34:56 01.02.2024",
-            "last_health_status": True,
-            "uptime_seconds": 3600.0,
-            "current_cpu_percent": 5.5,
-            "avg_cpu_percent": 3.2,
-            "total_memory_mb": 16384.0,
-            "available_memory_mb": 8192.0,
-            "current_chromium_memory_mb": 128.5,
-            "avg_chromium_memory_mb": 120.3,
-            "queue_size": 2,
-            "active_pdf_generations": 5,
-            "avg_queue_time_ms": 15.75,
-            "max_concurrent_pdf_generations": 10,
-        }
-    )
+    metrics = ConversionMetrics()
+    metrics.record_success(100.0)
+    metrics.record_success(200.0)
+    metrics.record_failure()
 
-    # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
+    with patch("app.conversion_metrics._conversion_metrics", metrics), TestClient(app) as test_client:
         result = test_client.get("/health?detailed=true")
 
-        assert result.status_code == 200
-        assert result.headers["content-type"] == "application/json"
+    assert result.status_code == 200
+    assert result.headers["content-type"] == "application/json"
 
-        data = result.json()
-        assert data["status"] == "healthy"
-        assert data["version"] == "test1"
-        assert data["weasyprint_version"] is not None
-        assert data["chromium_running"] is True
-        assert data["chromium_version"] == "131.0.6778.33"
-        assert data["health_monitoring_enabled"] is True
+    data = result.json()
+    assert data["status"] == "healthy"
+    assert data["version"] == "test1"
+    assert data["weasyprint_version"] is not None
+    assert data["svg_renderer"] == "weasysvg"
+    assert set(data) == {"status", "version", "weasyprint_version", "svg_renderer", "metrics"}
 
-        metrics = data["metrics"]
-        assert metrics["pdf_generations"] == 42
-        assert metrics["failed_pdf_generations"] == 3
-        assert metrics["total_svg_conversions"] == 100
-        assert metrics["failed_svg_conversions"] == 5
-        assert metrics["error_pdf_generation_rate_percent"] == 7.14
-        assert metrics["error_svg_conversion_rate_percent"] == 5.0
-        assert metrics["total_chromium_restarts"] == 1
-        assert metrics["avg_pdf_generation_time_ms"] == 123.45
-        assert metrics["avg_svg_conversion_time_ms"] == 50.12
-        assert metrics["last_health_check"] == "12:34:56 01.02.2024"
-        assert metrics["last_health_status"] is True
-        assert metrics["uptime_seconds"] == 3600.0
-        assert metrics["current_cpu_percent"] == 5.5
-        assert metrics["avg_cpu_percent"] == 3.2
-        assert metrics["total_memory_mb"] == 16384.0
-        assert metrics["available_memory_mb"] == 8192.0
-        assert metrics["current_chromium_memory_mb"] == 128.5
-        assert metrics["avg_chromium_memory_mb"] == 120.3
-        assert metrics["queue_size"] == 2
-        assert metrics["active_pdf_generations"] == 5
-        assert metrics["avg_queue_time_ms"] == 15.75
-        assert metrics["max_concurrent_pdf_generations"] == 10
-
-
-def test_health_detailed_unhealthy():
-    """Test /health?detailed=true returns 503 with JSON when unhealthy."""
-    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
-
-    # Create mock manager
-    mock_manager = AsyncMock()
-    # Mock lifespan methods (start/stop are async)
-    mock_manager.start = AsyncMock()
-    mock_manager.stop = AsyncMock()
-    # health_check() and other sync methods use MagicMock
-    mock_manager.health_check = MagicMock(return_value=False)
-    mock_manager.is_running = MagicMock(return_value=False)
-    mock_manager.get_version = MagicMock(return_value=None)
-    mock_manager.health_check_enabled = True
-    mock_manager.get_metrics = MagicMock(
-        return_value={
-            "pdf_generations": 10,
-            "failed_pdf_generations": 5,
-            "total_svg_conversions": 20,
-            "failed_svg_conversions": 10,
-            "error_pdf_generation_rate_percent": 50.0,
-            "error_svg_conversion_rate_percent": 50.0,
-            "total_chromium_restarts": 3,
-            "avg_pdf_generation_time_ms": 0.0,
-            "avg_svg_conversion_time_ms": 0.0,
-            "last_health_check": "",
-            "last_health_status": False,
-            "uptime_seconds": 0.0,
-            "current_cpu_percent": 0.0,
-            "avg_cpu_percent": 0.0,
-            "total_memory_mb": 16384.0,
-            "available_memory_mb": 2048.0,
-            "current_chromium_memory_mb": 0.0,
-            "avg_chromium_memory_mb": 0.0,
-            "queue_size": 0,
-            "active_pdf_generations": 0,
-            "avg_queue_time_ms": 0.0,
-            "max_concurrent_pdf_generations": 10,
-        }
-    )
-
-    # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
-        result = test_client.get("/health?detailed=true")
-
-        assert result.status_code == 503
-        assert result.headers["content-type"] == "application/json"
-
-        data = result.json()
-        assert data["status"] == "unhealthy"
-        assert data["version"] == "test1"
-        assert data["weasyprint_version"] is not None
-        assert data["chromium_running"] is False
-        assert data["chromium_version"] is None
-        assert data["health_monitoring_enabled"] is True
-
-        metrics = data["metrics"]
-        assert metrics["pdf_generations"] == 10
-        assert metrics["failed_pdf_generations"] == 5
-        assert metrics["total_svg_conversions"] == 20
-        assert metrics["failed_svg_conversions"] == 10
-        assert metrics["error_pdf_generation_rate_percent"] == 50.0
-        assert metrics["error_svg_conversion_rate_percent"] == 50.0
-        assert metrics["total_chromium_restarts"] == 3
-        assert metrics["last_health_status"] is False
-        assert metrics["last_health_check"] == ""
+    assert data["metrics"]["pdf_generations"] == 2
+    assert data["metrics"]["failed_pdf_generations"] == 1
+    assert data["metrics"]["avg_pdf_generation_time_ms"] == 150.0
+    assert data["metrics"]["error_pdf_generation_rate_percent"] == 33.33
+    assert data["metrics"]["uptime_seconds"] >= 0
+    assert data["metrics"]["total_memory_mb"] > 0
+    assert data["metrics"]["available_memory_mb"] > 0
+    assert set(data["metrics"]) == {
+        "pdf_generations",
+        "failed_pdf_generations",
+        "avg_pdf_generation_time_ms",
+        "error_pdf_generation_rate_percent",
+        "uptime_seconds",
+        "total_memory_mb",
+        "available_memory_mb",
+    }
 
 
 def test_health_detailed_false():
     """Test /health?detailed=false returns simple text response."""
-    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
-
-    # Create mock manager
-    mock_manager = AsyncMock()
-    # Mock lifespan methods (start/stop are async)
-    mock_manager.start = AsyncMock()
-    mock_manager.stop = AsyncMock()
-    # health_check() is a regular method, not async
-    mock_manager.health_check = MagicMock(return_value=True)
-
-    # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
+    with TestClient(app) as test_client:
         result = test_client.get("/health?detailed=false")
 
-        assert result.status_code == 200
-        assert result.headers["content-type"] == "text/plain; charset=utf-8"
-        assert result.text == "OK"
+    assert result.status_code == 200
+    assert result.headers["content-type"] == "text/plain; charset=utf-8"
+    assert result.text == "OK"
 
 
 def test_health_default_no_parameter():
     """Test /health without detailed parameter returns simple text response (default behavior)."""
-    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
-
-    # Create mock manager
-    mock_manager = AsyncMock()
-    # Mock lifespan methods (start/stop are async)
-    mock_manager.start = AsyncMock()
-    mock_manager.stop = AsyncMock()
-    # health_check() is a regular method, not async
-    mock_manager.health_check = MagicMock(return_value=True)
-
-    # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
+    with TestClient(app) as test_client:
         result = test_client.get("/health")
 
-        assert result.status_code == 200
-        assert result.headers["content-type"] == "text/plain; charset=utf-8"
-        assert result.text == "OK"
+    assert result.status_code == 200
+    assert result.headers["content-type"] == "text/plain; charset=utf-8"
+    assert result.text == "OK"
 
 
-def test_health_detailed_with_health_monitoring_disabled():
-    """Test /health?detailed=true when health monitoring is disabled."""
-    os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
+def test_a_removed_query_parameter_is_ignored():
+    """Old clients still send scale_factor, which no longer has an effect."""
+    with TestClient(app) as test_client:
+        result = test_client.post("/convert/html?scale_factor=2.0", content="<p>text</p>")
 
-    # Create mock manager
-    mock_manager = AsyncMock()
-    # Mock lifespan methods (start/stop are async)
-    mock_manager.start = AsyncMock()
-    mock_manager.stop = AsyncMock()
-    # health_check() and other sync methods use MagicMock
-    mock_manager.health_check = MagicMock(return_value=True)
-    mock_manager.is_running = MagicMock(return_value=True)
-    mock_manager.get_version = MagicMock(return_value="131.0.6778.33")
-    mock_manager.health_check_enabled = False
-    mock_manager.get_metrics = MagicMock(
-        return_value={
-            "pdf_generations": 5,
-            "failed_pdf_generations": 0,
-            "total_svg_conversions": 15,
-            "failed_svg_conversions": 0,
-            "error_pdf_generation_rate_percent": 0.0,
-            "error_svg_conversion_rate_percent": 0.0,
-            "total_chromium_restarts": 0,
-            "avg_pdf_generation_time_ms": 100.0,
-            "avg_svg_conversion_time_ms": 45.0,
-            "last_health_check": "",
-            "last_health_status": False,
-            "uptime_seconds": 1800.0,
-            "current_cpu_percent": 2.5,
-            "avg_cpu_percent": 1.8,
-            "total_memory_mb": 16384.0,
-            "available_memory_mb": 10240.0,
-            "current_chromium_memory_mb": 95.5,
-            "avg_chromium_memory_mb": 90.2,
-            "queue_size": 0,
-            "active_pdf_generations": 0,
-            "avg_queue_time_ms": 5.25,
-            "max_concurrent_pdf_generations": 10,
-        }
-    )
-
-    # Patch the singleton instance directly
-    with patch("app.chromium_manager._chromium_manager", mock_manager), TestClient(app) as test_client:
-        result = test_client.get("/health?detailed=true")
-
-        assert result.status_code == 200
-        assert result.headers["content-type"] == "application/json"
-
-        data = result.json()
-        assert data["status"] == "healthy"
-        assert data["version"] == "test1"
-        assert data["weasyprint_version"] is not None
-        assert data["health_monitoring_enabled"] is False
-        assert data["metrics"]["last_health_check"] == ""
-        assert data["metrics"]["pdf_generations"] == 5
-        assert data["metrics"]["total_svg_conversions"] == 15
+    assert result.status_code == 200
 
 
 def test_pdf_rendering_runs_off_the_event_loop():

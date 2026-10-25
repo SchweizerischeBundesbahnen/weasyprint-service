@@ -18,9 +18,9 @@ def test_dashboard_endpoint_returns_html():
         assert result.headers["content-type"] == "text/html; charset=utf-8"
         assert "WeasyPrint Service Monitor" in result.text
         assert "chart.umd.min.js" in result.text  # Local Chart.js file
-        assert "queueChart" in result.text
-        assert "cpuChart" in result.text
         assert "memoryChart" in result.text
+        assert "queueChart" not in result.text
+        assert "cpuChart" not in result.text
 
 
 def test_dashboard_contains_required_elements():
@@ -31,32 +31,28 @@ def test_dashboard_contains_required_elements():
         result = test_client.get("/dashboard")
         html_content = result.text
 
-        # Check for all 12 metric cards
+        # Check for all 6 metric cards
         assert "Status" in html_content
         assert "Uptime" in html_content
-        assert "Concurrent Slots" in html_content
-        assert "Queue" in html_content
         assert "PDF Generations" in html_content
         assert "Avg Generation Time" in html_content
         assert "Failed Generations" in html_content
         assert "Generation Error Rate" in html_content
-        assert "SVG Conversions" in html_content
-        assert "Avg Conversion Time" in html_content
-        assert "Failed Conversions" in html_content
-        assert "Conversion Error Rate" in html_content
 
-        # Check for charts (3 charts: Queue, CPU, Memory)
-        assert "Queue & Active PDF Generations" in html_content
-        assert "CPU Usage" in html_content
+        # Check for the memory chart, the only one
         assert "Memory Usage" in html_content
+
+        # The browser and its SVG conversions are gone
+        assert "Chromium" not in html_content
+        assert "SVG Conversions" not in html_content
 
         # Check for version info in header
         assert "Service:" in html_content
         assert "WeasyPrint:" in html_content
-        assert "Chromium:" in html_content
+        assert "SVG renderer:" in html_content
         assert "serviceVersion" in html_content
         assert "weasyprintVersion" in html_content
-        assert "chromiumVersion" in html_content
+        assert "svgRenderer" in html_content
 
 
 def test_dashboard_auto_refresh_configured():

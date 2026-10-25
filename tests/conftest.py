@@ -1,13 +1,6 @@
 """Pytest configuration and fixtures for weasyprint-service tests."""
 
-import os
-
 import pytest
-
-# The suite runs in the chromium SVG mode, whatever the environment says: the controller reads SVG_RENDERER
-# at import, and weasysvg patches WeasyPrint for the whole process. A fixture would come too late.
-# The tests of weasysvg, the default mode, switch the mode themselves.
-os.environ["SVG_RENDERER"] = "chromium"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

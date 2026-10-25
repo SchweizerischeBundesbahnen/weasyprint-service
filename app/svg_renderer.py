@@ -1,9 +1,9 @@
 """
-Selection of the SVG renderer.
+The SVG renderer.
 
-SVG_RENDERER picks who draws the SVG of a document. ``weasysvg`` (default) lets WeasyPrint draw it
-natively, so it stays vector in the PDF, and the service starts no browser. ``chromium`` rasterizes
-it to PNG through the browser, as the service did before.
+weasysvg lets WeasyPrint draw the SVG of a document natively, so it stays vector in the PDF.
+It is the only renderer: the Chromium renderer of earlier versions is gone. SVG_RENDERER is
+read only to warn a deployment which still asks for another renderer.
 """
 
 from __future__ import annotations
@@ -14,44 +14,28 @@ import os
 
 import weasysvg
 
-CHROMIUM = "chromium"
 WEASYSVG = "weasysvg"
-SVG_RENDERERS = (CHROMIUM, WEASYSVG)
-DEFAULT_SVG_RENDERER = WEASYSVG
 
 logger = logging.getLogger(__name__)
 
 
-def get_svg_renderer() -> str:
-    """
-    Read the SVG renderer from the SVG_RENDERER variable.
-
-    Returns:
-        ``chromium`` or ``weasysvg``. The value is case-insensitive and may carry whitespace.
-        An unset, empty or unknown value falls back to ``weasysvg``.
-    """
-    value = os.environ.get("SVG_RENDERER", DEFAULT_SVG_RENDERER).strip().lower()
-    if not value:
-        return DEFAULT_SVG_RENDERER
-    if value not in SVG_RENDERERS:
-        logger.warning("Invalid SVG_RENDERER value '%s', using default: %s", value, DEFAULT_SVG_RENDERER)
-        return DEFAULT_SVG_RENDERER
-    return value
+def warn_about_svg_renderer() -> None:
+    """Log a warning when SVG_RENDERER asks for a renderer other than weasysvg. It never fails."""
+    value = os.environ.get("SVG_RENDERER", "").strip()
+    if value and value.lower() != WEASYSVG:
+        logger.warning("SVG_RENDERER=%s is no longer supported; weasysvg draws SVG", value)
 
 
 def configure_svg_renderer() -> str:
     """
-    Select the SVG renderer and prepare WeasyPrint for it.
-
-    weasysvg patches WeasyPrint for the whole process, so it is installed only when it is selected.
+    Install weasysvg, which patches WeasyPrint for the whole process.
 
     Returns:
-        The selected renderer.
+        The renderer, always ``weasysvg``.
     """
-    renderer = get_svg_renderer()
-    if renderer == WEASYSVG:
-        weasysvg.install()
-    return renderer
+    warn_about_svg_renderer()
+    weasysvg.install()
+    return WEASYSVG
 
 
 def get_weasysvg_version() -> str:

@@ -83,149 +83,14 @@ curl -X POST "http://localhost:9080/convert/html?full_fonts=true" \
 
 ### SVG Renderer
 
-The `SVG_RENDERER` environment variable selects who draws the SVG of a document.
+WeasyPrint draws the SVG of a document natively through the [weasysvg](https://github.com/grigoriev/weasysvg) plugin. The SVG stays vector in the PDF: text in a diagram can be selected and searched, and the PDF is usually smaller. An image without a width of its own keeps the place a browser gives it (#409).
 
-**Valid values:** `weasysvg` (default), `chromium`. The value is case-insensitive.
-
-- `weasysvg`: WeasyPrint draws the SVG natively through the [weasysvg](https://github.com/grigoriev/weasysvg) plugin. The SVG stays vector in the PDF. The service does not start Chromium.
-- `chromium`: Chromium rasterizes each SVG to PNG, and the PNG goes into the PDF. This was the default of earlier versions, and stays available as a fallback.
-
-To go back to Chromium:
-
-```bash
-docker run --detach \
-  --init \
-  --publish 9080:9080 \
-  --name weasyprint-service \
-  --env SVG_RENDERER=chromium \
-  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
-```
-
-What changes against `chromium`:
-- An image without a width of its own keeps the place a browser gives it. In `chromium` mode of earlier versions, a shortened diagram stood centered in a box as wide as its SVG (#409).
-- Text in a diagram can be selected and searched, and the PDF is usually smaller.
-
-With `weasysvg`:
-- `DEVICE_SCALE_FACTOR`, the `scale_factor` query parameter, `MAX_CONCURRENT_CONVERSIONS` and all `CHROMIUM_*` variables have no effect.
-- `/health` does not depend on Chromium. `/health?detailed=true` reports `chromium_running: false` and `svg_renderer: weasysvg`.
-- `/version` reports `chromium: null`, `svgRenderer: weasysvg` and the weasysvg version.
-- The HTML to PDF metrics keep counting. The SVG to PNG and Chromium metrics stay at zero.
-
-The image takes its default from the `SVG_RENDERER` build argument (`weasysvg`): `docker build --build-arg SVG_RENDERER=chromium ...`.
-
-**Note:** An invalid value falls back to the default (`weasysvg`) with a warning logged.
-
-### Device Scaling
-
-> Only with `SVG_RENDERER=chromium`. The default `weasysvg` mode starts no browser, and this setting has no effect there.
-
-Device Scaling can be configured via the `DEVICE_SCALE_FACTOR` environment variable. This allows you to adjust the scaling factor for the SVG to PNG conversion.
-
-**Valid range:** 1.0 - 10.0 (default: 1.0)
-
-To customize the device scaling when running the container:
-
-```bash
-docker run --detach \
-  --init \
-  --publish 9080:9080 \
-  --name weasyprint-service \
-  --env SVG_RENDERER=chromium \
-  --env DEVICE_SCALE_FACTOR=2.0 \
-  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
-```
-
-**Note:** Invalid values will fall back to default (1.0) with a warning logged.
-
-### Concurrency Control
-
-> Only with `SVG_RENDERER=chromium`. The default `weasysvg` mode starts no browser, and this setting has no effect there.
-
-The service limits concurrent SVG to PNG conversions to prevent memory leaks and resource exhaustion.
-
-**Valid range:** 1 - 100 (default: 10)
-
-To customize the concurrency limit when running the container:
-
-```bash
-docker run --detach \
-  --init \
-  --publish 9080:9080 \
-  --name weasyprint-service \
-  --env SVG_RENDERER=chromium \
-  --env MAX_CONCURRENT_CONVERSIONS=20 \
-  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
-```
-
-**Note:** Invalid values will fall back to default (10) with a warning logged.
-
-### Automatic Chromium Restart
-
-> Only with `SVG_RENDERER=chromium`. The default `weasysvg` mode starts no browser, and this setting has no effect there.
-
-The service can automatically restart the Chromium browser after a specified number of conversions to prevent memory accumulation and ensure long-term stability.
-
-**Valid range:** 0 - 10000 (default: 0 = disabled)
-
-To enable automatic restart after every 1000 conversions:
-
-```bash
-docker run --detach \
-  --init \
-  --publish 9080:9080 \
-  --name weasyprint-service \
-  --env SVG_RENDERER=chromium \
-  --env CHROMIUM_RESTART_AFTER_N_CONVERSIONS=1000 \
-  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
-```
-
-**How it works:**
-- When enabled (value > 0), Chromium will automatically restart after reaching the specified conversion count
-- The restart happens transparently before the next conversion begins
-- Conversion counter resets to 0 after each restart
-- Set to 0 (default) to disable automatic restarts
-- Useful for long-running services with high conversion volumes
-
-**Note:** Invalid values will fall back to default (0) with a warning logged.
-
-### Chromium Requirements and Recovery
-
-> Only with `SVG_RENDERER=chromium`. In the default `weasysvg` mode the service starts no browser, starts without one, and `/health` does not depend on it.
-
-In the `chromium` mode the service requires a persistent Chromium browser instance for SVG to PNG conversion.
-
-**Startup Behavior (Fail-Fast):**
-- The service will terminate if Chromium cannot be initialized during startup
-- Common causes: Missing dependencies, insufficient memory, or missing Chromium binaries
-- Docker requirements: `--shm-size` should be configured if running many concurrent conversions
-- Health check: The `/health` endpoint verifies Chromium is running and healthy at runtime
-
-**Automatic Recovery:**
-- If a conversion fails due to Chromium crash or error, the service automatically restarts Chromium and retries
-- **Valid range:** 1 - 10 (default: 2)
-- This provides resilience against transient Chromium failures during operation
-- If restart fails or all retry attempts are exhausted, the conversion request will fail with an error
-- Recovery attempts are logged for monitoring and troubleshooting
-
-To customize the number of retry attempts:
-```bash
-docker run --detach \
-  --init \
-  --publish 9080:9080 \
-  --name weasyprint-service \
-  --env SVG_RENDERER=chromium \
-  --env CHROMIUM_MAX_CONVERSION_RETRIES=3 \
-  ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
-```
-
-**Note:** Invalid values will fall back to default (2) with a warning logged.
-
-**Monitoring:**
-- Use Docker healthcheck or the `/health` endpoint to monitor service availability
-- Check service logs for automatic recovery events and conversion failures
-- Failed conversions are logged with WARNING level, recovery attempts with INFO level
-
-To diagnose Chromium startup issues, check the service logs for error messages during initialization. The container will exit if Chromium fails to start.
+The service has no Chromium. Earlier versions rasterized SVG to PNG through Chromium: by default at first, later with `SVG_RENDERER=chromium`. That mode is gone:
+- `SVG_RENDERER` set to anything but `weasysvg` logs a warning at startup. The service starts and draws SVG with weasysvg.
+- `DEVICE_SCALE_FACTOR`, `MAX_CONCURRENT_CONVERSIONS` and all `CHROMIUM_*` variables have no effect.
+- The `scale_factor` query parameter has no effect. The `/convert/*` endpoints ignore it, so old clients keep working.
+- `/version` has no `chromium` field. `/health?detailed=true` has no `chromium_running`, `chromium_version` and `health_monitoring_enabled` fields, and no SVG, browser or queue metrics.
+- The Prometheus metrics of SVG conversions, of Chromium and of the conversion queue are gone. See [Prometheus & Grafana Integration](#prometheus--grafana-integration).
 
 ### Graceful Shutdown
 
@@ -233,7 +98,7 @@ The service shuts down on SIGTERM, the signal `docker stop` and Kubernetes send.
 
 1. Stops accepting new requests.
 2. Waits for the running conversions to finish.
-3. Closes the metrics server and the Chromium browser.
+3. Closes the metrics server.
 4. Exits with code 143 (128 + SIGTERM), the normal result of a stop by signal.
 
 The wait for running conversions is bounded by the `GRACEFUL_SHUTDOWN_TIMEOUT` environment variable:
@@ -251,7 +116,7 @@ docker run --detach \
 
 The rendering runs in a worker thread, so SIGTERM is acted on the moment it arrives and the timeout starts counting at once, whatever a conversion is doing. A rendering already under way still runs to its end: the worker thread is not interrupted, and the process leaves once it returns. Size the stop grace period for the longest document the service converts, not only for the timeout. `MAX_CONCURRENT_PDF_CONVERSIONS` bounds how many renderings run at the same time (1 - 100, default: 2). It is the size of the thread pool the renderings run in, so the number is the real ceiling; further requests wait for a free thread. Rendering is memory heavy, so raise the limit together with the memory of the container. See [Memory Requirements](#memory-requirements).
 
-Keep the stop grace period of the orchestrator above this value (`docker stop --time`, or `terminationGracePeriodSeconds` in Kubernetes). A shorter one ends in SIGKILL, which leaves the Chromium browser unclosed.
+Keep the stop grace period of the orchestrator above this value (`docker stop --time`, or `terminationGracePeriodSeconds` in Kubernetes). A shorter one ends in SIGKILL, which cuts the running conversions off.
 
 The log line `Service shutdown complete` marks a shutdown which ran to the end.
 
@@ -263,16 +128,13 @@ The service includes an interactive web-based monitoring dashboard accessible at
 
 **Key Performance Indicators:**
 - Service health status with real-time indicator
-- Total conversions (HTML→PDF and SVG→PNG)
+- Total and failed HTML→PDF conversions
 - Error rate percentage
-- Current queue size and active conversions
 - Average response time
-- System uptime and browser restarts
+- Service uptime
 
 **Interactive Charts:**
-1. **Queue & Active Conversions** - Real-time visualization of request queue and concurrent processing
-2. **CPU Usage (%)** - CPU consumption tracking with percentage scale
-3. **Memory Usage (MB)** - Memory tracking showing Chromium memory, total system memory, and available memory
+1. **Memory Usage (MB)** - Total and available system memory
 
 **Technical Details:**
 - **Auto-refresh**: Updates every 5 seconds
@@ -280,7 +142,7 @@ The service includes an interactive web-based monitoring dashboard accessible at
 - **Technology**: Chart.js 4.4.0 (bundled locally) for visualizations
 - **Design**: Light or dark theme support via environment variable
 - **API endpoint**: Fetches data from `/health?detailed=true`
-- **Version information**: Service, WeasyPrint, and Chromium versions displayed in the header
+- **Version information**: Service and WeasyPrint versions and the SVG renderer displayed in the header
 
 **Theme Configuration:**
 
@@ -320,28 +182,20 @@ The service exposes Prometheus-compatible metrics for comprehensive monitoring a
 - `pdf_generations_total` - Total successful PDF generations
 - `pdf_generation_failures_total` - Total failed PDF conversions
 - `pdf_generation_error_rate_percent` - PDF generation error rate
-- `svg_conversions_total` - Total successful SVG conversions
-- `svg_conversion_failures_total` - Total failed SVG conversions
-- `svg_conversion_error_rate_percent` - SVG conversion error rate
 
 **Performance Metrics:**
 - `pdf_generation_duration_seconds` - PDF generation time histogram
-- `svg_conversion_duration_seconds` - SVG conversion time histogram
-- `queue_time_seconds` - Request queue wait time histogram
+- `avg_pdf_generation_time_seconds` - Average PDF generation time
 - `http_request_duration_seconds` - HTTP request duration histogram
 
 **Resource Metrics:**
-- `cpu_percent` - Current CPU usage
 - `system_memory_total_bytes` - Total system memory
 - `system_memory_available_bytes` - Available system memory
-- `chromium_memory_bytes` - Current Chromium memory usage
-- `queue_size` - Current requests in queue
-- `active_pdf_generations` - Active PDF generations processes
+- `process_resident_memory_bytes` - Memory of the service process
+- `process_cpu_seconds_total` - CPU time of the service process
 
 **Health Metrics:**
 - `uptime_seconds` - Service uptime
-- `chromium_restarts_total` - Chromium restart count
-- `chromium_consecutive_failures` - Health check failure streak
 
 **Prometheus Configuration Example:**
 
@@ -362,14 +216,14 @@ scrape_configs:
 rate(pdf_generations_total[5m])
 
 # Error rate percentage
-(rate(pdf_generation_failures_total[5m]) + rate(svg_conversion_failures_total[5m]))
-/ (rate(pdf_generations_total[5m]) + rate(svg_conversions_total[5m])) * 100
+rate(pdf_generation_failures_total[5m])
+/ (rate(pdf_generations_total[5m]) + rate(pdf_generation_failures_total[5m])) * 100
 
 # 95th percentile conversion duration
 histogram_quantile(0.95, rate(pdf_generation_duration_seconds_bucket[5m]))
 
 # Memory usage (MB)
-chromium_memory_bytes / 1024 / 1024
+process_resident_memory_bytes / 1024 / 1024
 ```
 
 **Docker Compose Example with Prometheus & Grafana:**

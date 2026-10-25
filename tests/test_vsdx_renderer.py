@@ -14,46 +14,33 @@ from app.weasyprint_controller import app
 
 @pytest.fixture
 def installs():
-    """Patch weasyvsdx and weasysvg, whose installs would patch WeasyPrint for the whole process."""
+    """Patch weasyvsdx, whose install would patch WeasyPrint for the whole process."""
     with (
         patch.object(vsdx_renderer.weasyvsdx, "find_converter", return_value="/usr/bin/vsd2xhtml") as find,
         patch.object(vsdx_renderer.weasyvsdx, "install") as weasyvsdx_install,
         patch.object(vsdx_renderer.weasyvsdx, "libvisio_version", return_value="0.1.7") as version,
-        patch.object(vsdx_renderer.weasysvg, "install") as weasysvg_install,
         patch.dict(vsdx_renderer._LIBVISIO, clear=True),
     ):
-        yield find, weasyvsdx_install, weasysvg_install, version
+        yield find, weasyvsdx_install, version
 
 
 def test_configure_installs_weasyvsdx(installs):
-    _, weasyvsdx_install, weasysvg_install, version = installs
+    _, weasyvsdx_install, version = installs
 
-    assert vsdx_renderer.configure_vsdx("weasysvg") is True
+    assert vsdx_renderer.configure_vsdx() is True
     assert vsdx_renderer.get_libvisio_version() == "0.1.7"
     weasyvsdx_install.assert_called_once_with(converter="/usr/bin/vsd2xhtml")
-    weasysvg_install.assert_not_called()
     version.assert_called_once_with("/usr/bin/vsd2xhtml")
 
 
-def test_configure_installs_only_the_foreign_object_of_weasysvg_in_chromium_mode(installs):
-    _, weasyvsdx_install, weasysvg_install, _ = installs
-
-    assert vsdx_renderer.configure_vsdx("chromium") is True
-    weasyvsdx_install.assert_called_once_with(converter="/usr/bin/vsd2xhtml")
-    features = weasysvg_install.call_args.kwargs
-    assert {name for name, wanted in features.items() if wanted} == {"foreign_object"}
-
-
-@pytest.mark.parametrize("svg_renderer", ["weasysvg", "chromium"])
-def test_configure_patches_nothing_without_vsd2xhtml(installs, caplog, svg_renderer):
-    find, weasyvsdx_install, weasysvg_install, version = installs
+def test_configure_patches_nothing_without_vsd2xhtml(installs, caplog):
+    find, weasyvsdx_install, version = installs
     find.return_value = None
 
     with caplog.at_level("WARNING", logger="app.vsdx_renderer"):
-        assert vsdx_renderer.configure_vsdx(svg_renderer) is False
+        assert vsdx_renderer.configure_vsdx() is False
     assert vsdx_renderer.get_libvisio_version() is None
     weasyvsdx_install.assert_not_called()
-    weasysvg_install.assert_not_called()
     version.assert_not_called()
     assert "vsd2xhtml not found: install libvisio-tools" in caplog.text
 

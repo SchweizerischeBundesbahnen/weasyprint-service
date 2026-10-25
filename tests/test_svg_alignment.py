@@ -1,4 +1,4 @@
-"""An SVG image the document limits in height keeps the alignment of its table column, in the chromium renderer; #409."""
+"""An SVG image the document limits in height keeps the alignment of its table column; #409."""
 
 import base64
 
@@ -14,6 +14,7 @@ SOURCE = "data:image/svg+xml;base64," + base64.b64encode(TALL_SVG.encode()).deco
 ALIGNMENTS = ("left", "center", "right")
 CELL = "vertical-align: top; border: 1px solid #ccc; padding: 5px; width: 33%;"
 TOLERANCE_PT = 1.5
+BLUE = (0x1A / 255, 0x73 / 255, 0xE8 / 255)
 
 
 def _html() -> str:
@@ -28,20 +29,21 @@ def _html() -> str:
     return f'<html><body><table style="width: 100%; table-layout: fixed; border-collapse: collapse;"><tr>{cells}</tr></table></body></html>'
 
 
-@pytest.mark.parametrize("scale", [1.0, 2.0])
-def test_a_shortened_svg_keeps_the_alignment_of_its_column(scale: float) -> None:
+def test_a_shortened_svg_keeps_the_alignment_of_its_column() -> None:
     with TestClient(app) as test_client:
-        result = test_client.post(f"/convert/html?scale_factor={scale}", content=_html())
+        result = test_client.post("/convert/html", content=_html())
     assert result.status_code == 200
 
     with pymupdf.open(stream=result.content, filetype="pdf") as doc:
         page = doc[0]
-        drawn = sorted((rect for image in page.get_images() for rect in page.get_image_rects(image[0])), key=lambda rect: rect.x0)
+        # weasysvg draws the SVG as vector: the blue rectangle of each image is a filled path
+        drawn = sorted((drawing["rect"] for drawing in page.get_drawings() if drawing["fill"] and drawing["fill"] == pytest.approx(BLUE, abs=0.01)), key=lambda rect: rect.x0)
         assert len(drawn) == len(ALIGNMENTS)
         for i, (align, image) in enumerate(zip(ALIGNMENTS, drawn, strict=True)):
             left = page.search_for(f"Start{i}")[0].x0
             right = page.search_for(f"End{i}")[0].x1
-            # The drawing is shortened to 200 px, 150 pt, and narrowed with it: 20 pt, not the 60 pt of the SVG
+            # The drawing is shortened to 200 px, 150 pt, and narrowed with it: 20 pt, not the 60 pt of the SVG.
+            # The rectangle sits 2 px inside the 80x600 SVG, which the tolerance covers.
             assert image.height == pytest.approx(150, abs=TOLERANCE_PT)
             assert image.width == pytest.approx(20, abs=TOLERANCE_PT)
             gaps = f"{align}: column {left:.1f}-{right:.1f} pt, image {image.x0:.1f}-{image.x1:.1f} pt"

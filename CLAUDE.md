@@ -45,7 +45,7 @@ uv sync --group dev --group test
 uv run pytest tests/test_specific_file.py -v
 
 # Run specific test within a file
-uv run pytest tests/test_svg_processor.py::test_process_valid_svg -v
+uv run pytest tests/test_svg_renderer.py::test_svg_is_drawn_as_vector -v
 
 # Manual linting/formatting (if needed outside of tox/pre-commit)
 uv run ruff format
@@ -103,7 +103,7 @@ uv run python scripts/load_test.py --requests 50 --concurrency 5 --verbose
 **Use Cases:**
 - Validate service behavior under load
 - Identify performance bottlenecks
-- Test Chromium browser pool behavior with SVG conversions
+- Measure the cost of SVG drawn by weasysvg
 - Generate performance baselines for CI/CD
 
 ### Local Development Server
@@ -142,30 +142,26 @@ grype weasyprint-service:0.0.0
 - **FormParser** (`app/form_parser.py`): Parses multipart/form-data with configurable limits via environment variables
 - **HtmlParser** (`app/html_parser.py`): Processes HTML content and handles embedded resources
 - **Visio drawings** (`app/vsdx_renderer.py`): weasyvsdx draws VSDX and VSD natively in WeasyPrint, as vector; `/version` adds `weasyvsdx` and `libvisio`
-- **SvgProcessor** (`app/svg_processor.py`, `SVG_RENDERER=chromium` only): Converts SVG to PNG via CDP (Chrome DevTools Protocol) with configurable device scaling (`DEVICE_SCALE_FACTOR` env var)
-- **ChromiumManager** (`app/chromium_manager.py`): Manages persistent Chromium browser instance for SVG to PNG conversion via CDP with proactive health monitoring
-  - Background health monitoring: Periodic checks (configurable interval) to detect browser issues
-  - Auto-restart on degraded health: Automatically restarts browser after 3 consecutive health check failures
-  - Metrics collection: Tracks conversions, errors, response times, restarts, and uptime
-  - Configurable retry logic: Automatic retry with browser restart on conversion failures
+- **SVG** (`app/svg_renderer.py`): weasysvg draws SVG natively in WeasyPrint, as vector. It is the only renderer, the service has no Chromium
+- **ConversionMetrics** (`app/conversion_metrics.py`): Counts HTML to PDF conversions, failures and durations since the service started. `get_conversion_metrics()` is the singleton, taken as a FastAPI dependency by the `/convert/*` endpoints, `/health` and `/metrics`
 - **Schemas** (`app/schemas.py`): Pydantic models for API request/response validation
 
 ### API Endpoints Architecture
 - `/dashboard` - Interactive web-based monitoring dashboard with real-time metrics visualization
-  - Real-time charts for queue size, active conversions, response times, and resource usage
+  - PDF conversion counts, error rate, average time, uptime and a chart of the system memory
   - Auto-refresh every 5 seconds
   - Configurable light/dark theme via DASHBOARD_THEME environment variable (default: light)
 - `/health` - Health check endpoint with optional detailed metrics
-  - Simple mode (default): Returns 200 "OK" or 503 "Service Unavailable"
-  - Detailed mode (`?detailed=true`): Returns JSON with metrics, browser status, health monitoring info, and queue metrics
-- `/version` - Service version information (apiVersion, Python, WeasyPrint, Chromium, service versions)
+  - Simple mode (default): Returns 200 "OK"
+  - Detailed mode (`?detailed=true`): Returns JSON with status, versions, `svg_renderer` and the PDF conversion metrics (`ConversionMetricsSchema`)
+- `/version` - Service version information (apiVersion, Python, WeasyPrint, service, `svgRenderer`, weasysvg, weasyvsdx, libvisio versions)
   - `apiVersion`: Integer for compatibility checking with pdf-exporter. Increment only on breaking API changes.
 - `/metrics` - Prometheus metrics endpoint (served on dedicated port, default: 9180)
   - **Security**: Exposed on separate port from main API for network-level isolation
   - Returns metrics in Prometheus text format
   - Automatic FastAPI metrics (request duration, in-progress requests, total requests)
-  - Custom ChromiumManager metrics (conversions, failures, error rates, resource usage)
-  - System metrics (CPU, memory, queue size)
+  - Custom conversion metrics (conversions, failures, durations, error rate, uptime)
+  - System memory, and the process metrics of prometheus_client (CPU, resident memory)
   - Compatible with Prometheus scraping and Grafana visualization
 - `/convert/html` - Basic HTML to PDF conversion (accepts HTML string, returns PDF binary)
 - `/convert/html-with-attachments` - HTML to PDF with file attachments support (multipart/form-data, for embedded resources)
@@ -177,7 +173,6 @@ grype weasyprint-service:0.0.0
 - `presentational_hints` - Use HTML presentational hints (default: true)
 - `custom_metadata` - Include custom metadata in PDF (default: false)
 - `full_fonts` - Embed full fonts instead of subsetting (default: false). Escape hatch for fonts that fail during subsetting. Note: fonttools 4.63.0 accepts reserved OS/2 ulUnicodeRange bits 123-127, so the former `ValueError: expected 0 <= int <= 122` no longer occurs (truly out-of-range bits now raise `expected 0 <= int <= 127`)
-- `device_scale_factor` - Override default SVG to PNG scale factor
 
 **Supported PDF variants (WeasyPrint 70.0):**
 - PDF/A basic: `pdf/a-1b`, `pdf/a-2b`, `pdf/a-3b`
@@ -218,20 +213,9 @@ grype weasyprint-service:0.0.0
 - `FORM_MAX_PART_SIZE`: Maximum size per form part in bytes (default: 10485760/10MB)
 
 **SVG Renderer (see `app/svg_renderer.py`):**
-- `SVG_RENDERER`: who draws SVG. `weasysvg` (default) lets WeasyPrint draw it natively through the weasysvg plugin, vector in the PDF. `chromium` rasterizes it to PNG, the default of earlier versions, and stays as a fallback. Case-insensitive; an invalid value falls back to `weasysvg` with a warning. The Dockerfile sets the default through `ARG SVG_RENDERER=weasysvg`.
-- The controller reads it once at import (`configure_svg_renderer()`). `weasysvg.install()` patches WeasyPrint for the whole process, so it runs only in weasysvg mode. `tests/conftest.py` sets `SVG_RENDERER=chromium` before any import, so the suite runs in the chromium mode in any environment; the weasysvg tests switch the mode themselves. The container tests that check Chromium PNGs run the container with `SVG_RENDERER=chromium`; `tests/test_container_default_mode.py` checks the shipped default. Tests switch modes by patching `weasyprint_controller.SVG_RENDERER`; a real conversion with weasysvg runs in a child process (`tests/test_svg_renderer.py`).
-- With `weasysvg` the lifespan does not start Chromium and `SvgProcessor` is never called. `DEVICE_SCALE_FACTOR`, the `scale_factor` parameter, `MAX_CONCURRENT_CONVERSIONS` and all `CHROMIUM_*` variables have no effect. `/health` is 200 without Chromium, `/health?detailed=true` adds `svg_renderer`, `/version` adds `svgRenderer` and `weasysvg`. HTML to PDF metrics keep counting through the unstarted `ChromiumManager`.
-
-**Chromium/SVG Processing:**
-- `DEVICE_SCALE_FACTOR`: SVG to PNG conversion scaling factor via CDP (float, 1.0-10.0, default: 1.0)
-- `MAX_CONCURRENT_CONVERSIONS`: Max concurrent SVG conversions (1-100, default: 10)
-- `CHROMIUM_RESTART_AFTER_N_CONVERSIONS`: Restart Chromium after N conversions (0-10000, default: 0 = disabled)
-- `CHROMIUM_MAX_CONVERSION_RETRIES`: Max retry attempts on conversion failure (1-10, default: 2)
-- `CHROMIUM_CONVERSION_TIMEOUT`: Timeout in seconds for each conversion (5-300, default: 30)
-
-**Health Monitoring:**
-- `CHROMIUM_HEALTH_CHECK_ENABLED`: Enable background health monitoring (true/false, default: true)
-- `CHROMIUM_HEALTH_CHECK_INTERVAL`: Interval in seconds for background health checks (10-300, default: 30)
+- weasysvg draws SVG, always. The controller installs it once at import (`configure_svg_renderer()`), before weasyvsdx, which draws the text of Visio drawings with its foreignObject. `weasysvg.install()` patches WeasyPrint for the whole process, so the whole test suite runs with it.
+- `SVG_RENDERER` is read only to warn: a value other than `weasysvg` logs `SVG_RENDERER=<value> is no longer supported; weasysvg draws SVG`. The service never fails on it.
+- The Chromium mode is gone. `DEVICE_SCALE_FACTOR`, `MAX_CONCURRENT_CONVERSIONS`, all `CHROMIUM_*` variables and the `scale_factor` query parameter have no effect; FastAPI ignores the unknown parameter, so old clients keep working.
 
 **Dashboard Configuration:**
 - `DASHBOARD_THEME`: Dashboard theme (light/dark, case-insensitive, default: light)
@@ -341,7 +325,7 @@ grype weasyprint-service:0.0.0
 - Python 3.13+ syntax and features
 - FastAPI patterns already in use
 - Temporary file handling patterns
-- Playwright Chromium for SVG conversion
+- weasysvg for SVG, weasyvsdx for Visio drawings
 
 ### Project-Specific Review Focus
 
@@ -353,17 +337,15 @@ grype weasyprint-service:0.0.0
    - Secrets exposure in logs
    - SVG/HTML injection attacks
 
-2. **WeasyPrint/Chromium Integration**:
+2. **WeasyPrint Integration**:
    - Proper error handling for PDF generation failures
-   - ChromiumManager lifecycle management
-   - CDP connection handling
-   - Resource cleanup (browser tabs, temporary files)
+   - Process-wide patches of WeasyPrint (weasysvg, weasyvsdx, the `app/weasyprint_*_patch.py` modules)
+   - Resource cleanup (temporary files)
 
 3. **Resource Management**:
    - Temporary file cleanup
    - Proper async/await patterns
    - Memory leaks in PDF/SVG processing
-   - Browser instance cleanup
 
 4. **Breaking Changes**:
    - API endpoint changes
@@ -422,12 +404,12 @@ The repository uses extensive pre-commit hooks including:
 - **Non-root user**: Container runs as `appuser` (uid 1000) for enhanced security
 - **Python via uv**: Python version installed from `.tool-versions` file (single source of truth)
 - **Base image**: `debian:trixie-slim` with uv for Python management
-- Includes fonts and Playwright Chromium for complete PDF rendering capabilities
+- Includes the fonts the documents use. No browser: weasysvg draws SVG, the image has no Chromium and no Playwright, which the container structure test asserts
 - `libharfbuzz-subset0` lets WeasyPrint subset fonts with HarfBuzz. Without it WeasyPrint falls back to fontTools, warns once per font, and renders small documents about 40% slower. `test_fonts_are_subset_with_harfbuzz` asserts it
-- Visio drawings: weasyvsdx draws VSDX and VSD as vector through `vsd2xhtml` of libvisio (`app/vsdx_renderer.py`, installed at import of the controller). libvisio-tools is 0.1.7 of trixie, which weasyvsdx is tested with; the Dockerfile and the structure test check `vsd2xhtml --version`. `emf2svg`, Carlito, Caladea and Selawik (from its GitHub release, by checksum) serve the drawings. With `SVG_RENDERER=chromium` only the `foreign_object` feature of weasysvg is installed, which weasyvsdx needs for text. Without `vsd2xhtml` nothing is patched and Visio images are left out. LibreOffice is gone
+- Visio drawings: weasyvsdx draws VSDX and VSD as vector through `vsd2xhtml` of libvisio (`app/vsdx_renderer.py`, installed at import of the controller). libvisio-tools is 0.1.7 of trixie, which weasyvsdx is tested with; the Dockerfile and the structure test check `vsd2xhtml --version`. `emf2svg`, Carlito, Caladea and Selawik (from its GitHub release, by checksum) serve the drawings. weasyvsdx draws text with the `foreign_object` feature of weasysvg, which is installed first. Without `vsd2xhtml` nothing is patched and Visio images are left out. LibreOffice is gone
 - Logging directory `/opt/weasyprint/logs` with timestamped log files
 - Custom fonts can be mounted via `/usr/share/fonts/custom`
-- Playwright Chromium browser installed via `playwright install --only-shell chromium`: the service launches the headless shell, the full browser (which alone needs libcups2 and libcairo2) is not in the image. No `--with-deps` either: that would add xvfb, an X server the headless service never uses. The libraries and fonts Playwright lists for Chromium are in the apt list of the Dockerfile; keep them in step when Playwright changes its list (`playwright install-deps --dry-run chromium` in a fresh `debian:trixie-slim` shows it)
+- The apt list holds what WeasyPrint, weasysvg, weasyvsdx and the documents need: Pango, HarfBuzz subsetting, libvisio-tools, emf2svg and the fonts. The libraries Playwright listed for Chromium left with it
 - The image has no compiler: `uv sync` runs with `--no-build`, so a dependency without a wheel for the Python of `.tool-versions` fails the build instead of compiling.
 - pip is removed from the uv-installed Python in `/opt/python`, in the layer that installs it. Nothing in the image uses pip, and image scanners report the packages it vendors. The container structure test asserts it is absent.
 - Every `uv run` in the Dockerfile needs `--no-sync`: without it uv syncs the default groups again and puts the `dev` group (ruff, ty, pre-commit) into the image. The container structure test asserts they are absent.
@@ -442,52 +424,18 @@ The repository uses extensive pre-commit hooks including:
 - Static analysis via ty
 
 ### Request/Response Flow
-1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → WeasyPrint renders, drawing SVG through weasysvg (with `SVG_RENDERER=chromium`, SvgProcessor first converts SVG to PNG via CDP) → PDF returned
-2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → WeasyPrint renders, drawing SVG through weasysvg (with `SVG_RENDERER=chromium`, SvgProcessor first converts SVG to PNG) → PDF returned
-3. **SVG Processing via CDP** (`SVG_RENDERER=chromium` only): SVG detected → SvgProcessor uses ChromiumManager (persistent Chromium instance) → CDP creates browser tab → Renders SVG → Screenshots as PNG → Tab closed → PNG embedded in PDF
-4. **Application Lifecycle** (the browser parts with `SVG_RENDERER=chromium` only; the default weasysvg mode starts no browser and no health monitor):
-   - FastAPI startup → ChromiumManager starts persistent Chromium browser
-   - Background health monitor starts (if enabled) → Periodic health checks every 30s (configurable)
-   - Handles all SVG conversions with automatic retry and metrics collection
-   - Auto-restart on health degradation (3 consecutive failures)
-   - FastAPI shutdown → Health monitor stops → Chromium stops gracefully
-5. **Shutdown on SIGTERM**: `docker stop` sends SIGTERM → `entrypoint.sh` runs the server via `exec`, so the signal reaches it → uvicorn stops accepting requests, waits up to `GRACEFUL_SHUTDOWN_TIMEOUT` → lifespan shutdown closes the metrics server and, in chromium mode, Chromium → last log line is `Service shutdown complete` → exit code 143 (uvicorn re-raises the signal), which is a normal stop
+1. **HTML to PDF Conversion**: Client sends HTML → HtmlParser processes → WeasyPrint renders, drawing SVG through weasysvg → PDF returned
+2. **With Attachments**: Multipart form → FormParser validates limits → AttachmentManager extracts files → HtmlParser resolves references → WeasyPrint renders, drawing SVG through weasysvg → PDF returned
+3. **Application Lifecycle**: FastAPI startup → the PDF rendering pool and the metrics server start → FastAPI shutdown → the metrics server stops, queued renderings are dropped
+4. **Metrics**: each `/convert/*` request records its success or failure in `ConversionMetrics` and in the Prometheus counters
+5. **Shutdown on SIGTERM**: `docker stop` sends SIGTERM → `entrypoint.sh` runs the server via `exec`, so the signal reaches it → uvicorn stops accepting requests, waits up to `GRACEFUL_SHUTDOWN_TIMEOUT` → lifespan shutdown closes the metrics server → last log line is `Service shutdown complete` → exit code 143 (uvicorn re-raises the signal), which is a normal stop
 
-### Chromium Health Monitoring
+### Monitoring
 
-The ChromiumManager includes proactive health monitoring to ensure reliability:
-
-**Features:**
-- **Background Health Checks**: Runs every 30 seconds (configurable via `CHROMIUM_HEALTH_CHECK_INTERVAL`)
-- **Automatic Recovery**: Restarts browser after 3 consecutive health check failures
-- **Metrics Collection**: Tracks all conversions, failures, response times, and system uptime
-- **Retry Logic**: Automatic retry with browser restart on conversion errors (configurable via `CHROMIUM_MAX_CONVERSION_RETRIES`)
-- **Queue Monitoring**: Real-time tracking of request queue and active conversions
-- **Detailed Health Endpoint**: Access `/health?detailed=true` for JSON metrics including:
-  - Total conversions and failures (HTML→PDF and SVG→PNG)
-  - Error rate percentage
-  - Average conversion time
-  - Browser restarts count
-  - Uptime and last health check status
-  - Queue metrics: queue size, active conversions, max queue size, average queue wait time
-
-**Configuration:**
-```bash
-# Enable/disable health monitoring (default: true)
-CHROMIUM_HEALTH_CHECK_ENABLED=true
-
-# Health check interval in seconds (10-300, default: 30)
-CHROMIUM_HEALTH_CHECK_INTERVAL=30
-
-# Auto-restart after N conversions (0=disabled, default: 0)
-CHROMIUM_RESTART_AFTER_N_CONVERSIONS=1000
-
-# Max retry attempts on failure (1-10, default: 2)
-CHROMIUM_MAX_CONVERSION_RETRIES=3
-
-# Conversion timeout in seconds (5-300, default: 30)
-CHROMIUM_CONVERSION_TIMEOUT=30
-```
+The service keeps conversion metrics in `ConversionMetrics` (`app/conversion_metrics.py`):
+- Total and failed HTML→PDF conversions, error rate percentage, average conversion time
+- Uptime since the service started, total and available system memory
+- `/health?detailed=true` returns them as JSON, `/metrics` exports them to Prometheus
 
 **Monitoring Dashboard:**
 ```bash
@@ -495,12 +443,10 @@ CHROMIUM_CONVERSION_TIMEOUT=30
 open http://localhost:9080/dashboard
 
 # Dashboard features:
-# - Real-time charts with 5-second auto-refresh
-# - Queue size and active conversions visualization
-# - Response time metrics (HTML→PDF and SVG→PNG)
-# - Resource usage (CPU and Memory)
-# - Conversion rate graphs
-# - System information and health status
+# - 5-second auto-refresh
+# - PDF conversions, failures, error rate and average time
+# - Uptime and a chart of the system memory
+# - Service and WeasyPrint versions and the SVG renderer
 # - Configurable light/dark theme (DASHBOARD_THEME env var, default: light)
 
 # Configure dashboard theme
@@ -511,40 +457,24 @@ DASHBOARD_THEME=dark uv run python -m app.weasyprint_service_application --port 
 ```bash
 # Simple health check
 curl http://localhost:9080/health
-# Response: OK (200) or Service Unavailable (503)
+# Response: OK (200)
 
 # Detailed health with metrics (used by dashboard)
 curl http://localhost:9080/health?detailed=true
 # Response (JSON):
 {
   "status": "healthy",
-  "chromium_running": true,
-  "chromium_version": "131.0.6778.69",
-  "health_monitoring_enabled": true,
+  "version": "70.0.7",
+  "weasyprint_version": "70.0",
+  "svg_renderer": "weasysvg",
   "metrics": {
-    "total_conversions": 1523,
-    "failed_conversions": 2,
-    "total_svg_conversions": 458,
-    "failed_svg_conversions": 1,
-    "error_rate_percent": 0.13,
-    "total_chromium_restarts": 0,
-    "avg_conversion_time_ms": 145.23,
-    "avg_svg_conversion_time_ms": 82.45,
-    "last_health_check": "14:30:45 16.10.2025",
-    "last_health_status": true,
-    "consecutive_failures": 0,
+    "pdf_generations": 1523,
+    "failed_pdf_generations": 2,
+    "avg_pdf_generation_time_ms": 145.23,
+    "error_pdf_generation_rate_percent": 0.13,
     "uptime_seconds": 3600.45,
-    "current_cpu_percent": 12.5,
-    "avg_cpu_percent": 8.3,
     "total_memory_mb": 16384.0,
-    "available_memory_mb": 8192.0,
-    "current_chromium_memory_mb": 256.8,
-    "avg_chromium_memory_mb": 234.5,
-    "queue_size": 3,
-    "max_queue_size": 15,
-    "active_conversions": 7,
-    "avg_queue_time_ms": 12.34,
-    "max_concurrent_conversions": 10
+    "available_memory_mb": 8192.0
   }
 }
 ```
@@ -560,30 +490,18 @@ The service exposes metrics in Prometheus format via the `/metrics` endpoint on 
 - `http_requests_total` - Total HTTP requests counter
 - `http_requests_inprogress` - Current in-flight HTTP requests
 
-**Custom ChromiumManager Metrics:**
+**Custom Conversion Metrics:**
 - `pdf_generations_total` - Total successful HTML→PDF conversions
 - `pdf_generation_failures_total` - Failed HTML→PDF conversions
-- `svg_conversions_total` - Total successful SVG→PNG conversions
-- `svg_conversion_failures_total` - Failed SVG→PNG conversions
 - `pdf_generation_duration_seconds` - PDF generation duration histogram (buckets: 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
-- `svg_conversion_duration_seconds` - SVG conversion duration histogram (buckets: 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
 - `pdf_generation_error_rate_percent` - PDF generation error rate percentage
-- `svg_conversion_error_rate_percent` - SVG conversion error rate percentage
-- `chromium_restarts_total` - Browser restart count
-- `uptime_seconds` - Browser uptime
-- `chromium_consecutive_failures` - Current consecutive health check failures
+- `avg_pdf_generation_time_seconds` - Average PDF generation time
+- `uptime_seconds` - Service uptime
 
 **System & Resource Metrics:**
-- `cpu_percent` - Current Chromium CPU usage percentage
-- `chromium_memory_bytes` - Current Chromium memory usage in bytes
 - `system_memory_total_bytes` - Total system memory in bytes
 - `system_memory_available_bytes` - Available system memory in bytes
-- `queue_size` - Current number of requests in conversion queue
-- `active_pdf_generations` - Current number of active PDF generation processes
-- `queue_time_seconds` - Request queue wait time histogram (buckets: 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0)
-
-**Browser Info:**
-- `chromium_info` - Chromium browser version information
+- `process_resident_memory_bytes`, `process_cpu_seconds_total` - Memory and CPU of the service process, from the default collectors of prometheus_client
 
 **Usage Example:**
 
@@ -598,9 +516,6 @@ pdf_generations_total 1523.0
 # HELP pdf_generation_failures_total Total number of failed HTML to PDF conversions
 # TYPE pdf_generation_failures_total counter
 pdf_generation_failures_total 2.0
-# HELP svg_conversions_total Total number of successful SVG to PNG conversions
-# TYPE svg_conversions_total counter
-svg_conversions_total 458.0
 # HELP uptime_seconds Service uptime in seconds
 # TYPE uptime_seconds gauge
 uptime_seconds 3600.45
@@ -634,30 +549,17 @@ Inbound: TCP 9180 from <Prometheus server IP/SG only>
 # PDF generation rate (requests per second)
 rate(pdf_generations_total[5m])
 
-# SVG conversion rate (requests per second)
-rate(svg_conversions_total[5m])
-
-# Overall error rate percentage
-(
-  rate(pdf_generation_failures_total[5m]) +
-  rate(svg_conversion_failures_total[5m])
-) / (
+# Error rate percentage
+rate(pdf_generation_failures_total[5m]) / (
   rate(pdf_generations_total[5m]) +
-  rate(svg_conversions_total[5m])
+  rate(pdf_generation_failures_total[5m])
 ) * 100
 
 # 95th percentile PDF generation duration
 histogram_quantile(0.95, rate(pdf_generation_duration_seconds_bucket[5m]))
 
-# 95th percentile SVG conversion duration
-histogram_quantile(0.95, rate(svg_conversion_duration_seconds_bucket[5m]))
-
 # Memory usage trend
-chromium_memory_bytes / 1024 / 1024
-
-# Active conversions and queue size
-active_pdf_generations
-queue_size
+process_resident_memory_bytes / 1024 / 1024
 ```
 
 **Alerting Rules Example:**
@@ -676,7 +578,7 @@ groups:
           summary: "High PDF generation error rate"
           description: "PDF generation error rate is {{ $value }}% (threshold: 5%)"
 
-      - alert: ChromiumBrowserDown
+      - alert: WeasyPrintServiceDown
         expr: up{job="weasyprint-service"} == 0
         for: 2m
         labels:
@@ -686,22 +588,13 @@ groups:
           description: "The WeasyPrint service has been unreachable for 2 minutes"
 
       - alert: HighMemoryUsage
-        expr: chromium_memory_bytes > 2147483648  # 2GB
+        expr: process_resident_memory_bytes > 2147483648  # 2GB
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "High Chromium memory usage"
-          description: "Chromium memory usage is {{ $value | humanize }}B"
-
-      - alert: LargeConversionQueue
-        expr: queue_size > 50
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Large conversion queue"
-          description: "Conversion queue has {{ $value }} pending requests"
+          summary: "High service memory usage"
+          description: "Service memory usage is {{ $value | humanize }}B"
 ```
 
 **Complete Monitoring Stack:**

@@ -17,9 +17,9 @@ import uvicorn
 from fastapi import Depends, FastAPI, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.constants import get_bool_env
-from app.prometheus_metrics import update_gauges_from_chromium_manager
+from app.conversion_metrics import ConversionMetrics, get_conversion_metrics
+from app.prometheus_metrics import update_gauges
 from app.tls import METRICS_TLS_PREFIX, get_scheme, load_tls_options
 
 logger = logging.getLogger(__name__)
@@ -41,21 +41,21 @@ metrics_app = FastAPI(
 
 
 @metrics_app.get("/metrics")
-async def metrics(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> Response:
+async def metrics(conversion_metrics: Annotated[ConversionMetrics, Depends(get_conversion_metrics)]) -> Response:
     """
     Expose Prometheus metrics endpoint.
 
     This endpoint returns metrics in Prometheus text format, including:
     - Automatic FastAPI request metrics (duration, in-progress, total) from prometheus-fastapi-instrumentator
-    - Custom ChromiumManager metrics (conversions, failures, resource usage)
-    - System metrics (CPU, memory)
+    - Conversion metrics (conversions, failures, durations, uptime)
+    - System memory, and the process metrics of prometheus_client
 
     The metrics are automatically scraped by Prometheus for monitoring and alerting.
 
     Note: Counters are incremented when events occur. This endpoint only updates gauges
-    to reflect current state (CPU, memory, queue size, etc.).
+    to reflect current state (error rate, uptime, memory).
     """
-    update_gauges_from_chromium_manager(chromium_manager)
+    update_gauges(conversion_metrics)
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

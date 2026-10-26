@@ -74,10 +74,19 @@ jobs:
     with:
       release-type: simple
       include-v-in-tag: false
-  docker-build-and-publish:
+  # Each platform builds on a runner of its own architecture: the Visio stage compiles C++, which takes far longer under QEMU
+  docker-build:
     needs: [verify-with-tox, release-please]
-    runs-on: ubuntu-latest
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
@@ -87,57 +96,103 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
+      - name: 🧱 Prepare the image name and platform
+        id: names
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          {
+            echo "image=${REGISTRY}/${IMAGE_NAME,,}"
+            echo "pair=${PLATFORM//\//-}"
+          } >> "$GITHUB_OUTPUT"
       - name: 🧱 Log into registry ${{ env.REGISTRY }}
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.REGISTRY_USERNAME }}
           password: ${{ env.REGISTRY_PASSWORD }}
-      - name: 🧱 Prepare tags for Docker meta
-        id: tags
-        env:
-          # When release-please is skipped, these values will be empty
-          release_created: ${{ needs.release-please.outputs.release_created }}
-          version: ${{ needs.release-please.outputs.version }}
-        run: |
-          tags=""
-          if [[ "$release_created" = 'true' ]]; then
-            tags="type=semver,pattern={{version}},value=$version
-          type=semver,pattern={{major}},value=$version
-          type=semver,pattern={{major}}.{{minor}},value=$version"
-          else
-            tags="type=ref,event=branch
-          type=ref,event=pr"
-          fi
-          {
-            echo 'tags<<EOF'
-            echo "$tags"
-            echo EOF
-          } >> "$GITHUB_OUTPUT"
       - name: 🧱 Docker meta
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: ${{ steps.tags.outputs.tags }}
-      - name: 🧱 Set up QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1  # v4.4.0
+          images: ${{ steps.names.outputs.image }}
+          tags: type=semver,pattern={{version}},value=${{ needs.release-please.outputs.version }}
       - name: 🧱 Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
         with:
           driver-opts: |
             image=moby/buildkit:latest
             network=host
-      - name: 📦 Build and push
+      - name: 📦 Build and push by digest
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
           provenance: false
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
+          platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
           build-args: APP_IMAGE_VERSION=${{ steps.meta.outputs.version }}
-          # Enable BuildKit cache mounts for faster builds
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          outputs: type=image,name=${{ steps.names.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+          # Enable BuildKit cache mounts for faster builds, one cache per platform
+          cache-from: type=gha,scope=${{ steps.names.outputs.pair }}
+          cache-to: type=gha,mode=max,scope=${{ steps.names.outputs.pair }}
+      - name: 📋 Export the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/digests"
+          touch "${RUNNER_TEMP}/digests/${DIGEST#sha256:}"
+      - name: 📋 Upload the digest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: digests-${{ steps.names.outputs.pair }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+  # Joins the images of the platforms into one multi-platform image under the release tags
+  docker-build-and-publish:
+    needs: [docker-build, release-please]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: 📋 Download the digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+      - name: 🧱 Prepare the image name
+        id: names
+        run: echo "image=${REGISTRY}/${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+      - name: 🧱 Log into registry ${{ env.REGISTRY }}
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USERNAME }}
+          password: ${{ env.REGISTRY_PASSWORD }}
+      - name: 🧱 Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - name: 🧱 Docker meta
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
+        with:
+          images: ${{ steps.names.outputs.image }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.release-please.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.release-please.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.version }}
+      - name: 📦 Create and push the manifest list
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          IMAGE: ${{ steps.names.outputs.image }}
+        run: |
+          # shellcheck disable=SC2046  # one argument per tag and per digest
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf "${IMAGE}@sha256:%s " *)
+      - name: 🔍 Inspect the image
+        env:
+          IMAGE: ${{ steps.names.outputs.image }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: docker buildx imagetools inspect "${IMAGE}:${VERSION}"

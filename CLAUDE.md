@@ -399,7 +399,7 @@ The repository uses extensive pre-commit hooks including:
 - Python 3.15 required
 
 ### Docker Considerations
-- Multi-architecture support (amd64/arm64)
+- Multi-architecture support (amd64/arm64). The release builds each platform on a runner of its own architecture (`ubuntu-24.04-arm` for arm64) and joins them with `docker buildx imagetools create`: under QEMU the Visio stage would compile for far longer
 - Uses `--init` flag for proper signal handling and zombie process reaping
 - **Non-root user**: Container runs as `appuser` (uid 1000) for enhanced security
 - **Python via uv**: Python version installed from `.tool-versions` file (single source of truth)

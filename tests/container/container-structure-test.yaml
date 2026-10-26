@@ -17,15 +17,6 @@ commandTests:
     command: weasyprint
     args: [--version]
     expectedOutput: [70.0]
-  - name: Chromium version is correct
-    # The image has the headless shell alone, which is what the service launches.
-    # The browser directory carries the Playwright revision, and its inner directory
-    # carries the architecture (chrome-headless-shell-linux64 on amd64,
-    # chrome-headless-shell-linux-arm64 on arm64), so both are matched by a glob.
-    # The version string differs per build, so only the version number is asserted.
-    command: sh
-    args: [-c, /opt/playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell --version]
-    expectedOutput: [156\.0\.8078\.4]
   - name: Tox should not be installed
     command: uv
     args: [run, --no-sync, tox, --version]
@@ -50,11 +41,6 @@ commandTests:
   - name: Curl should not be installed
     command: sh
     args: [-c, '! command -v curl']
-    exitCode: 0
-  # Chromium runs headless, playwright install --with-deps would add an X server
-  - name: Xvfb should not be installed
-    command: sh
-    args: [-c, '! command -v Xvfb']
     exitCode: 0
   # Every package installs from a wheel, the image needs no compiler
   - name: A C compiler should not be installed
@@ -112,11 +98,6 @@ commandTests:
     command: sh
     args: [-c, 'fc-match serif | grep -q "DejaVu Serif" && fc-match sans-serif | grep -q "DejaVu Sans"']
     exitCode: 0
-# The default image draws SVG with weasysvg; Chromium stays in it for SVG_RENDERER=chromium
-metadataTest:
-  envVars:
-    - key: SVG_RENDERER
-      value: weasysvg
 fileExistenceTests:
   - name: Log directory
     path: /opt/weasyprint/logs

@@ -292,7 +292,7 @@
             <div class="header-info">
                 <div class="info-item">Service: <span id="serviceVersion">-</span></div>
                 <div class="info-item">WeasyPrint: <span id="weasyprintVersion">-</span></div>
-                <div class="info-item">Chromium: <span id="chromiumVersion">-</span></div>
+                <div class="info-item">SVG renderer: <span id="svgRenderer">-</span></div>
             </div>
         </div>
     </div>
@@ -310,16 +310,6 @@
             <div class="card">
                 <div class="card-label">Uptime</div>
                 <div class="card-value" id="uptime">0s</div>
-            </div>
-
-            <div class="card">
-                <div class="card-label">Concurrent Slots</div>
-                <div class="card-value"><span id="activePdfGenerations">0</span> / <span id="maxConcurrent">10</span></div>
-            </div>
-
-            <div class="card">
-                <div class="card-label">Queue</div>
-                <div class="card-value" id="queueSize">0</div>
             </div>
 
             <div class="card">
@@ -341,40 +331,10 @@
                 <div class="card-label">Generation Error Rate</div>
                 <div class="card-value" id="errorRate">0.00%</div>
             </div>
-
-            <div class="card">
-                <div class="card-label">SVG Conversions</div>
-                <div class="card-value" id="svgConversions">0</div>
-            </div>
-
-            <div class="card">
-                <div class="card-label">Avg Conversion Time</div>
-                <div class="card-value" id="avgSvgTime">0 ms</div>
-            </div>
-
-            <div class="card">
-                <div class="card-label">Failed Conversions</div>
-                <div class="card-value" id="failedSvgConversions">0</div>
-            </div>
-
-            <div class="card">
-                <div class="card-label">Conversion Error Rate</div>
-                <div class="card-value" id="svgErrorRate">0.00%</div>
-            </div>
         </div>
 
         <!-- Charts -->
         <div class="chart-grid">
-            <div class="chart-container">
-                <div class="chart-title">Queue & Active PDF Generations</div>
-                <canvas id="queueChart"></canvas>
-            </div>
-
-            <div class="chart-container">
-                <div class="chart-title">CPU Usage (%)</div>
-                <canvas id="cpuChart"></canvas>
-            </div>
-
             <div class="chart-container">
                 <div class="chart-title">Memory Usage (MB)</div>
                 <canvas id="memoryChart"></canvas>
@@ -424,85 +384,16 @@
         }
 
         // Initialize charts
-        let queueChart, cpuChart, memoryChart;
+        let memoryChart;
         const maxDataPoints = 20;
         const chartData = {
             labels: [],
-            queue: [],
-            active: [],
-            cpu: [],
-            chromiumMemory: [],
             totalMemory: [],
             availableMemory: []
         };
 
         function initCharts() {
             const chartConfig = getChartConfig();
-
-            // Queue Chart
-            const queueCtx = document.getElementById('queueChart').getContext('2d');
-            queueChart = new Chart(queueCtx, {
-                type: 'line',
-                data: {
-                    labels: chartData.labels,
-                    datasets: [
-                        {
-                            label: 'Queue Size',
-                            data: chartData.queue,
-                            borderColor: '#ff9800',
-                            backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Active PDF Generations',
-                            data: chartData.active,
-                            borderColor: '#4caf50',
-                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                            tension: 0.4
-                        }
-                    ]
-                },
-                options: chartConfig
-            });
-
-            // CPU Chart
-            const cpuCtx = document.getElementById('cpuChart').getContext('2d');
-            cpuChart = new Chart(cpuCtx, {
-                type: 'line',
-                data: {
-                    labels: chartData.labels,
-                    datasets: [
-                        {
-                            label: 'CPU Usage',
-                            data: chartData.cpu,
-                            borderColor: '#f44336',
-                            backgroundColor: 'rgba(244, 67, 54, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        }
-                    ]
-                },
-                options: {
-                    ...chartConfig,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: {
-                                color: getChartColor(),
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            },
-                            grid: { color: getChartGridColor() }
-                        },
-                        x: {
-                            ticks: { color: getChartColor() },
-                            grid: { color: getChartGridColor() }
-                        }
-                    }
-                }
-            });
 
             // Memory Chart
             const memoryCtx = document.getElementById('memoryChart').getContext('2d');
@@ -511,14 +402,6 @@
                 data: {
                     labels: chartData.labels,
                     datasets: [
-                        {
-                            label: 'Chromium Memory',
-                            data: chartData.chromiumMemory,
-                            borderColor: '#2196f3',
-                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        },
                         {
                             label: 'Total System Memory',
                             data: chartData.totalMemory,
@@ -547,27 +430,17 @@
             const now = new Date().toLocaleTimeString();
 
             chartData.labels.push(now);
-            chartData.queue.push(metrics.queue_size);
-            chartData.active.push(metrics.active_pdf_generations);
-            chartData.cpu.push(metrics.current_cpu_percent);
-            chartData.chromiumMemory.push(metrics.current_chromium_memory_mb);
             chartData.totalMemory.push(metrics.total_memory_mb);
             chartData.availableMemory.push(metrics.available_memory_mb);
 
             // Keep only last N data points
             if (chartData.labels.length > maxDataPoints) {
                 chartData.labels.shift();
-                chartData.queue.shift();
-                chartData.active.shift();
-                chartData.cpu.shift();
-                chartData.chromiumMemory.shift();
                 chartData.totalMemory.shift();
                 chartData.availableMemory.shift();
             }
 
-            // Update all charts
-            queueChart.update('none');
-            cpuChart.update('none');
+            // Update the chart
             memoryChart.update('none');
         }
 
@@ -601,15 +474,10 @@
                 // Update header info
                 document.getElementById('serviceVersion').textContent = data.version;
                 document.getElementById('weasyprintVersion').textContent = data.weasyprint_version;
-                document.getElementById('chromiumVersion').textContent = data.chromium_version || 'N/A';
+                document.getElementById('svgRenderer').textContent = data.svg_renderer || 'N/A';
 
                 // Update cards
-                // With SVG_RENDERER=weasysvg the service starts no Chromium
-                let chromiumStatus = data.chromium_running ? 'Running' : 'Stopped';
-                if (!data.chromium_running && data.svg_renderer === 'weasysvg') {
-                    chromiumStatus = 'Not used';
-                }
-                document.getElementById('status').textContent = chromiumStatus;
+                document.getElementById('status').textContent = isHealthy ? 'Healthy' : 'Unhealthy';
 
                 const metrics = data.metrics;
 
@@ -618,23 +486,16 @@
                 // Card 2: Uptime
                 document.getElementById('uptime').textContent = formatUptime(metrics.uptime_seconds);
 
-                // Card 3: Concurrent Slots
-                document.getElementById('activePdfGenerations').textContent = metrics.active_pdf_generations;
-                document.getElementById('maxConcurrent').textContent = metrics.max_concurrent_pdf_generations;
-
-                // Card 4: Queue
-                document.getElementById('queueSize').textContent = metrics.queue_size;
-
-                // Card 5: PDF Generations
+                // Card 3: PDF Generations
                 document.getElementById('pdfGenerations').textContent = metrics.pdf_generations.toLocaleString();
 
-                // Card 6: Avg Response Time
+                // Card 4: Avg Response Time
                 document.getElementById('avgResponseTime').textContent = `${(metrics.avg_pdf_generation_time_ms / 1000).toFixed(2)} s`;
 
-                // Card 7: Failed PDF Generations
+                // Card 5: Failed PDF Generations
                 document.getElementById('failedPdfGenerations').textContent = metrics.failed_pdf_generations.toLocaleString();
 
-                // Card 8: Error Rate
+                // Card 6: Error Rate
                 const pdfErrorRate = metrics.error_pdf_generation_rate_percent;
                 const errorRateElement = document.getElementById('errorRate');
                 errorRateElement.textContent = `${pdfErrorRate.toFixed(2)}%`;
@@ -648,30 +509,7 @@
                 }
                 errorRateElement.className = errorClass;
 
-                // Card 9: SVG Conversions
-                document.getElementById('svgConversions').textContent = metrics.total_svg_conversions.toLocaleString();
-
-                // Card 10: Avg SVG Conversion Time
-                document.getElementById('avgSvgTime').textContent = `${metrics.avg_svg_conversion_time_ms.toFixed(0)} ms`;
-
-                // Card 11: Failed SVG Conversions
-                document.getElementById('failedSvgConversions').textContent = metrics.failed_svg_conversions.toLocaleString();
-
-                // Card 12: SVG Error Rate
-                const svgErrorRate = metrics.error_svg_conversion_rate_percent;
-                const svgErrorRateElement = document.getElementById('svgErrorRate');
-                svgErrorRateElement.textContent = `${svgErrorRate.toFixed(2)}%`;
-
-                // Determine SVG error rate class
-                let svgErrorClass = 'card-value success';
-                if (svgErrorRate > 5) {
-                    svgErrorClass = 'card-value error';
-                } else if (svgErrorRate > 1) {
-                    svgErrorClass = 'card-value warning';
-                }
-                svgErrorRateElement.className = svgErrorClass;
-
-                // Update charts
+                // Update the chart
                 updateChartData(metrics);
 
                 // Update timestamp

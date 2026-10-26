@@ -61,18 +61,17 @@ def vsdx_image() -> Iterator[str]:
             logger.warning("Failed to remove image %s", IMAGE_TAG)
 
 
-# weasysvg draws the text of a drawing in both modes: wholly by default, its foreignObject alone with chromium
-@pytest.fixture(scope="module", params=["weasysvg", "chromium"])
-def vsdx_container(request: pytest.FixtureRequest, vsdx_image: str) -> Iterator[tuple[Container, str]]:
-    """Start the image with one SVG renderer, on a free host port."""
+@pytest.fixture(scope="module")
+def vsdx_container(vsdx_image: str) -> Iterator[tuple[Container, str]]:
+    """Start the image on a free host port."""
     client = docker.from_env()
-    name = f"{CONTAINER_NAME}_{request.param}"
+    name = CONTAINER_NAME
     # A container of an interrupted run holds the name, and the run below would fail on it.
     with contextlib.suppress(docker.errors.NotFound):
         client.containers.get(name).remove(force=True)
 
     # Docker picks the host port, so the test never collides with a service already running
-    container = client.containers.run(image=vsdx_image, detach=True, name=name, init=True, ports={"9080/tcp": None}, environment={"SVG_RENDERER": request.param})
+    container = client.containers.run(image=vsdx_image, detach=True, name=name, init=True, ports={"9080/tcp": None})
     try:
         _wait_for_healthy(container)
         container.reload()

@@ -39,47 +39,64 @@ def test_metrics_endpoint_not_on_main_app():
 
 
 def test_metrics_endpoint_updates_custom_metrics():
-    """Test /metrics endpoint updates gauges from ChromiumManager."""
+    """Test /metrics endpoint updates gauges from the conversion metrics."""
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
 
-    with patch("app.metrics_server.update_gauges_from_chromium_manager") as mock_update_gauges, TestClient(metrics_app) as test_client:
+    with patch("app.metrics_server.update_gauges") as mock_update_gauges, TestClient(metrics_app) as test_client:
         result = test_client.get("/metrics")
 
-        # Verify update_gauges_from_chromium_manager was called
+        # Verify update_gauges was called
         assert mock_update_gauges.called
 
         # Verify successful response
         assert result.status_code == 200
 
 
-def test_metrics_endpoint_contains_custom_chromium_metrics():
-    """Test /metrics endpoint contains custom ChromiumManager metrics."""
+def test_metrics_endpoint_contains_custom_conversion_metrics():
+    """Test /metrics endpoint contains the custom conversion metrics, and none of the browser."""
     os.environ["WEASYPRINT_SERVICE_VERSION"] = "test1"
 
     with TestClient(metrics_app) as test_client:
         result = test_client.get("/metrics")
         content = result.text
 
-        # Check for custom ChromiumManager metrics
         # Note: These will be 0 or default values since we're not running actual conversions
         assert "pdf_generations_total" in content
         assert "pdf_generation_failures_total" in content
-        assert "svg_conversions_total" in content
-        assert "svg_conversion_failures_total" in content
+        assert "pdf_generation_duration_seconds" in content
+        assert "pdf_generation_error_rate_percent" in content
         assert "uptime_seconds" in content
-        assert "chromium_memory_bytes" in content
         assert "system_memory_total_bytes" in content
+        assert "system_memory_available_bytes" in content
+        for removed in ("svg_conversion", "chromium", "cpu_percent", "queue_size", "active_pdf_generations"):
+            assert removed not in content
 
 
-def test_update_gauges_survives_a_broken_manager():
-    """A failure while reading the manager must not propagate to the caller."""
+def test_update_gauges_reads_the_conversion_metrics():
+    """The gauges take the values of the conversion metrics."""
+    from app import prometheus_metrics
+    from app.conversion_metrics import ConversionMetrics
+
+    metrics = ConversionMetrics()
+    metrics.record_success(3000.0)
+    metrics.record_failure()
+
+    prometheus_metrics.update_gauges(metrics)
+
+    assert prometheus_metrics.pdf_generation_error_rate_percent._value.get() == 50.0
+    assert prometheus_metrics.avg_pdf_generation_time_seconds._value.get() == 3.0
+    assert prometheus_metrics.system_memory_total_bytes._value.get() > 0
+
+
+def test_update_gauges_survives_broken_metrics():
+    """A failure while reading the metrics must not propagate to the caller."""
     from unittest.mock import MagicMock
 
-    from app.prometheus_metrics import update_gauges_from_chromium_manager
+    from app.prometheus_metrics import update_gauges
 
     broken = MagicMock()
     broken.get_metrics.side_effect = RuntimeError("no metrics")
 
-    update_gauges_from_chromium_manager(broken)
+    update_gauges(broken)
 
     broken.get_metrics.assert_called_once()

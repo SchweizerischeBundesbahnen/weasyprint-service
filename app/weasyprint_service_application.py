@@ -131,7 +131,7 @@ def setup_logging() -> Path:
     # Explicitly set logging level for third-party libraries that have their own loggers
     # This ensures they respect the LOG_LEVEL environment variable
     # Note: Setting level on parent logger affects all child loggers
-    for logger_name in ["fontTools", "fontTools.subset", "fontTools.ttLib", "weasyprint", "PIL", "playwright"]:
+    for logger_name in ["fontTools", "fontTools.subset", "fontTools.ttLib", "weasyprint", "PIL"]:
         logging.getLogger(logger_name).setLevel(configured_level)
 
     configure_uvicorn_logging(configured_level)
@@ -150,7 +150,7 @@ def setup_logging() -> Path:
 def start_server(port: int) -> None:
     # uvicorn installs its own SIGTERM and SIGINT handlers. Both stop the server
     # gracefully and run the lifespan shutdown, which closes the metrics server and
-    # the Chromium browser.
+    # the PDF rendering pool.
     # log_config=None keeps uvicorn from applying its own logging configuration, which
     # would take its messages out of the log file. See configure_uvicorn_logging.
     uvicorn.run(

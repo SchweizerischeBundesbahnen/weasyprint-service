@@ -80,65 +80,53 @@ This will:
 - `pdf_generations_total` - Total successful PDF generations
 - `pdf_generation_failures_total` - Total failed PDF conversions
 - `pdf_generation_error_rate_percent` - PDF generation error rate
-- `svg_conversions_total` - Total successful SVG conversions
-- `svg_conversion_failures_total` - Total failed SVG conversions
-- `svg_conversion_error_rate_percent` - SVG conversion error rate
 
 ### Performance Metrics
 - `pdf_generation_duration_seconds` - PDF generation time histogram
-- `svg_conversion_duration_seconds` - SVG conversion time histogram
-- `queue_time_seconds` - Request queue wait time histogram
+- `avg_pdf_generation_time_seconds` - Average PDF generation time
 - `http_request_duration_seconds` - HTTP request duration histogram
 
 ### Resource Metrics
-- `cpu_percent` - Current CPU usage
 - `system_memory_total_bytes` - Total system memory
 - `system_memory_available_bytes` - Available system memory
-- `chromium_memory_bytes` - Current Chromium memory usage
-- `queue_size` - Current requests in queue
-- `active_pdf_generations` - Active PDF generations processes
+- `process_resident_memory_bytes` - Memory of the service process
+- `process_cpu_seconds_total` - CPU time of the service process
 
 ### Health Metrics
 - `uptime_seconds` - Service uptime
-- `chromium_restarts_total` - Browser restart count
-- `chromium_consecutive_failures` - Health check failure streak
 
 ## Grafana Dashboard Panels
 
-1. **Conversion Rate** - Real-time PDF and SVG conversion rates
-2. **Error Rate** - PDF and SVG error percentages
-3. **P95 Durations** - 95th percentile response times
-4. **Queue Size** - Current queue depth
-5. **Active Conversions** - Concurrent operations
-6. **CPU Usage** - Service CPU utilization
-7. **Memory Usage** - Chromium and system memory
-8. **Service Uptime** - Total service uptime
-9. **Chromium Restarts** - Browser restart count
+1. **Status** - Whether Prometheus reaches the service
+2. **Uptime** - Total service uptime
+3. **PDF Generations** - Successful PDF generations
+4. **Avg Generation Time** - Average PDF generation time
+5. **Failed Generations** - Failed PDF generations
+6. **Generation Error Rate** - PDF generation error percentage
+7. **Memory Usage** - Service and system memory
 
 ## Prometheus Queries Examples
 
 ### Conversion Rate (requests/sec)
 ```promql
 rate(pdf_generations_total[5m])
-rate(svg_conversions_total[5m])
 ```
 
 ### Error Rate (%)
 ```promql
-(rate(pdf_generation_failures_total[5m]) + rate(svg_conversion_failures_total[5m]))
+rate(pdf_generation_failures_total[5m])
 /
-(rate(pdf_generations_total[5m]) + rate(svg_conversions_total[5m])) * 100
+(rate(pdf_generations_total[5m]) + rate(pdf_generation_failures_total[5m])) * 100
 ```
 
 ### P95 Response Time
 ```promql
 histogram_quantile(0.95, rate(pdf_generation_duration_seconds_bucket[5m]))
-histogram_quantile(0.95, rate(svg_conversion_duration_seconds_bucket[5m]))
 ```
 
 ### Memory Usage Trend
 ```promql
-chromium_memory_bytes / 1024 / 1024
+process_resident_memory_bytes / 1024 / 1024
 ```
 
 ## Configuration Files

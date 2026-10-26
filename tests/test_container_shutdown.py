@@ -68,8 +68,6 @@ def stopped_container():
         # health probe runs inside it. This keeps the test off a possibly busy host port.
         init=True,
         auto_remove=False,
-        # The chromium mode, which has a browser to close
-        environment={"SVG_RENDERER": "chromium"},
         labels={"test-suite": "weasyprint-service-shutdown"},
     )
     try:
@@ -94,7 +92,7 @@ def stopped_container():
 
 
 def test_sigterm_shuts_the_service_down_gracefully(stopped_container) -> None:
-    """SIGTERM runs the shutdown hooks: metrics server and Chromium browser are closed."""
+    """SIGTERM runs the shutdown hooks: the metrics server is closed."""
     container, _ = stopped_container
     logs = container.logs().decode("utf-8")
 
@@ -105,10 +103,6 @@ def test_sigterm_shuts_the_service_down_gracefully(stopped_container) -> None:
         "Application shutdown complete",
         "Finished server process",
         "Metrics server stopped",
-        "Stopping background health monitoring...",
-        "Background health monitoring stopped",
-        "Stopping Chromium browser...",
-        "Chromium browser stopped successfully",
         "Service shutdown complete",
     ]
     for pattern in expected_patterns:

@@ -10,10 +10,7 @@ from __future__ import annotations
 import importlib.metadata
 import logging
 
-import weasysvg
 import weasyvsdx
-
-from app.svg_renderer import CHROMIUM
 
 logger = logging.getLogger(__name__)
 
@@ -21,16 +18,13 @@ logger = logging.getLogger(__name__)
 _LIBVISIO: dict[str, str | None] = {}
 
 
-def configure_vsdx(svg_renderer: str) -> bool:
+def configure_vsdx() -> bool:
     """
     Install weasyvsdx, when vsd2xhtml is on the PATH.
 
     weasyvsdx patches WeasyPrint for the whole process. It draws the text of a drawing with the
-    foreignObject of weasysvg. With the chromium SVG renderer only that feature of weasysvg is installed,
-    so the rest of WeasyPrint stays as the chromium mode expects. Without vsd2xhtml nothing is patched.
-
-    Args:
-        svg_renderer: The selected SVG renderer.
+    foreignObject of weasysvg, so weasysvg must be installed first (configure_svg_renderer).
+    Without vsd2xhtml nothing is patched.
 
     Returns:
         Whether weasyvsdx is installed.
@@ -39,21 +33,6 @@ def configure_vsdx(svg_renderer: str) -> bool:
     if converter is None:
         logger.warning("vsd2xhtml not found: install libvisio-tools, Visio images are left out of the PDF")
         return False
-    if svg_renderer == CHROMIUM:
-        weasysvg.install(
-            conditional_processing=False,
-            foreign_object=True,
-            filters=False,
-            paint=False,
-            blend=False,
-            text=False,
-            fonts=False,
-            fetch_cache=False,
-            markers=False,
-            paint_order=False,
-            form_xobject=False,
-            css=False,
-        )
     weasyvsdx.install(converter=converter)
     _LIBVISIO["version"] = weasyvsdx.libvisio_version(converter)
     return True

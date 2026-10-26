@@ -11,7 +11,7 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any, cast
+from typing import TYPE_CHECKING, Annotated
 from urllib.parse import unquote
 
 import weasyprint
@@ -30,8 +30,8 @@ from starlette.staticfiles import StaticFiles
 from app import memory_manager
 from app.attachment_manager import AttachmentManager
 from app.auth import require_api_key
-from app.chromium_manager import ChromiumManager, get_chromium_manager
 from app.constants import API_VERSION
+from app.conversion_metrics import ConversionMetrics, get_conversion_metrics
 from app.external_resources import PolicyUrlFetcher
 from app.form_parser import FormParser
 from app.html_parser import HtmlParser
@@ -43,9 +43,8 @@ from app.prometheus_metrics import (
     pdf_generation_duration_seconds,
 )
 from app.sanitization import sanitize_path_for_logging, sanitize_url_for_logging
-from app.schemas import ChromiumMetricsSchema, HealthSchema, VersionSchema
-from app.svg_processor import SvgProcessor
-from app.svg_renderer import CHROMIUM, WEASYSVG, configure_svg_renderer, get_weasysvg_version
+from app.schemas import ConversionMetricsSchema, HealthSchema, VersionSchema
+from app.svg_renderer import configure_svg_renderer, get_weasysvg_version
 from app.vsdx_renderer import configure_vsdx, get_libvisio_version, get_weasyvsdx_version
 from app.weasyprint_actual_text_patch import apply_actual_text_patch
 from app.weasyprint_running_width_patch import apply_running_width_patch
@@ -66,44 +65,29 @@ apply_actual_text_patch()
 # See app/weasyprint_tagging_patch.py.
 apply_tagging_patch()
 
-# SVG_RENDERER picks who draws the SVG of a document: weasysvg (default) or chromium.
-# weasysvg patches WeasyPrint for the process, so it is installed here, once. See app/svg_renderer.py.
+# weasysvg draws the SVG of a document. It patches WeasyPrint for the process, so it is
+# installed here, once. See app/svg_renderer.py.
 SVG_RENDERER = configure_svg_renderer()
 
 # weasyvsdx draws the Visio drawings of a document. It patches WeasyPrint for the process, so it is
-# installed here, once. See app/vsdx_renderer.py.
-VSDX = configure_vsdx(SVG_RENDERER)
-
-
-def uses_chromium() -> bool:
-    """Tell whether Chromium draws the SVG. With weasysvg the service starts no browser."""
-    return SVG_RENDERER == CHROMIUM
+# installed here, once, after weasysvg: it draws text with the foreignObject of weasysvg.
+# See app/vsdx_renderer.py.
+VSDX = configure_vsdx()
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
     """
-    Manage the lifecycle of the Chromium browser and metrics server.
-
-    This ensures a single persistent Chromium instance is started when the
-    FastAPI application starts and properly cleaned up on shutdown.
-
-    If Chromium fails to start, the application will not start and the
-    service will terminate (fail-fast behavior for containerized environments).
-    With SVG_RENDERER=weasysvg, WeasyPrint draws the SVG and no browser is started.
+    Manage the lifecycle of the PDF rendering pool and the metrics server.
 
     The metrics server is started on a dedicated port (default: 9180) for
     security isolation from the main application API.
     """
-    chromium_manager = get_chromium_manager()
     lifespan_logger = logging.getLogger(__name__)
 
-    if uses_chromium():
-        lifespan_logger.info("Prepare Chromium browser for SVG conversion...")
-        await chromium_manager.start()
-        lifespan_logger.info("Chromium browser prepared successfully")
-    else:
-        lifespan_logger.info("SVG renderer is weasysvg %s: SVG stays vector, Chromium is not started", get_weasysvg_version())
+    # The uptime of the metrics counts from here, the start of the service.
+    get_conversion_metrics()
+    lifespan_logger.info("SVG renderer is weasysvg %s: SVG stays vector", get_weasysvg_version())
 
     # The renderings run in this pool, sized to the configured limit. A pool of its own,
     # rather than the default executor of the loop: that one is sized from the CPU count,
@@ -127,14 +111,6 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
             await metrics_server.stop()
         except Exception:
             lifespan_logger.exception("Error stopping metrics server")
-
-    if uses_chromium():
-        try:
-            lifespan_logger.info("Stopping Chromium browser...")
-            await chromium_manager.stop()
-            lifespan_logger.info("Chromium browser stopped successfully")
-        except Exception:
-            lifespan_logger.exception("Error stopping Chromium browser")
 
     # Drop the renderings which are still queued. One already under way keeps its thread:
     # a worker cannot be interrupted, and the process leaves once it returns.
@@ -267,61 +243,48 @@ async def dashboard() -> HTMLResponse:
     },
 )
 async def health(
-    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
+    conversion_metrics: Annotated[ConversionMetrics, Depends(get_conversion_metrics)],
     detailed: Annotated[bool, Query(description="Return detailed JSON response with metrics")] = False,
 ) -> Response:
     """
-    Health check endpoint that verifies service and Chromium browser status.
+    Health check endpoint.
+
+    The service holds no component which can turn unhealthy while it runs, so a service which
+    answers is healthy.
 
     Args:
         detailed: If True, returns detailed JSON response with metrics. If False, returns simple text response.
 
     Returns:
-        - Simple mode: 200 with "OK" text or 503 with "Service Unavailable" text
-        - Detailed mode: 200/503 with JSON containing status, metrics, and browser info
-
-    Note: If Chromium is not healthy, the service should have failed to start.
-    This endpoint primarily serves as a runtime health verification.
-    With SVG_RENDERER=weasysvg the service runs no browser, so Chromium does not decide the health.
+        - Simple mode: 200 with "OK" text
+        - Detailed mode: 200 with JSON containing status, versions and conversion metrics
     """
-    healthy = chromium_manager.health_check() if uses_chromium() else True
-
     if detailed:
-        # Return detailed JSON response with metrics
-        metrics_data = chromium_manager.get_metrics()
         health_response = HealthSchema(
-            status="healthy" if healthy else "unhealthy",
+            status="healthy",
             version=os.environ.get("WEASYPRINT_SERVICE_VERSION", "unknown"),
             weasyprint_version=weasyprint.__version__,
-            chromium_running=chromium_manager.is_running(),
-            chromium_version=chromium_manager.get_version(),
-            health_monitoring_enabled=chromium_manager.health_check_enabled and uses_chromium(),
             svg_renderer=SVG_RENDERER,
-            metrics=ChromiumMetricsSchema(**cast("dict[str, Any]", metrics_data)),
+            metrics=ConversionMetricsSchema.model_validate(conversion_metrics.get_metrics()),
         )
-        # Return with appropriate status code
-        status_code = 200 if healthy else 503
         return Response(
             content=health_response.model_dump_json(),
             media_type="application/json",
-            status_code=status_code,
+            status_code=200,
         )
 
-    # Return simple text response
-    if healthy:
-        return Response("OK", media_type="text/plain", status_code=200)
-    return Response("Service Unavailable", media_type="text/plain", status_code=503)
+    return Response("OK", media_type="text/plain", status_code=200)
 
 
 @app.get(
     "/version",
     response_model=VersionSchema,
     summary="Service version information",
-    description="Returns versions of Python, WeasyPrint, the service itself, build timestamp, and Chromium.",
+    description="Returns versions of Python, WeasyPrint, the service itself, build timestamp, and the SVG and Visio renderers.",
     operation_id="getVersion",
     tags=["meta"],
 )
-async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)]) -> dict[str, str | int | None]:
+async def version() -> dict[str, str | int | None]:
     """
     Get version information
     """
@@ -332,9 +295,8 @@ async def version(chromium_manager: Annotated[ChromiumManager, Depends(get_chrom
         "weasyprint": weasyprint.__version__,
         "weasyprintService": os.environ.get("WEASYPRINT_SERVICE_VERSION"),
         "timestamp": os.environ.get("WEASYPRINT_SERVICE_BUILD_TIMESTAMP"),
-        "chromium": chromium_manager.get_version(),
         "svgRenderer": SVG_RENDERER,
-        "weasysvg": get_weasysvg_version() if SVG_RENDERER == WEASYSVG else None,
+        "weasysvg": get_weasysvg_version(),
         "weasyvsdx": get_weasyvsdx_version() if VSDX else None,
         "libvisio": get_libvisio_version() if VSDX else None,
     }
@@ -351,7 +313,6 @@ class RenderOptions(BaseModel):
         media_type: CSS media type to apply when rendering ("print" or "screen" are typical).
         presentational_hints: Whether to honor presentational HTML attributes as CSS hints.
         base_url: Base URL used to resolve relative links (e.g., stylesheets, images).
-        scale_factor: Device scale factor used for SVG/PNG rendering. If not provided, falls back to DEVICE_SCALE_FACTOR env var.
 
     """
 
@@ -359,7 +320,6 @@ class RenderOptions(BaseModel):
     media_type: str = "print"
     presentational_hints: bool = False
     base_url: str | None = None
-    scale_factor: float | None = None
 
 
 class OutputOptions(BaseModel):
@@ -405,18 +365,12 @@ def get_render_options(
         title="Base URL",
         description="Base URL used to resolve relative links (stylesheets, images).",
     ),
-    scale_factor: float | None = Query(
-        None,
-        title="Scale Factor",
-        description="Device scale factor used for SVG/PNG rendering. Overrides DEVICE_SCALE_FACTOR if provided.",
-    ),
 ) -> RenderOptions:
     return RenderOptions(
         encoding=encoding,
         media_type=media_type,
         presentational_hints=presentational_hints,
         base_url=base_url,
-        scale_factor=scale_factor,
     )
 
 
@@ -472,7 +426,7 @@ async def convert_html(
     request: Request,
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
-    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
+    conversion_metrics: Annotated[ConversionMetrics, Depends(get_conversion_metrics)],
 ) -> Response:
     """
     Convert HTML content from the request body to a PDF document.
@@ -486,12 +440,12 @@ async def convert_html(
 
     try:
         html = raw.decode(encoding)
-        output_pdf = await __process_html_to_pdf(html, render, output, chromium_manager)
+        output_pdf = await __process_html_to_pdf(html, render, output)
         response = await __create_response(output, output_pdf)
-        __record_conversion_metrics(chromium_manager, start_time, success=True)
+        __record_conversion_success(conversion_metrics, start_time)
     # The HTTP boundary must answer, not leak.
     except Exception as e:  # noqa: BLE001
-        return __handle_conversion_error(e, chromium_manager, start_time)
+        return __handle_conversion_error(e, conversion_metrics, start_time)
     else:
         return response
 
@@ -509,24 +463,21 @@ async def __process_html_to_pdf(
     html: str,
     render: RenderOptions,
     output: OutputOptions,
-    chromium_manager: ChromiumManager,
     attachments: list | None = None,
 ) -> bytes:
     """
-    Common logic for HTML to PDF conversion with SVG processing.
+    Common logic for HTML to PDF conversion.
 
     This function handles the complete pipeline from raw HTML string to final PDF:
     - Parses HTML
     - Processes notes
-    - Converts SVG to PNG
-    - Generates PDF with WeasyPrint
+    - Generates PDF with WeasyPrint, which draws SVG through weasysvg
     - Applies note processing to PDF
 
     Args:
         html: HTML content to convert
         render: Rendering options
         output: Output options
-        chromium_manager: Chromium manager instance
         attachments: Optional list of PDF attachments
 
     Returns:
@@ -535,7 +486,7 @@ async def __process_html_to_pdf(
     html_parser = HtmlParser()
     parsed_html = html_parser.parse(html)
 
-    return await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments)
+    return await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, attachments)
 
 
 async def __generate_pdf_from_parsed_html(
@@ -543,7 +494,6 @@ async def __generate_pdf_from_parsed_html(
     html_parser: HtmlParser,
     render: RenderOptions,
     output: OutputOptions,
-    chromium_manager: ChromiumManager,
     attachments: list | None = None,
     attachments_dir: Path | None = None,
 ) -> bytes:
@@ -558,19 +508,14 @@ async def __generate_pdf_from_parsed_html(
         html_parser: HtmlParser instance for serialization
         render: Rendering options
         output: Output options
-        chromium_manager: Chromium manager instance
         attachments: Optional list of PDF attachments
+        attachments_dir: Temporary directory of the attachments, the only place file: URLs may read
 
     Returns:
         Generated PDF as bytes
     """
     notes_processor = NotesProcessor()
     notes = notes_processor.replace_notes(parsed_html)
-
-    # Use CDP-based async SVG processing; with weasysvg, WeasyPrint draws the SVG itself
-    if uses_chromium():
-        svg_processor = SvgProcessor(chromium_manager=chromium_manager, device_scale_factor=render.scale_factor)
-        parsed_html = await svg_processor.process_svg(parsed_html)
 
     processed_html = html_parser.serialize(parsed_html)
 
@@ -622,39 +567,33 @@ async def __generate_pdf_from_parsed_html(
     return result
 
 
-def __record_conversion_metrics(chromium_manager: ChromiumManager, start_time: float, success: bool) -> None:
+def __record_conversion_success(conversion_metrics: ConversionMetrics, start_time: float) -> None:
     """
-    Record conversion metrics for both internal tracking and Prometheus.
+    Record a successful conversion for both internal tracking and Prometheus.
 
     Args:
-        chromium_manager: Chromium manager instance
+        conversion_metrics: Metrics of the conversions
         start_time: Conversion start time from time.time()
-        success: Whether conversion succeeded
     """
     duration_ms = (time.time() - start_time) * 1000
-
-    if success:
-        chromium_manager.metrics.record_success(duration_ms)
-        increment_pdf_generation_success(duration_ms / 1000.0)  # Convert ms to seconds
-    else:
-        chromium_manager.metrics.record_failure()
-        increment_pdf_generation_failure()
+    conversion_metrics.record_success(duration_ms)
+    increment_pdf_generation_success(duration_ms / 1000.0)  # Convert ms to seconds
 
 
-def __handle_conversion_error(e: Exception, chromium_manager: ChromiumManager, start_time: float) -> Response:
+def __handle_conversion_error(e: Exception, conversion_metrics: ConversionMetrics, start_time: float) -> Response:
     """
     Handle conversion errors with appropriate logging and metrics.
 
     Args:
         e: Exception that occurred
-        chromium_manager: Chromium manager instance
+        conversion_metrics: Metrics of the conversions
         start_time: Conversion start time from time.time()
 
     Returns:
         Error response with appropriate status code
     """
     duration_ms = (time.time() - start_time) * 1000
-    chromium_manager.metrics.record_failure()
+    conversion_metrics.record_failure()
     increment_pdf_generation_failure()
     pdf_generation_duration_seconds.observe(duration_ms / 1000.0)
 
@@ -709,7 +648,7 @@ async def convert_html_with_attachments(
     request: Request,
     render: Annotated[RenderOptions, Depends(get_render_options)],
     output: Annotated[OutputOptions, Depends(get_output_options)],
-    chromium_manager: Annotated[ChromiumManager, Depends(get_chromium_manager)],
+    conversion_metrics: Annotated[ConversionMetrics, Depends(get_conversion_metrics)],
 ) -> Response:
     """
     Convert HTML to PDF and embed provided files as PDF attachments.
@@ -741,13 +680,13 @@ async def convert_html_with_attachments(
             tmpdir=Path(tmpdir),
         )
 
-        # Use common PDF generation logic (handles notes, SVG, WeasyPrint)
-        output_pdf = await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, chromium_manager, attachments, attachments_dir=Path(tmpdir))
+        # Use common PDF generation logic (handles notes and WeasyPrint)
+        output_pdf = await __generate_pdf_from_parsed_html(parsed_html, html_parser, render, output, attachments, attachments_dir=Path(tmpdir))
         response = await __create_response(output, output_pdf)
-        __record_conversion_metrics(chromium_manager, start_time, success=True)
+        __record_conversion_success(conversion_metrics, start_time)
     # Same, for the attachments endpoint.
     except Exception as e:  # noqa: BLE001
-        return __handle_conversion_error(e, chromium_manager, start_time)
+        return __handle_conversion_error(e, conversion_metrics, start_time)
     else:
         return response
     finally:

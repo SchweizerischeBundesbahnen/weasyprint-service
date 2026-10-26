@@ -1,4 +1,4 @@
-"""The image as it is shipped, without SVG_RENDERER: weasysvg draws SVG as vector and no browser runs."""
+"""The image as it is shipped: weasysvg draws SVG as vector and no browser runs."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def test_the_default_mode_is_weasysvg_without_chromium(base_url: str) -> None:
 
     assert version["svgRenderer"] == "weasysvg"
     assert version["weasysvg"]
-    assert version["chromium"] is None
+    assert "chromium" not in version
     assert requests.get(f"{base_url}/health", timeout=10).status_code == 200
 
 

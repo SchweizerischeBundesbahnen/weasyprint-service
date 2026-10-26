@@ -11,8 +11,6 @@ services:
     environment:
       - LOG_LEVEL=INFO
       - WEASYPRINT_SERVICE_VERSION=dev
-      - CHROMIUM_HEALTH_CHECK_ENABLED=true
-      - CHROMIUM_HEALTH_CHECK_INTERVAL=30
       - PORT=9080
       - METRICS_PORT=9180
     networks:

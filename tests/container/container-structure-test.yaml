@@ -68,13 +68,18 @@ commandTests:
     command: python
     args: [-c, 'import subprocess, sys; sys.exit(subprocess.run([sys.base_prefix + "/bin/python3", "-I", "-c", "import pip"]).returncode == 0)']
     exitCode: 0
-  - name: libvisio is 0.1.7 of trixie, which weasyvsdx is tested with
+  - name: libvisio is 0.1.7, which weasyvsdx is tested with
     command: vsd2xhtml
     args: [--version]
     expectedOutput: [vsd2xhtml 0\.1\.7]
   - name: emf2svg draws the EMF images of Visio drawings
     command: sh
     args: [-c, command -v emf2svg-conv]
+    exitCode: 0
+  # weasyvsdx places the text of a drawing by the output of vsd2raw, which it takes from the folder of vsd2xhtml
+  - name: vsd2raw is next to vsd2xhtml
+    command: sh
+    args: [-c, 'test "$(dirname "$(command -v vsd2raw)")" = "$(dirname "$(command -v vsd2xhtml)")"']
     exitCode: 0
   - name: The replacements of the fonts of Visio drawings are installed
     command: sh
@@ -84,10 +89,21 @@ commandTests:
     command: sh
     args: [-c, 'grep -q "SIL OPEN FONT LICENSE" /usr/local/share/fonts/selawik/LICENSE.txt']
     exitCode: 0
-  # The slim image drops the documentation of packages, but keeps their copyright files
-  - name: Every font package keeps its license
+  # The fonts come from Debian packages, the apk database does not know them: their copyright files and SBOM go along.
+  # Python, not sh: the test expands the shell variables of its arguments itself.
+  - name: Every font package keeps its license and is in the SBOM of the Debian fonts
+    command: python
+    args: [-c, 'import glob, json, os, sys; dirs = glob.glob("/usr/share/doc/fonts-*"); sbom = {c["name"] for c in json.load(open("/usr/share/doc/debian-fonts.cdx.json"))["components"]}; bad = [d for d in dirs if not os.path.isfile(d + "/copyright") or not os.path.getsize(d + "/copyright") or os.path.basename(d) not in sbom]; sys.exit("no font packages" if not dirs else ", ".join(bad) or None)']
+    exitCode: 0
+  # libvisio, librevenge and libemf2svg are built from their releases, no package carries their licenses
+  - name: The Visio libraries keep their licenses
     command: sh
-    args: [-c, 'for package in $(dpkg-query --show --showformat="\${Package}\n" "fonts-*"); do test -s "/usr/share/doc/$package/copyright" || { echo "$package has no copyright file"; exit 1; }; done']
+    args: [-c, 'test -s /usr/share/doc/librevenge-0.0.5/COPYING.MPL && test -s /usr/share/doc/libvisio-0.1.7/COPYING.MPL && test -s /usr/share/doc/libemf2svg-1.1.0/LICENSE']
+    exitCode: 0
+  # Wolfi: the image has no Debian package manager, the fonts are files of the fonts stage
+  - name: The image is Wolfi
+    command: sh
+    args: [-c, 'grep -q "^ID=wolfi$" /etc/os-release && ! command -v dpkg && ! command -v apt-get']
     exitCode: 0
   - name: Symbola draws the symbols of Word documents
     command: sh

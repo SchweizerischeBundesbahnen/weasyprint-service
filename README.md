@@ -492,6 +492,8 @@ To extend or customize the service, use it as a base image in the Dockerfile:
 FROM ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
+The image is based on Wolfi. Install packages with `apk add`, not `apt-get`, and add users with `adduser`. `/bin/sh` is the shell of busybox.
+
 ### Using Docker Compose
 
 To run the service using Docker Compose:

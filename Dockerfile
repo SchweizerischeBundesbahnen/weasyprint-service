@@ -77,11 +77,9 @@ RUN apt-get update && \
 # path for FONTCONFIG_FILE. A font linked through /etc/alternatives is linked to its file, the runtime has no
 # alternatives.
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN for package in $(dpkg-query -W -f='${Package}\n'); do \
-        if dpkg -L "${package}" | grep -qE '^/(etc/fonts|usr/share/fonts|usr/share/fontconfig)/'; then \
-            echo "${package}"; \
-        fi; \
-    done > /font-packages && \
+RUN dpkg-query --search '/etc/fonts/*' '/usr/share/fonts/*' '/usr/share/fontconfig/*' | cut -d: -f1 | tr ',' '\n' | \
+        tr -d ' ' | sort -u > /font-packages && \
+    test -s /font-packages && \
     mkdir -p /licenses /sbom-root/etc /sbom-root/var/lib/dpkg && \
     cp /etc/os-release /sbom-root/etc/os-release && \
     xargs dpkg-query --status < /font-packages > /sbom-root/var/lib/dpkg/status && \

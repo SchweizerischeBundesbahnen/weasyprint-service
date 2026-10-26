@@ -1,22 +1,63 @@
 # Copy uv from official image (version matches .tool-versions)
 FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv-source
 
-# Use debian:trixie-slim as base (same base as python:3.15-slim)
-FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
+# ---------------------------------------------------------------- Visio stage
+# Wolfi has no libvisio and no emf2svg, so this stage builds them from their upstream releases, checked by
+# their SHA-256: librevenge 0.0.5 and libvisio 0.1.7, the release weasyvsdx is tested with, from the
+# LibreOffice project, and libemf2svg 1.1.0. Debian builds the same releases without patches. The libraries
+# they link come from Wolfi: their sonames go to /opt/visio/needed, which the runtime installs with apk.
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:360896efb0753a5701c48f860e17130c205eae5a264797aa3e7ea126ee2923a7 AS visio
+# perl generates the token table of libvisio, the image does not keep it
+# hadolint ignore=DL3018
+RUN apk add --no-cache bash binutils boost-dev build-base cmake fontconfig-dev freetype-dev gperf icu-dev libpng-dev libxml2-dev perl pkgconf zlib-dev
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+ADD --checksum=sha256:5892ca6796f7a2a93d580832e907e849b19d980b40d326a283b18877ab6de0c5 \
+    https://dev-www.libreoffice.org/src/librevenge-0.0.5.tar.bz2 /src/
+ADD --checksum=sha256:8faf8df870cb27b09a787a1959d6c646faa44d0d8ab151883df408b7166bea4c \
+    https://dev-www.libreoffice.org/src/libvisio/libvisio-0.1.7.tar.xz /src/
+ADD --checksum=sha256:ad48d2de9d1f4172aca475d9220bbd152b7280f98642db561ee6688faf50cd1e \
+    https://github.com/kakwa/libemf2svg/archive/refs/tags/1.1.0.tar.gz /src/libemf2svg-1.1.0.tar.gz
+ENV PREFIX=/opt/visio \
+    PKG_CONFIG_PATH=/opt/visio/lib/pkgconfig \
+    LDFLAGS="-Wl,-rpath,/opt/visio/lib"
+WORKDIR /src
+RUN tar xf librevenge-0.0.5.tar.bz2 && tar xf libvisio-0.1.7.tar.xz && tar xf libemf2svg-1.1.0.tar.gz
+WORKDIR /src/librevenge-0.0.5
+RUN ./configure --prefix="${PREFIX}" --disable-static --disable-tests --disable-werror --without-docs && \
+    make -j"$(nproc)" && make install-strip
+WORKDIR /src/libvisio-0.1.7
+RUN ./configure --prefix="${PREFIX}" --disable-static --disable-tests --disable-werror --without-docs && \
+    make -j"$(nproc)" && make install-strip
+# libemf2svg asks for a CMake older than 3.5, which CMake 4 refuses without a policy minimum
+WORKDIR /src
+RUN cmake -S libemf2svg-1.1.0 -B emf2svg-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DCMAKE_INSTALL_PREFIX="${PREFIX}" -DCMAKE_INSTALL_RPATH="${PREFIX}/lib" && \
+    cmake --build emf2svg-build -j"$(nproc)" && \
+    cmake --install emf2svg-build --strip
+# Only the tools weasyvsdx runs and their libraries stay, with the license of each project: vsd2xhtml, vsd2raw,
+# whose output places the text, and emf2svg-conv. The sonames they need from outside /opt/visio go to
+# /opt/visio/needed.
+RUN find "${PREFIX}/bin" -type f ! -name vsd2xhtml ! -name vsd2raw ! -name emf2svg-conv -delete && \
+    rm -rf "${PREFIX}/include" "${PREFIX}/lib/pkgconfig" "${PREFIX}/share" "${PREFIX}"/lib/*.la && \
+    for project in librevenge-0.0.5 libvisio-0.1.7; do \
+        mkdir -p "${PREFIX}/licenses/${project}" && cp "${project}/COPYING".* "${PREFIX}/licenses/${project}/"; \
+    done && \
+    mkdir -p "${PREFIX}/licenses/libemf2svg-1.1.0" && cp libemf2svg-1.1.0/LICENSE "${PREFIX}/licenses/libemf2svg-1.1.0/" && \
+    ls "${PREFIX}/lib" > /tmp/own-libraries && \
+    readelf --dynamic "${PREFIX}"/bin/* "${PREFIX}"/lib/*.so.*.* | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' | sort -u | \
+        grep -vxF -f /tmp/own-libraries > "${PREFIX}/needed" && \
+    "${PREFIX}/bin/vsd2xhtml" --version
 
-# Copy uv binary from source stage
-COPY --from=uv-source /uv /usr/local/bin/uv
-
-# Install dependencies
-# libvisio-tools and emf2svg let weasyvsdx draw Visio drawings, Carlito and Caladea replace the Calibri and
-# Cambria they ask for. weasyvsdx is tested with libvisio 0.1.7 of trixie; the build checks the release.
-# Symbola draws the symbols Word documents take from Wingdings and Symbol. Each font package keeps its license
-# in /usr/share/doc/<package>/copyright.
+# ---------------------------------------------------------------- fonts stage
+# The fonts of the Debian image and the fontconfig rules which choose among them, so the PDFs come out as
+# they did on Debian. Wolfi's own fonts change them: serif becomes DejaVu LGC Serif, and it has no Unifont.
+# Carlito and Caladea replace the Calibri and Cambria Visio drawings ask for. Symbola draws the symbols Word
+# documents take from Wingdings and Symbol.
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS fonts
 # hadolint ignore=DL3008
 RUN apt-get update && \
-    apt-get upgrade -y && \
     apt-get --yes --no-install-recommends install \
-    emf2svg \
+    fontconfig \
     fonts-crosextra-caladea \
     fonts-crosextra-carlito \
     fonts-dejavu \
@@ -29,15 +70,76 @@ RUN apt-get update && \
     fonts-symbola \
     fonts-tlwg-loma-otf \
     fonts-unifont \
-    fonts-wqy-zenhei \
-    libharfbuzz-subset0 \
-    libpango-1.0-0 \
-    libpangoft2-1.0-0 \
-    libvisio-tools && \
-    test "$(vsd2xhtml --version)" = "vsd2xhtml 0.1.7" && \
-    apt-get clean autoclean && \
-    apt-get --yes autoremove && \
-    rm -rf /var/lib/apt/lists/*
+    fonts-wqy-zenhei
+
+# The packages which own a file under the font directories, their copyright files, a dpkg database of these
+# packages alone for the SBOM, and the active fontconfig rules, with fonts.conf including them by an absolute
+# path for FONTCONFIG_FILE. A font linked through /etc/alternatives is linked to its file, the runtime has no
+# alternatives.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN for package in $(dpkg-query -W -f='${Package}\n'); do \
+        if dpkg -L "${package}" | grep -qE '^/(etc/fonts|usr/share/fonts|usr/share/fontconfig)/'; then \
+            echo "${package}"; \
+        fi; \
+    done > /font-packages && \
+    mkdir -p /licenses /sbom-root/etc /sbom-root/var/lib/dpkg && \
+    cp /etc/os-release /sbom-root/etc/os-release && \
+    xargs dpkg-query --status < /font-packages > /sbom-root/var/lib/dpkg/status && \
+    while read -r package; do \
+        mkdir -p "/licenses/${package}" "/sbom-root/usr/share/doc/${package}" && \
+        cp "/usr/share/doc/${package}/copyright" "/licenses/${package}/" && \
+        cp "/usr/share/doc/${package}/copyright" "/sbom-root/usr/share/doc/${package}/"; \
+    done < /font-packages && \
+    mkdir -p /fontconfig/conf.d && \
+    cp --dereference /etc/fonts/conf.d/*.conf /fontconfig/conf.d/ && \
+    sed 's#<include ignore_missing="yes">conf.d</include>#<include ignore_missing="yes">/opt/weasyprint/fontconfig/conf.d</include>#' \
+        /etc/fonts/fonts.conf > /fontconfig/fonts.conf && \
+    grep -q '/opt/weasyprint/fontconfig/conf.d' /fontconfig/fonts.conf && \
+    find /usr/share/fonts -lname '/etc/alternatives/*' -exec sh -c 'ln -sf "$(readlink -f "$1")" "$1"' sh {} \;
+
+# A CycloneDX SBOM of the font packages with their Debian purls and licenses: the apk database of the final
+# image does not know them.
+FROM anchore/syft:v1.55.0@sha256:4cc92b64ca74ffca4c94d4c8fcc01f217731375300be14d0b6eeb2e82eaa110a AS fonts-sbom
+ENV SYFT_FILE_METADATA_SELECTION=none
+COPY --from=fonts /sbom-root /sbom-root
+RUN ["/syft", "scan", "dir:/sbom-root", "--select-catalogers", "dpkg", "--source-name", "debian-fonts", "-o", "cyclonedx-json=/tmp/debian-fonts.cdx.json"]
+
+# -------------------------------------------------------------- runtime stage
+# Wolfi follows upstream releases, so the scanners find next to nothing in it, where Debian keeps unfixed
+# findings in the libraries the service loads.
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:360896efb0753a5701c48f860e17130c205eae5a264797aa3e7ea126ee2923a7
+
+# Copy uv binary from source stage
+COPY --from=uv-source /uv /usr/local/bin/uv
+
+# Pango for WeasyPrint, with HarfBuzz, whose package carries libharfbuzz-subset. bash for entrypoint.sh,
+# fontconfig for fc-cache. The libraries the Visio converters link are installed by their soname.
+COPY --from=visio /opt/visio /opt/visio
+SHELL ["/bin/sh", "-o", "pipefail", "-c"]
+# hadolint ignore=DL3018,SC2046
+RUN apk add --no-cache \
+    bash \
+    fontconfig \
+    harfbuzz \
+    pango \
+    $(sed 's/^/so:/' /opt/visio/needed) && \
+    ln -s /opt/visio/bin/vsd2xhtml /opt/visio/bin/vsd2raw /opt/visio/bin/emf2svg-conv /usr/local/bin/ && \
+    mkdir -p /usr/share/doc && \
+    mv /opt/visio/licenses/* /usr/share/doc/ && \
+    rmdir /opt/visio/licenses && \
+    test "$(vsd2xhtml --version)" = "vsd2xhtml 0.1.7"
+
+# The fonts of the Debian image, their copyright files and their SBOM. No apk package owns these paths.
+# FONTCONFIG_FILE selects Debian's rules.
+COPY --from=fonts /usr/share/fonts /usr/share/fonts
+COPY --from=fonts /licenses /usr/share/doc
+COPY --from=fonts-sbom /tmp/debian-fonts.cdx.json /usr/share/doc/debian-fonts.cdx.json
+COPY --from=fonts /fontconfig /opt/weasyprint/fontconfig
+ENV FONTCONFIG_FILE=/opt/weasyprint/fontconfig/fonts.conf
+
+# Wolfi's glibc backs malloc with huge pages, which malloc_trim cannot give back in part.
+# RECLAIM_MEMORY_AFTER_CONVERSION then frees about 1 MB instead of 15 MB, as on Debian.
+ENV GLIBC_TUNABLES=glibc.malloc.hugetlb=0
 
 ARG APP_IMAGE_VERSION=0.0.0
 ENV WORKING_DIR="/opt/weasyprint" \
@@ -47,7 +149,7 @@ ENV WORKING_DIR="/opt/weasyprint" \
     LOG_LEVEL=INFO
 
 # Create non-root user early (before creating directories that need ownership)
-RUN useradd -u 1000 -m -s /bin/bash appuser
+RUN adduser -D -u 1000 -s /bin/bash appuser
 
 # Create and configure logging directory (owned by appuser)
 RUN mkdir -p ${WORKING_DIR}/logs && \
@@ -108,9 +210,10 @@ RUN DICT_DIR="$(python -c 'import os, pyphen; print(os.path.dirname(str(pyphen.L
 # Verify WeasyPrint is installed and working
 RUN weasyprint --version
 
-# Selawik, the open fallback Microsoft made for Segoe UI, which Visio drawings ask for. Debian has no
-# package of it: the release of microsoft/Selawik, checked by its SHA-256. Its fonts carry no license text,
-# which the SIL Open Font License asks to travel with each copy, so the license of the release goes along.
+# Selawik, the open fallback Microsoft made for Segoe UI, which Visio drawings ask for. Neither Debian nor
+# Wolfi has a package of it: the release of microsoft/Selawik, checked by its SHA-256. Its fonts carry no
+# license text, which the SIL Open Font License asks to travel with each copy, so the license of the release
+# goes along.
 ADD --checksum=sha256:3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423 \
     https://github.com/microsoft/Selawik/releases/download/1.01/Selawik_Release.zip /tmp/selawik.zip
 ADD --checksum=sha256:77b7c2506d4efb22e09c8ccf10159f4956eab3ef7c007fef95de136bcf45300c \
@@ -135,7 +238,7 @@ ENTRYPOINT ["./entrypoint.sh"]
 
 # Security and metadata labels
 LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>" \
-      org.opencontainers.image.title="WeasyPrint Service (Debian)" \
+      org.opencontainers.image.title="WeasyPrint Service (Wolfi)" \
       org.opencontainers.image.description="API service for WeasyPrint document processing" \
       org.opencontainers.image.vendor="SBB" \
       org.opencontainers.image.security.caps.drop="ALL" \

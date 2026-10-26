@@ -721,7 +721,7 @@ uv run pytest
 
 ```bash
 # a specific test
-uv run pytest tests/test_svg_processor.py -v
+uv run pytest tests/test_svg_renderer.py -v
 ```
 
 #### pre-commit

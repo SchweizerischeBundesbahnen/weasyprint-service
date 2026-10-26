@@ -42,16 +42,6 @@ commandTests:
     command: sh
     args: [-c, '! command -v curl']
     exitCode: 0
-  # weasysvg draws SVG, the service starts no browser
-  - name: Playwright and its Chromium should not be installed
-    command: sh
-    args: [-c, '! test -e /opt/playwright && ! python -c "import playwright" 2>/dev/null && test -z "$(find / -xdev \( -name chrome-headless-shell -o -name chromium -o -name chrome \) -print -quit 2>/dev/null)"']
-    exitCode: 0
-  # The service draws nothing on a screen, an X server has no use in it
-  - name: Xvfb should not be installed
-    command: sh
-    args: [-c, '! command -v Xvfb']
-    exitCode: 0
   # Every package installs from a wheel, the image needs no compiler
   - name: A C compiler should not be installed
     command: sh

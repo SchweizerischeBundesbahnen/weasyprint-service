@@ -404,7 +404,7 @@ The repository uses extensive pre-commit hooks including:
 - **Non-root user**: Container runs as `appuser` (uid 1000) for enhanced security
 - **Python via uv**: Python version installed from `.tool-versions` file (single source of truth)
 - **Base image**: `debian:trixie-slim` with uv for Python management
-- Includes the fonts the documents use. No browser: weasysvg draws SVG, the image has no Chromium and no Playwright, which the container structure test asserts
+- Includes the fonts the documents use. No browser: weasysvg draws SVG, the image has no Chromium and no Playwright
 - `libharfbuzz-subset0` lets WeasyPrint subset fonts with HarfBuzz. Without it WeasyPrint falls back to fontTools, warns once per font, and renders small documents about 40% slower. `test_fonts_are_subset_with_harfbuzz` asserts it
 - Visio drawings: weasyvsdx draws VSDX and VSD as vector through `vsd2xhtml` of libvisio (`app/vsdx_renderer.py`, installed at import of the controller). libvisio-tools is 0.1.7 of trixie, which weasyvsdx is tested with; the Dockerfile and the structure test check `vsd2xhtml --version`. `emf2svg`, Carlito, Caladea and Selawik (from its GitHub release, by checksum) serve the drawings. weasyvsdx draws text with the `foreign_object` feature of weasysvg, which is installed first. Without `vsd2xhtml` nothing is patched and Visio images are left out. LibreOffice is gone
 - Logging directory `/opt/weasyprint/logs` with timestamped log files

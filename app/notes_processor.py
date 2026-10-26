@@ -419,7 +419,6 @@ class NotesProcessor:
         """
         try:
             # Parse ISO 8601 format with timezone support
-            # Python 3.11+ supports fromisoformat with most ISO 8601 variants
             dt = datetime.fromisoformat(time_str)
 
             # Build PDF date format: D:YYYYMMDDHHmmSSOHH'mm

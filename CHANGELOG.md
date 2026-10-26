@@ -1,5 +1,27 @@
 # Changelog
 
+## [70.0.8](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.7...v70.0.8) (2026-10-26)
+
+
+### Features
+
+* **svg:** drop Chromium, weasysvg draws every SVG ([#428](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/428)) ([dc15e0a](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/dc15e0a61aa22985b85acb1106a11bfe7cb9655b))
+
+
+### Bug Fixes
+
+* **deps:** update dependency coverage to v7.17.0 ([2f0e3ca](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/2f0e3cab47cf6397eaefc42021cadc95c9a3c2bd))
+* **deps:** update dependency fastapi to v0.159.1 ([46b68c3](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/46b68c349251b9262e98f9dfc05bf2bb7a48de78))
+* **deps:** update dependency fastapi to v0.161.1 ([39e47f5](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/39e47f567a9980e52eb5190dc0a81db778ee7ad3))
+* **deps:** update dependency playwright to v1.64.1 ([503c022](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/503c022b7b6903e933e2b15dfc1beec8e6ff56d7))
+* **deps:** update dependency ruff to v0.17.2 ([ce38676](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/ce38676a8cac4f34c12d57250329713d17205ef0))
+* **deps:** update dependency ty to v0.0.91 ([9e065de](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9e065de93c82ccda304d472dc6946d4305142f05))
+
+
+### Miscellaneous Chores
+
+* release 70.0.8 ([#431](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/issues/431)) ([580eeb2](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/580eeb2675dd8bbbe36272b8e2a909bfc0263319))
+
 ## [70.0.7](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.6...v70.0.7) (2026-10-24)
 
 

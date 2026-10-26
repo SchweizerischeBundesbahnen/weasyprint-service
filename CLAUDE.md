@@ -322,7 +322,6 @@ grype weasyprint-service:0.0.0
 **Don't suggest these common patterns (already established in codebase):**
 - Using Ruff instead of Black/isort/flake8
 - Using uv for package management
-- Python 3.13+ syntax and features
 - FastAPI patterns already in use
 - Temporary file handling patterns
 - weasysvg for SVG, weasyvsdx for Visio drawings

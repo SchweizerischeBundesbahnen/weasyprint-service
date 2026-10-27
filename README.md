@@ -492,6 +492,8 @@ To extend or customize the service, use it as a base image in the Dockerfile:
 FROM ghcr.io/schweizerischebundesbahnen/weasyprint-service:latest
 ```
 
+The image is based on Wolfi. Install packages with `apk add`, not `apt-get`, and add users with `adduser`. `/bin/sh` is the shell of busybox.
+
 ### Using Docker Compose
 
 To run the service using Docker Compose:
@@ -621,7 +623,9 @@ docker run --detach \
 
 The Docker image uses a multi-stage build with the following components:
 
-- **Base image**: `debian:trixie-slim` (same base as `python:3.15-slim`)
+- **Base image**: [Wolfi](https://github.com/wolfi-dev) (`cgr.dev/chainguard/wolfi-base`), which follows upstream releases
+- **Fonts**: the font packages of Debian trixie and their fontconfig rules, so the PDFs stay as they were; their SBOM is in `/usr/share/doc/debian-fonts.cdx.json`
+- **Visio tools**: librevenge, libvisio and libemf2svg, built from their upstream releases
 - **Python**: Installed via [uv](https://github.com/astral-sh/uv) from `.tool-versions` file
 - **Package manager**: uv for fast, reproducible dependency management
 - **Runtime user**: Non-root `appuser` (uid 1000)
@@ -649,7 +653,7 @@ Replace 0.0.0 with the desired version number.
 
 The service draws Visio drawings (VSDX, VSD and the other formats of Visio) through [weasyvsdx](https://github.com/grigoriev/weasyvsdx). WeasyPrint draws them natively, so they stay vector in the PDF, with their text selectable. An image counts as a Visio drawing by its media type, `application/vnd.ms-visio.drawing` for VSDX or `application/vnd.visio` for VSD, or by the suffix of a file or URL without a type. This works for `<img>`, `<object>`, `<embed>` and CSS images. The service draws the first page of a drawing.
 
-weasyvsdx runs `vsd2xhtml` of libvisio. The image has libvisio 0.1.7 of Debian trixie, which weasyvsdx is tested with. `emf2svg` draws the EMF images inside drawings. Carlito, Caladea and Selawik replace Calibri, Cambria and Segoe UI, the fonts Visio drawings ask for most. All three are under the SIL Open Font License 1.1, which allows them in the image as long as their license travels with them: Carlito and Caladea carry it in `/usr/share/doc/<package>/copyright`, Selawik in `/usr/local/share/fonts/selawik/LICENSE.txt`.
+weasyvsdx runs `vsd2xhtml` of libvisio. The image has libvisio 0.1.7, which weasyvsdx is tested with, built from its upstream release, as Wolfi has no package of it. `emf2svg` draws the EMF images inside drawings. Carlito, Caladea and Selawik replace Calibri, Cambria and Segoe UI, the fonts Visio drawings ask for most. All three are under the SIL Open Font License 1.1, which allows them in the image as long as their license travels with them: Carlito and Caladea carry it in `/usr/share/doc/<package>/copyright`, Selawik in `/usr/local/share/fonts/selawik/LICENSE.txt`.
 
 Beyond these, Symbola (`fonts-symbola`) draws the symbols Word documents take from Wingdings and Symbol. Every font package of the image keeps its license in `/usr/share/doc/<package>/copyright`, and a container structure test asserts it.
 

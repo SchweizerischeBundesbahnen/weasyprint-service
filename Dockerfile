@@ -2,14 +2,16 @@
 FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv-source
 
 # ---------------------------------------------------------------- Visio stage
-# Wolfi has no libvisio and no emf2svg, so this stage builds them from their upstream releases, checked by
-# their SHA-256: librevenge 0.0.5 and libvisio 0.1.7, the release weasyvsdx is tested with, from the
-# LibreOffice project, and libemf2svg 1.1.0. Debian builds the same releases without patches. The libraries
-# they link come from Wolfi: their sonames go to /opt/visio/needed, which the runtime installs with apk.
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:360896efb0753a5701c48f860e17130c205eae5a264797aa3e7ea126ee2923a7 AS visio
-# perl generates the token table of libvisio, the image does not keep it
+# Alpine 3.24 has libvisio 0.1.10, not the 0.1.7 weasyvsdx is tested with, and emf2svg only in edge/testing.
+# So this stage builds them from their upstream releases, checked by their SHA-256: librevenge 0.0.5 and
+# libvisio 0.1.7 from the LibreOffice project, and libemf2svg 1.1.0. Debian builds the same releases without
+# patches. The libraries they link come from Alpine: their sonames go to /opt/visio/needed, which the runtime
+# installs with apk.
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS visio
+# perl generates the token table of libvisio, the image does not keep it. musl has no argp, which emf2svg-conv
+# parses its options with.
 # hadolint ignore=DL3018
-RUN apk add --no-cache bash binutils boost-dev build-base cmake fontconfig-dev freetype-dev gperf icu-dev libpng-dev libxml2-dev perl pkgconf zlib-dev
+RUN apk add --no-cache argp-standalone bash binutils boost-dev build-base cmake fontconfig-dev freetype-dev gperf icu-dev libpng-dev libxml2-dev perl pkgconf zlib-dev
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ADD --checksum=sha256:5892ca6796f7a2a93d580832e907e849b19d980b40d326a283b18877ab6de0c5 \
     https://dev-www.libreoffice.org/src/librevenge-0.0.5.tar.bz2 /src/
@@ -28,9 +30,11 @@ RUN ./configure --prefix="${PREFIX}" --disable-static --disable-tests --disable-
 WORKDIR /src/libvisio-0.1.7
 RUN ./configure --prefix="${PREFIX}" --disable-static --disable-tests --disable-werror --without-docs && \
     make -j"$(nproc)" && make install-strip
-# libemf2svg asks for a CMake older than 3.5, which CMake 4 refuses without a policy minimum
+# libemf2svg asks for a CMake older than 3.5, which CMake 4 refuses without a policy minimum. Its CMake
+# expects argp in libc, so emf2svg-conv links the static libargp of argp-standalone.
 WORKDIR /src
 RUN cmake -S libemf2svg-1.1.0 -B emf2svg-build -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DCMAKE_CXX_STANDARD_LIBRARIES=-largp \
         -DCMAKE_INSTALL_PREFIX="${PREFIX}" -DCMAKE_INSTALL_RPATH="${PREFIX}/lib" && \
     cmake --build emf2svg-build -j"$(nproc)" && \
     cmake --install emf2svg-build --strip
@@ -50,7 +54,7 @@ RUN find "${PREFIX}/bin" -type f ! -name vsd2xhtml ! -name vsd2raw ! -name emf2s
 
 # ---------------------------------------------------------------- fonts stage
 # The fonts of the Debian image and the fontconfig rules which choose among them, so the PDFs come out as
-# they did on Debian. Wolfi's own fonts change them: serif becomes DejaVu LGC Serif, and it has no Unifont.
+# they did on Debian. The fonts of another distribution change them.
 # Carlito and Caladea replace the Calibri and Cambria Visio drawings ask for. Symbola draws the symbols Word
 # documents take from Wingdings and Symbol.
 FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS fonts
@@ -103,22 +107,24 @@ COPY --from=fonts /sbom-root /sbom-root
 RUN ["/syft", "scan", "dir:/sbom-root", "--select-catalogers", "dpkg", "--source-name", "debian-fonts", "-o", "cyclonedx-json=/tmp/debian-fonts.cdx.json"]
 
 # -------------------------------------------------------------- runtime stage
-# Wolfi follows upstream releases, so the scanners find next to nothing in it, where Debian keeps unfixed
-# findings in the libraries the service loads.
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:360896efb0753a5701c48f860e17130c205eae5a264797aa3e7ea126ee2923a7
+# Alpine fixes its stable branch in point releases, where Debian keeps unfixed findings in the libraries the
+# service loads. Its libc is musl: Python comes from the musl build of uv, the packages from musllinux wheels.
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 
 # Copy uv binary from source stage
 COPY --from=uv-source /uv /usr/local/bin/uv
 
-# Pango for WeasyPrint, with HarfBuzz, whose package carries libharfbuzz-subset. bash for entrypoint.sh,
-# fontconfig for fc-cache. The libraries the Visio converters link are installed by their soname.
+# Pango for WeasyPrint, and harfbuzz-subset, so WeasyPrint subsets fonts with HarfBuzz. bash for entrypoint.sh,
+# fontconfig for fc-cache, mimalloc for malloc. The libraries the Visio converters link are installed by
+# their soname.
 COPY --from=visio /opt/visio /opt/visio
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 # hadolint ignore=DL3018,SC2046
 RUN apk add --no-cache \
     bash \
     fontconfig \
-    harfbuzz \
+    harfbuzz-subset \
+    mimalloc2 \
     pango \
     $(sed 's/^/so:/' /opt/visio/needed) && \
     ln -s /opt/visio/bin/vsd2xhtml /opt/visio/bin/vsd2raw /opt/visio/bin/emf2svg-conv /usr/local/bin/ && \
@@ -135,9 +141,9 @@ COPY --from=fonts-sbom /tmp/debian-fonts.cdx.json /usr/share/doc/debian-fonts.cd
 COPY --from=fonts /fontconfig /opt/weasyprint/fontconfig
 ENV FONTCONFIG_FILE=/opt/weasyprint/fontconfig/fonts.conf
 
-# Wolfi's glibc backs malloc with huge pages, which malloc_trim cannot give back in part.
-# RECLAIM_MEMORY_AFTER_CONVERSION then frees about 1 MB instead of 15 MB, as on Debian.
-ENV GLIBC_TUNABLES=glibc.malloc.hugetlb=0
+# The malloc of musl is slow for the many small allocations of Pango and cairo. An empty LD_PRELOAD at
+# docker run restores it.
+ENV LD_PRELOAD=/usr/lib/libmimalloc.so.2
 
 ARG APP_IMAGE_VERSION=0.0.0
 ENV WORKING_DIR="/opt/weasyprint" \
@@ -209,7 +215,7 @@ RUN DICT_DIR="$(python -c 'import os, pyphen; print(os.path.dirname(str(pyphen.L
 RUN weasyprint --version
 
 # Selawik, the open fallback Microsoft made for Segoe UI, which Visio drawings ask for. Neither Debian nor
-# Wolfi has a package of it: the release of microsoft/Selawik, checked by its SHA-256. Its fonts carry no
+# Alpine has a package of it: the release of microsoft/Selawik, checked by its SHA-256. Its fonts carry no
 # license text, which the SIL Open Font License asks to travel with each copy, so the license of the release
 # goes along.
 ADD --checksum=sha256:3f62c51e05e3b5a1e6241cf92a371f0be2ea1183aa87b30718bbd40832a8d423 \
@@ -236,7 +242,7 @@ ENTRYPOINT ["./entrypoint.sh"]
 
 # Security and metadata labels
 LABEL maintainer="SBB Polarion Team <polarion-opensource@sbb.ch>" \
-      org.opencontainers.image.title="WeasyPrint Service (Wolfi)" \
+      org.opencontainers.image.title="WeasyPrint Service (Alpine)" \
       org.opencontainers.image.description="API service for WeasyPrint document processing" \
       org.opencontainers.image.vendor="SBB" \
       org.opencontainers.image.security.caps.drop="ALL" \

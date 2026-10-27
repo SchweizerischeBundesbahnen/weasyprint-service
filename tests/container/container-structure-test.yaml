@@ -100,10 +100,15 @@ commandTests:
     command: sh
     args: [-c, 'test -s /usr/share/doc/librevenge-0.0.5/COPYING.MPL && test -s /usr/share/doc/libvisio-0.1.7/COPYING.MPL && test -s /usr/share/doc/libemf2svg-1.1.0/LICENSE']
     exitCode: 0
-  # Wolfi: the image has no Debian package manager, the fonts are files of the fonts stage
-  - name: The image is Wolfi
+  # Alpine: the image has no Debian package manager, the fonts are files of the fonts stage
+  - name: The image is Alpine
     command: sh
-    args: [-c, 'grep -q "^ID=wolfi$" /etc/os-release && ! command -v dpkg && ! command -v apt-get']
+    args: [-c, 'grep -q "^ID=alpine$" /etc/os-release && ! command -v dpkg && ! command -v apt-get']
+    exitCode: 0
+  # mimalloc replaces the malloc of musl, which is slow for the small allocations of Pango and cairo
+  - name: mimalloc is preloaded
+    command: sh
+    args: [-c, 'test -f "$LD_PRELOAD" && grep -q mimalloc /proc/self/maps']
     exitCode: 0
   - name: Symbola draws the symbols of Word documents
     command: sh

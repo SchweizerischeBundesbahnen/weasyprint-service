@@ -89,6 +89,27 @@ def test_reclaim_memory_handles_oserror_on_linux(monkeypatch):
         mock_gc.assert_called_once()
 
 
+def test_reclaim_memory_calls_mi_collect_on_musl_with_mimalloc(monkeypatch):
+    monkeypatch.setenv("RECLAIM_MEMORY_AFTER_CONVERSION", "true")
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+
+    collected = []
+    musl = type("MockMusl", (), {})()
+    process = type("MockProcess", (), {"mi_collect": lambda self, force: collected.append(force)})()
+    with patch("ctypes.CDLL", side_effect=lambda name: musl if name == "libc.so.6" else process):
+        memory_manager.reclaim_memory()
+    assert collected == [1]
+
+
+def test_reclaim_memory_handles_musl_without_mimalloc(monkeypatch):
+    monkeypatch.setenv("RECLAIM_MEMORY_AFTER_CONVERSION", "true")
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+
+    with patch("ctypes.CDLL", return_value=type("MockMusl", (), {})()), patch("gc.collect") as mock_gc:
+        memory_manager.reclaim_memory()
+        mock_gc.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # Integration test: reclaim_memory called during PDF conversion
 # ---------------------------------------------------------------------------

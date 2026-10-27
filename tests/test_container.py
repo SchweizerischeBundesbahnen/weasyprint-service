@@ -172,6 +172,19 @@ def test_convert_simple_html(test_parameters: TestParameters) -> None:
     assert response.headers.get("Python-Version")
 
 
+# On musl a thread stack of the default size overflowed at about 160 levels and killed the service
+def test_deeply_nested_html_does_not_crash_the_service(test_parameters: TestParameters) -> None:
+    depth = 400
+    html = "<html><body>" + "<div>" * depth + "deep" + "</div>" * depth + "</body></html>"
+
+    __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=False)
+
+    test_parameters.container.reload()
+    assert test_parameters.container.status == "running"
+    response = test_parameters.request_session.get(f"{test_parameters.base_url}/health")
+    assert response.status_code == 200
+
+
 def test_convert_complex_html(test_parameters: TestParameters) -> None:
     html = __load_test_html("tests/test-data/test-specification.html")
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)

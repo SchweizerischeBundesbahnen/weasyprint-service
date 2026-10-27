@@ -8,6 +8,7 @@ import os
 import platform
 import shutil
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -93,6 +94,10 @@ async def lifespan(app_instance: FastAPI) -> AsyncGenerator[None]:
     # rather than the default executor of the loop: that one is sized from the CPU count,
     # which would cap the limit at a value the configuration never names.
     render_limit = get_max_concurrent_pdf_conversions()
+    # The layout of WeasyPrint recurses with the nesting of the document. On musl a thread gets 128 KiB of
+    # stack, and about 160 nested elements overflow it: the process dies with SIGSEGV before Python raises
+    # RecursionError. 8 MiB is the glibc default, where RecursionError comes first.
+    threading.stack_size(RENDER_THREAD_STACK_SIZE)
     app_instance.state.pdf_render_executor = ThreadPoolExecutor(max_workers=render_limit, thread_name_prefix="pdf-render")
     lifespan_logger.info("PDF rendering limited to %d concurrent conversions", render_limit)
 
@@ -129,6 +134,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_CONCURRENT_PDF_CONVERSIONS = 2
 MIN_CONCURRENT_PDF_CONVERSIONS = 1
 MAX_CONCURRENT_PDF_CONVERSIONS = 100
+RENDER_THREAD_STACK_SIZE = 8 * 1024 * 1024
 
 
 def get_max_concurrent_pdf_conversions() -> int:

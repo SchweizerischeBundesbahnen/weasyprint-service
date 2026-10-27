@@ -45,5 +45,13 @@ def reclaim_memory() -> None:
             logger.debug("Memory reclaimed (gc.collect + malloc_trim)")
         except OSError:
             logger.debug("malloc_trim unavailable, skipped (gc.collect only)")
+        except AttributeError:
+            # musl loads as libc.so.6 but has no malloc_trim. The Alpine image preloads mimalloc, whose
+            # mi_collect gives the free memory back instead.
+            try:
+                ctypes.CDLL(None).mi_collect(1)
+                logger.debug("Memory reclaimed (gc.collect + mi_collect)")
+            except AttributeError:
+                logger.debug("malloc_trim unavailable, skipped (gc.collect only)")
     else:
         logger.debug("Memory reclaimed (gc.collect only, malloc_trim not available on %s)", platform.system())

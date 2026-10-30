@@ -44,7 +44,7 @@ jobs:
         with:
           args: test --image weasyprint_service --config tests/container/container-structure-test.yaml
       - name: SonarCloud scan for PR
-        uses: sonarsource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9  # v8
+        uses: sonarsource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304  # v8
         if: github.event_name == 'pull_request' && github.event.repository.visibility == 'public'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information
@@ -53,7 +53,7 @@ jobs:
           args: |
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
       - name: SonarCloud scan for Push
-        uses: sonarsource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9  # v8
+        uses: sonarsource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304  # v8
         if: github.event_name == 'push' && github.event.repository.visibility == 'public'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information

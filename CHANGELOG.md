@@ -1,5 +1,26 @@
 # Changelog
 
+## [70.0.9](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.8...v70.0.9) (2026-10-31)
+
+
+### Bug Fixes
+
+* **deps:** update debian:trixie-slim docker digest to 89c1ea9 ([649d175](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/649d1759e2daf495f3d476993ac592b5d25f5940))
+* **deps:** update debian:trixie-slim docker digest to f6b08b0 ([9ba9d66](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9ba9d66993051e26556bed4104584670cdd5a74f))
+* **deps:** update dependency fastapi to v0.162.0 ([145cdd0](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/145cdd058107f600e56f5832befac5b75e64a0ff))
+* **deps:** update dependency pytest to v9.2.0 ([9f8558e](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/9f8558e36b1873591252e5689c2da7e9864ce1ea))
+* **deps:** update dependency pytest-asyncio to v1.4.1 ([b00b043](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/b00b043246e8a561eeb3d562c6b942fa56c08378))
+* **deps:** update dependency python to v3.15.2 ([a9cdbcb](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/a9cdbcb3bb74be896708436ac00c6c125ab64a58))
+* **deps:** update dependency ruff to v0.17.3 ([5c2edae](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/5c2edaeefd3643d1ddb1c3be57f8066f83b98515))
+* **deps:** update dependency tox to v4.67.2 ([1f67747](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/1f67747fb85dd3abe8def937b20a8be64095aa10))
+* **deps:** update dependency tox to v4.67.4 ([0ee3dca](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/0ee3dca20283b2400fbb847417bb1f58c79166a4))
+* **deps:** update dependency tox-uv to v1.37.1 ([bc26e51](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/bc26e51d2cbe7612965d94e179929630ae098f5c))
+* **deps:** update dependency tox-uv to v1.37.2 ([35f1177](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/35f11777aceefe53bb3dfe264810bfef4e7706df))
+* **deps:** update dependency ty to v0.0.92 ([05684df](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/05684dfecde92d7ba9f489b075cdd4e5795e5d56))
+* **deps:** update dependency ty to v0.0.93 ([5786943](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/57869431b561096a98f75ccd754cb2438a791229))
+* **deps:** update ghcr.io/astral-sh/uv docker tag to v0.13.6 ([aa2bd09](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/aa2bd095103773cc142fca6c1d29f431e8ef639a))
+* **deps:** update grafana/grafana:latest docker digest to 488984b ([e2e4acf](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/commit/e2e4acf4b7a1c432c8a9299f6627030c9eee179b))
+
 ## [70.0.8](https://github.com/SchweizerischeBundesbahnen/weasyprint-service/compare/v70.0.7...v70.0.8) (2026-10-26)
 
 

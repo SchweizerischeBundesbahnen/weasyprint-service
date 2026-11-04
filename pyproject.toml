@@ -21,7 +21,7 @@ dependencies = [
     "psutil==7.2.2",
     "pypdf==6.21.4",
     "prometheus-fastapi-instrumentator==8.1.0",
-    "weasysvg==0.3.1",
+    "weasysvg==0.6.0",
     "weasyvsdx==0.2.0",
 ]
 

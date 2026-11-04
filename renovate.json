@@ -51,6 +51,38 @@
       "semanticCommitType": "chore",
       "commitMessageTopic": "Python Docker image version",
       "automerge": false
+    },
+    {
+      "description": "weasysvg and weasyvsdx are ours and change what the service draws: take each release at once, and review it",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDatasources": [
+        "pypi"
+      ],
+      "matchPackageNames": [
+        "weasysvg",
+        "weasyvsdx"
+      ],
+      "minimumReleaseAge": "0 days",
+      "automerge": false
+    },
+    {
+      "description": "A minor release of weasysvg or weasyvsdx is a feature of the service: release-please takes it as a minor release",
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchDatasources": [
+        "pypi"
+      ],
+      "matchPackageNames": [
+        "weasysvg",
+        "weasyvsdx"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "semanticCommitType": "feat"
     }
   ]
 }

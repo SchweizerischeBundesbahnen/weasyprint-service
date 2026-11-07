@@ -47,7 +47,7 @@ test = [
     "requests==2.34.2",
     "pytest-mock==3.17.0",
     "httpx==0.28.1",
-    "coverage==7.17.1",
+    "coverage==7.17.2",
 ]
 
 [tool.uv]

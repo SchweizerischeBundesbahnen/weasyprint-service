@@ -1,9 +1,10 @@
 ---
 schemaVersion: 2.0.0
 commandTests:
+  # UBI micro has no which and no grep: the checks use the builtins of the shell, or Python
   - name: Python installation - check uv-installed Python is in venv
-    command: which
-    args: [python]
+    command: sh
+    args: [-c, command -v python]
     expectedOutput: [/opt/weasyprint/.venv/bin/python]
   - name: Python version is correct
     command: python
@@ -83,13 +84,13 @@ commandTests:
     exitCode: 0
   - name: The replacements of the fonts of Visio drawings are installed
     command: sh
-    args: [-c, 'fc-list Selawik | grep -q . && fc-list Carlito | grep -q . && fc-list Caladea | grep -q .']
+    args: [-c, 'test -n "$(fc-list Selawik)" && test -n "$(fc-list Carlito)" && test -n "$(fc-list Caladea)"']
     exitCode: 0
   - name: The license of Selawik travels with it
-    command: sh
-    args: [-c, 'grep -q "SIL OPEN FONT LICENSE" /usr/local/share/fonts/selawik/LICENSE.txt']
+    command: python
+    args: [-c, 'import sys; sys.exit("SIL OPEN FONT LICENSE" not in open("/usr/local/share/fonts/selawik/LICENSE.txt").read())']
     exitCode: 0
-  # The fonts come from Debian packages, the apk database does not know them: their copyright files and SBOM go along.
+  # The fonts come from Debian packages, the rpm database does not know them: their copyright files and SBOM go along.
   # Python, not sh: the test expands the shell variables of its arguments itself.
   - name: Every font package keeps its license and is in the SBOM of the Debian fonts
     command: python
@@ -100,19 +101,19 @@ commandTests:
     command: sh
     args: [-c, 'test -s /usr/share/doc/librevenge-0.0.5/COPYING.MPL && test -s /usr/share/doc/libvisio-0.1.7/COPYING.MPL && test -s /usr/share/doc/libemf2svg-1.1.0/LICENSE']
     exitCode: 0
-  # Wolfi: the image has no Debian package manager, the fonts are files of the fonts stage
-  - name: The image is Wolfi
-    command: sh
-    args: [-c, 'grep -q "^ID=wolfi$" /etc/os-release && ! command -v dpkg && ! command -v apt-get']
+  # UBI micro: the image has no package manager, the fonts are files of the fonts stage
+  - name: The image is UBI 10 without a package manager
+    command: python
+    args: [-c, 'import shutil, sys; ids = dict(line.rstrip().split("=", 1) for line in open("/etc/os-release") if "=" in line); tools = [t for t in ("dnf", "microdnf", "yum", "rpm", "dpkg", "apt-get", "apk") if shutil.which(t)]; sys.exit(ids.get("ID") != "\"rhel\"" or not ids.get("VERSION_ID", "").startswith("\"10") or ", ".join(tools) or None)']
     exitCode: 0
   - name: Symbola draws the symbols of Word documents
     command: sh
-    args: [-c, 'fc-list Symbola | grep -q .']
+    args: [-c, 'test -n "$(fc-list Symbola)"']
     exitCode: 0
   # The generic families stay on DejaVu: a document which names no installed font keeps its line breaks
   - name: The generic families are DejaVu
     command: sh
-    args: [-c, 'fc-match serif | grep -q "DejaVu Serif" && fc-match sans-serif | grep -q "DejaVu Sans"']
+    args: [-c, 'case "$(fc-match serif)" in *"DejaVu Serif"*) ;; *) exit 1 ;; esac && case "$(fc-match sans-serif)" in *"DejaVu Sans"*) ;; *) exit 1 ;; esac']
     exitCode: 0
 fileExistenceTests:
   - name: Log directory

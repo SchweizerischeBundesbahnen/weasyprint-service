@@ -12,14 +12,14 @@ requires-python = ">=3.15,<3.16"
 dependencies = [
     "weasyprint==70.0",
     "defusedxml==0.7.1",
-    "fastapi==0.162.0",
+    "fastapi==0.165.0",
     "uvicorn==0.54.0",
-    "python-multipart==0.0.33",
+    "python-multipart==0.0.34",
     "beautifulsoup4==4.15.0",
     "html5lib==1.1",
     "pillow==13.0.0",
     "psutil==7.2.2",
-    "pypdf==6.21.4",
+    "pypdf==7.1.1",
     "prometheus-fastapi-instrumentator==8.1.0",
     "weasysvg==0.6.2",
     "weasyvsdx==0.2.0",
@@ -32,22 +32,22 @@ Repository = "https://github.com/SchweizerischeBundesbahnen/weasyprint-service"
 [dependency-groups]
 dev = [
     "pre-commit==4.7.0",
-    "ruff==0.17.4",
-    "ty==0.0.97",
+    "ruff==0.17.6",
+    "ty==0.0.107",
     "types-defusedxml==0.7.0.20260504",
-    "types-psutil==7.2.2.20260906",
+    "types-psutil==7.2.2.20261111",
 ]
 test = [
-    "tox==4.67.12",
-    "tox-uv==1.37.5",
+    "tox==4.67.15",
+    "tox-uv==1.37.9",
     "docker==7.2.0",
     "pytest==9.2.0",
-    "pytest-asyncio==1.4.1.post1",
-    "pymupdf==1.28.2",
+    "pytest-asyncio==1.5.0",
     "requests==2.34.2",
     "pytest-mock==3.17.0",
     "httpx==0.28.1",
-    "coverage==7.17.2",
+    "coverage==7.17.4",
+    "pypdfium2==5.15.2",
 ]
 
 [tool.uv]

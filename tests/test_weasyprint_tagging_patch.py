@@ -3,13 +3,13 @@
 import io
 
 import pydyf
-import pymupdf
 import pypdf
 import pytest
 import weasyprint
 
 from app import weasyprint_tagging_patch
 from app.weasyprint_tagging_patch import apply_tagging_patch, is_applied, is_decorative
+from tests import pdf_probe
 
 # Apply the same fix the service applies at import of weasyprint_controller.
 apply_tagging_patch()
@@ -91,9 +91,9 @@ def test_a_decorative_image_is_an_artifact():
 
     _, elements = _structure(pdf)
     assert not [element for element in elements if element["/S"] == "/Figure"]
-    with pymupdf.open(stream=pdf, filetype="pdf") as document:
-        assert len(document[0].get_image_info()) == 1, "The image is still drawn"
-        assert b"/Artifact" in document[0].read_contents()
+    with pdf_probe.open_pdf(pdf) as document:
+        assert pdf_probe.image_count(document[0]) == 1, "The image is still drawn"
+        assert b"/Artifact" in pdf_probe.page_contents(pdf)[0]
 
 
 @pytest.mark.parametrize("position", ["absolute", "fixed"])
@@ -102,8 +102,8 @@ def test_a_positioned_decorative_image_is_an_artifact(position):
 
     _, elements = _structure(pdf)
     assert not [element for element in elements if element["/S"] == "/Figure"]
-    with pymupdf.open(stream=pdf, filetype="pdf") as document:
-        assert len(document[0].get_image_info()) == 1, "The image is still drawn"
+    with pdf_probe.open_pdf(pdf) as document:
+        assert pdf_probe.image_count(document[0]) == 1, "The image is still drawn"
 
 
 def test_an_image_without_alt_is_named_by_its_title():
@@ -126,9 +126,9 @@ def test_an_untagged_pdf_is_drawn_as_before(pdf_variant):
 
     reader = pypdf.PdfReader(io.BytesIO(pdf))
     assert "/StructTreeRoot" not in reader.trailer["/Root"]
-    with pymupdf.open(stream=pdf, filetype="pdf") as document:
-        assert len(document[0].get_image_info()) == 1
-        assert b"/Artifact" not in document[0].read_contents()
+    with pdf_probe.open_pdf(pdf) as document:
+        assert pdf_probe.image_count(document[0]) == 1
+        assert b"/Artifact" not in pdf_probe.page_contents(pdf)[0]
 
 
 def test_a_link_annotation_without_a_link_above_stays():

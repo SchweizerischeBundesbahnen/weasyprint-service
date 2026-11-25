@@ -2,11 +2,11 @@
 
 import base64
 
-import pymupdf
 import pytest
 from fastapi.testclient import TestClient
 
 from app.weasyprint_controller import app
+from tests import pdf_probe
 
 # 80x600 px: max-height shortens it, and its width follows
 TALL_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="600" viewBox="0 0 80 600"><rect x="2" y="2" width="76" height="596" fill="#1a73e8"/></svg>'
@@ -34,14 +34,14 @@ def test_a_shortened_svg_keeps_the_alignment_of_its_column() -> None:
         result = test_client.post("/convert/html", content=_html())
     assert result.status_code == 200
 
-    with pymupdf.open(stream=result.content, filetype="pdf") as doc:
+    with pdf_probe.open_pdf(result.content) as doc:
         page = doc[0]
         # weasysvg draws the SVG as vector: the blue rectangle of each image is a filled path
-        drawn = sorted((drawing["rect"] for drawing in page.get_drawings() if drawing["fill"] and drawing["fill"] == pytest.approx(BLUE, abs=0.01)), key=lambda rect: rect.x0)
+        drawn = sorted((box for fill, box in pdf_probe.filled_paths(page) if fill == pytest.approx(BLUE, abs=0.01)), key=lambda box: box.x0)
         assert len(drawn) == len(ALIGNMENTS)
         for i, (align, image) in enumerate(zip(ALIGNMENTS, drawn, strict=True)):
-            left = page.search_for(f"Start{i}")[0].x0
-            right = page.search_for(f"End{i}")[0].x1
+            left = pdf_probe.find_text(page, f"Start{i}").x0
+            right = pdf_probe.find_text(page, f"End{i}").x1
             # The drawing is shortened to 200 px, 150 pt, and narrowed with it: 20 pt, not the 60 pt of the SVG.
             # The rectangle sits 2 px inside the 80x600 SVG, which the tolerance covers.
             assert image.height == pytest.approx(150, abs=TOLERANCE_PT)

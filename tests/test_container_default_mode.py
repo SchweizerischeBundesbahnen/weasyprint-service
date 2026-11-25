@@ -8,9 +8,10 @@ import time
 from typing import TYPE_CHECKING
 
 import docker
-import pymupdf
 import pytest
 import requests
+
+from tests import pdf_probe
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -60,9 +61,9 @@ def test_the_default_mode_draws_svg_as_vector(base_url: str) -> None:
     response = requests.post(f"{base_url}/convert/html", data=SVG_HTML.encode(), headers={"Content-Type": "text/html"}, timeout=60)
     assert response.status_code == 200
 
-    with pymupdf.open(stream=response.content, filetype="pdf") as doc:
+    with pdf_probe.open_pdf(response.content) as doc:
         page = doc[0]
         # No image: the SVG is drawn as a form of vector paths, not rasterized to a PNG
-        assert page.get_images() == []
-        assert page.get_xobjects()
-        assert any(drawing["fill"] == (1.0, 0.0, 0.0) for drawing in page.get_drawings())
+        assert pdf_probe.image_count(page) == 0
+        assert pdf_probe.has_form(page)
+        assert any(fill == (1.0, 0.0, 0.0) for fill, _ in pdf_probe.filled_paths(page))

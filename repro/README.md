@@ -26,7 +26,7 @@ Homebrew's libs):
 
 ```bash
 DYLD_FALLBACK_LIBRARY_PATH="$(brew --prefix)/lib" \
-  uv run --with 'weasyprint==70.0' --with pymupdf repro_running_element.py
+  uv run --with 'weasyprint==70.0' --with pypdfium2 repro_running_element.py
 ```
 
 ---
@@ -74,8 +74,8 @@ content still moves into the `@top-center` margin box.
 ### Validating on a future WeasyPrint version
 
 ```bash
-uv run --with 'weasyprint==<new>' --with pymupdf repro_running_element.py           # without
-uv run --with 'weasyprint==<new>' --with pymupdf repro_running_element.py --patch   # with
+uv run --with 'weasyprint==<new>' --with pypdfium2 repro_running_element.py           # without
+uv run --with 'weasyprint==<new>' --with pypdfium2 repro_running_element.py --patch   # with
 ```
 
 * without `--patch` every wrapper **CONVERTS** → upstream fixed it; the service patch can

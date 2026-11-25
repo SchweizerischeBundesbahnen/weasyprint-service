@@ -22,7 +22,7 @@ fi
 
 echo "== Running element in a shrink-to-fit box =="
 for v in 69.0 70.0; do
-  uv run --quiet --with "weasyprint==$v" --with pymupdf repro_running_element.py
+  uv run --quiet --with "weasyprint==$v" --with pypdfium2 repro_running_element.py
 done
 # Same broken version, but with the weasyprint-service fix applied:
-uv run --quiet --with "weasyprint==70.0" --with pymupdf repro_running_element.py --patch
+uv run --quiet --with "weasyprint==70.0" --with pypdfium2 repro_running_element.py --patch

@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import pymupdf
 import pytest
 import weasyprint
 from fontTools.fontBuilder import FontBuilder
@@ -10,6 +9,7 @@ from fontTools.pens.ttGlyphPen import TTGlyphPen
 
 from app import weasyprint_actual_text_patch
 from app.weasyprint_actual_text_patch import actual_text, apply_actual_text_patch, is_applied
+from tests import pdf_probe
 
 # Apply the same fix the service applies at import of weasyprint_controller.
 apply_actual_text_patch()
@@ -51,13 +51,12 @@ def _pdf(icon_font: Path, body: str, pdf_variant: str | None) -> bytes:
 
 
 def _text(pdf: bytes) -> str:
-    with pymupdf.open(stream=pdf, filetype="pdf") as document:
-        return "".join(page.get_text() for page in document)
+    with pdf_probe.open_pdf(pdf) as document:
+        return "".join(pdf_probe.text(page) for page in document)
 
 
 def _content(pdf: bytes) -> bytes:
-    with pymupdf.open(stream=pdf, filetype="pdf") as document:
-        return b"".join(page.read_contents() for page in document)
+    return b"".join(pdf_probe.page_contents(pdf))
 
 
 def test_patch_is_applied():
@@ -68,10 +67,9 @@ def test_patch_is_applied():
 def test_an_icon_reads_as_nothing_in_a_tagged_pdf(icon_font, pdf_variant):
     pdf = _pdf(icon_font, f'<p><i class="icon">{ICON}</i>Version 1.0</p>', pdf_variant)
 
-    assert b"/ActualText" in _content(pdf)
-    text = _text(pdf)
-    assert ICON not in text
-    assert "Version 1.0" in text
+    # PDFium ignores an empty ActualText and extracts the glyph code, so check the marked content itself.
+    assert b"<</ActualText ()>>" in _content(pdf)
+    assert "Version 1.0" in _text(pdf)
 
 
 def test_an_icon_reads_as_its_aria_label(icon_font):

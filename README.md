@@ -706,6 +706,15 @@ Then run the vulnerability scan on your image:
 grype weasyprint-service:0.0.0
 ```
 
+The scan of the image covers its rpm packages, but not the fonts from Debian. The rpm database does not know them, and the scanners ignore the SBOM of the fonts in the image. Scan that SBOM separately:
+
+```bash
+docker run --rm --entrypoint cat weasyprint-service:0.0.0 /usr/share/doc/debian-fonts.cdx.json > debian-fonts.cdx.json
+grype sbom:debian-fonts.cdx.json
+```
+
+No scanner sees librevenge, libvisio and libemf2svg, which the image builds from their releases.
+
 #### tox
 
 Tox automates testing in different Python environments, ensuring that the application works correctly across various Python versions and configurations. It helps maintain compatibility and provides a standardized way to run test suites, formatting checks, and other quality assurance processes.

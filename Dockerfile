@@ -18,7 +18,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ADD --checksum=sha256:6478edfe2f3305127cffe8caf73ea0176c53769f4bf1585be237eb30798c3b8e \
     https://archives.boost.io/release/1.83.0/source/boost_1_83_0.tar.bz2 /src/
 ADD --checksum=sha256:588546b945bba4b70b6a3a616e80b4ab466e3f33024a352fc2198112cdbb3ae2 \
-    https://mirrors.kernel.org/gnu/gperf/gperf-3.1.tar.gz /src/
+    https://ftp.gnu.org/gnu/gperf/gperf-3.1.tar.gz /src/
 ADD --checksum=sha256:5892ca6796f7a2a93d580832e907e849b19d980b40d326a283b18877ab6de0c5 \
     https://dev-www.libreoffice.org/src/librevenge-0.0.5.tar.bz2 /src/
 ADD --checksum=sha256:8faf8df870cb27b09a787a1959d6c646faa44d0d8ab151883df408b7166bea4c \

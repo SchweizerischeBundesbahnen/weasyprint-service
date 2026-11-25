@@ -127,6 +127,7 @@ RUN ["/syft", "scan", "dir:/sbom-root", "--select-catalogers", "dpkg", "--source
 # dnf --installroot from the full UBI image, so the rpm database of the runtime lists every package, and dnf,
 # microdnf and rpm stay out of it. Pango for WeasyPrint, with HarfBuzz, whose package carries
 # libharfbuzz-subset, fontconfig for fc-cache, and the libraries the Visio tools link, by their soname.
+# The packages of UBI micro are upgraded first: the digest pins only the start, the fixes of the repository apply.
 FROM registry.access.redhat.com/ubi10/ubi-micro:10.3@sha256:2ad0f98cb13160c4773c945ef93f88b25831c7f27cd3780d72a7e78b210ea72b AS micro
 FROM registry.access.redhat.com/ubi10/ubi:10.3@sha256:87ceab8634a53a36c75a8ba7282f09f11c46ab3e8906db6c6d2b3cd2a7dc4f4e AS rootfs
 COPY --from=micro / /rootfs
@@ -134,6 +135,7 @@ COPY --from=visio /opt/visio /rootfs/opt/visio
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # hadolint ignore=DL3041
 RUN mapfile -t needed < <(sed 's/$/()(64bit)/' /rootfs/opt/visio/needed) && \
+    dnf --assumeyes --installroot=/rootfs --releasever=10 --nodocs upgrade && \
     dnf --assumeyes --installroot=/rootfs --releasever=10 --setopt=install_weak_deps=0 --nodocs install \
         fontconfig harfbuzz pango "${needed[@]}" && \
     dnf --installroot=/rootfs clean all && \

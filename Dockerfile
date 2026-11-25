@@ -8,7 +8,7 @@ FROM ghcr.io/astral-sh/uv:0.13.10@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa
 # gperf either: the headers of boost 1.83, the release of RHEL 10, and gperf 3.1 come from their releases too.
 # The libraries the tools link come from UBI: their sonames go to /opt/visio/needed, which the rootfs stage
 # installs by the capability of each.
-FROM registry.access.redhat.com/ubi10/ubi:latest@sha256:65201965dbdf33aecf3796ba454684be29083708fadb6335507b86a56d2df06c AS visio
+FROM registry.access.redhat.com/ubi10/ubi:10.3@sha256:87ceab8634a53a36c75a8ba7282f09f11c46ab3e8906db6c6d2b3cd2a7dc4f4e AS visio
 # hadolint ignore=DL3041
 RUN dnf --assumeyes --setopt=install_weak_deps=0 install \
         binutils bzip2 cmake diffutils findutils fontconfig-devel freetype-devel gcc-c++ libicu-devel \
@@ -127,8 +127,8 @@ RUN ["/syft", "scan", "dir:/sbom-root", "--select-catalogers", "dpkg", "--source
 # dnf --installroot from the full UBI image, so the rpm database of the runtime lists every package, and dnf,
 # microdnf and rpm stay out of it. Pango for WeasyPrint, with HarfBuzz, whose package carries
 # libharfbuzz-subset, fontconfig for fc-cache, and the libraries the Visio tools link, by their soname.
-FROM registry.access.redhat.com/ubi10/ubi-micro:latest@sha256:8488f5ec082768a01d1ce4e0ef3878f782a40ff6d233afa74bc23d4e740620a4 AS micro
-FROM registry.access.redhat.com/ubi10/ubi:latest@sha256:65201965dbdf33aecf3796ba454684be29083708fadb6335507b86a56d2df06c AS rootfs
+FROM registry.access.redhat.com/ubi10/ubi-micro:10.3@sha256:2ad0f98cb13160c4773c945ef93f88b25831c7f27cd3780d72a7e78b210ea72b AS micro
+FROM registry.access.redhat.com/ubi10/ubi:10.3@sha256:87ceab8634a53a36c75a8ba7282f09f11c46ab3e8906db6c6d2b3cd2a7dc4f4e AS rootfs
 COPY --from=micro / /rootfs
 COPY --from=visio /opt/visio /rootfs/opt/visio
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -146,7 +146,7 @@ RUN mapfile -t needed < <(sed 's/$/()(64bit)/' /rootfs/opt/visio/needed) && \
 
 # ---------------------------------------------------------------- python stage
 # Python and the venv are installed where awk and the other tools exist, at the paths the runtime uses.
-FROM registry.access.redhat.com/ubi10/ubi:latest@sha256:65201965dbdf33aecf3796ba454684be29083708fadb6335507b86a56d2df06c AS python
+FROM registry.access.redhat.com/ubi10/ubi:10.3@sha256:87ceab8634a53a36c75a8ba7282f09f11c46ab3e8906db6c6d2b3cd2a7dc4f4e AS python
 COPY --from=uv-source /uv /usr/local/bin/uv
 WORKDIR /opt/weasyprint
 COPY .tool-versions pyproject.toml uv.lock ./

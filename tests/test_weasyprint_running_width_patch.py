@@ -1,11 +1,11 @@
 """Regression test for the WeasyPrint running-element intrinsic-width patch."""
 
-import pymupdf
 import pytest
 import weasyprint
 
 from app import weasyprint_running_width_patch
 from app.weasyprint_running_width_patch import apply_running_width_patch, is_applied
+from tests import pdf_probe
 
 # Apply the same fix the service applies at import of weasyprint_controller.
 apply_running_width_patch()
@@ -39,8 +39,8 @@ PAGE_MARGIN_PX = 40
 
 def _page_words(pdf_bytes: bytes) -> list[tuple[float, float, float, str]]:
     """Return the first page's words as (left, top, right, text), in reading order."""
-    with pymupdf.open(stream=pdf_bytes, filetype="pdf") as document:
-        return [(word[0], word[1], word[2], word[4]) for word in document[0].get_text("words")]
+    with pdf_probe.open_pdf(pdf_bytes) as document:
+        return [(word.box.x0, word.box.y0, word.box.x1, word.text) for word in pdf_probe.words(document[0])]
 
 
 def _word(words, needle):

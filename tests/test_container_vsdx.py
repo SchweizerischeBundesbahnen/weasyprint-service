@@ -13,10 +13,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import docker
-import pymupdf
 import pytest
 import requests
 from docker.models.containers import Container
+
+from tests import pdf_probe
 
 logger = logging.getLogger(__name__)
 
@@ -106,11 +107,11 @@ def test_vsdx_is_drawn_as_vector(vsdx_container: tuple[Container, str]) -> None:
     logs = container.logs().decode("utf-8")
     assert "vsd2xhtml not found" not in logs, f"The image has no libvisio-tools:\n{logs}"
 
-    with pymupdf.open(stream=response.content, filetype="pdf") as document:
+    with pdf_probe.open_pdf(response.content) as document:
         page = document[0]
         # No image: the drawing is drawn as vector paths, not rasterized to a PNG
-        assert page.get_images() == []
-        fills = {tuple(round(channel * 255) for channel in drawing["fill"]) for drawing in page.get_drawings() if drawing["fill"]}
-        text = page.get_text()
+        assert pdf_probe.image_count(page) == 0
+        fills = {tuple(round(channel * 255) for channel in fill) for fill, _ in pdf_probe.filled_paths(page)}
+        text = pdf_probe.text(page)
     assert HEADER_RGB in fills, f"The header bar of the drawing is missing, fills: {sorted(fills)}"
     assert "This is a test." in text

@@ -7,13 +7,12 @@ from pathlib import Path
 from typing import NamedTuple
 
 import docker
-import pymupdf
 import pypdf
 import pytest
 import requests
 from docker.models.containers import Container
 
-from tests import utils_pdf
+from tests import pdf_probe, utils_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -343,18 +342,16 @@ SIZED_SVG_FILL = (0xE8 / 255, 0xF0 / 255, 0xFE / 255)
 SIZED_SVG_RECT_SHARE = 196 / 200
 
 
-def __sized_svg_widths(doc: pymupdf.Document) -> list[int]:
+def __sized_svg_widths(doc: pdf_probe.pdfium.PdfDocument) -> list[int]:
     """The width each SVG is drawn at, top to bottom, in px, read from the rectangle it draws as vector.
 
     A CSS px is 0.75 pt, the unit a PDF is laid out in.
     """
     drawn = []
-    for page in doc:
-        for drawing in page.get_drawings():
-            fill = drawing["fill"]
-            if fill and fill == pytest.approx(SIZED_SVG_FILL, abs=0.01):
-                rect = drawing["rect"]
-                drawn.append((page.number, rect.y0, round(rect.width / 0.75 / SIZED_SVG_RECT_SHARE)))
+    for number, page in enumerate(doc):
+        for fill, box in pdf_probe.filled_paths(page):
+            if fill == pytest.approx(SIZED_SVG_FILL, abs=0.01):
+                drawn.append((number, box.y0, round(box.width / 0.75 / SIZED_SVG_RECT_SHARE)))
     return [width for _, _, width in sorted(drawn)]
 
 
@@ -364,9 +361,9 @@ def test_convert_svg_keeps_the_size_the_document_gives(test_parameters: TestPara
     response = __call_convert_html(base_url=test_parameters.base_url, request_session=test_parameters.request_session, data=html, print_error=True)
     assert response.status_code == 200
 
-    with pymupdf.open(stream=response.content, filetype="pdf") as doc:
+    with pdf_probe.open_pdf(response.content) as doc:
         # weasysvg draws the SVG as vector, so the document holds no image
-        assert all(not page.get_images() for page in doc)
+        assert all(pdf_probe.image_count(page) == 0 for page in doc)
         widths = __sized_svg_widths(doc)
 
     # The SVG is 200x100: its own size where the document gives none, then half of it, twice it, and

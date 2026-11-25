@@ -5,16 +5,16 @@ import os
 from io import BytesIO
 from pathlib import Path
 
-import pymupdf
 import pypdf
 from PIL import Image, ImageChops
+
+from tests import pdf_probe
 
 
 def pdf_bytes_to_png_pages(
     pdf_bytes: bytes,
     *,
     zoom: float | None = None,
-    matrix: pymupdf.Matrix | None = None,
     alpha: bool = False,
 ) -> list[bytes]:
     """
@@ -22,23 +22,20 @@ def pdf_bytes_to_png_pages(
 
     Args:
         pdf_bytes: The PDF document content in bytes.
-        zoom: Optional uniform zoom factor for both axes. Ignored if `matrix` is provided.
-        matrix: Optional pymupdf.Matrix to control rasterization scale/transform.
+        zoom: Optional uniform zoom factor for both axes. 1 pt becomes 1 px without it.
         alpha: Whether to include alpha channel in the output PNGs.
 
     Returns:
         List of PNG bytes, one per page, in page order (0..n-1).
     """
-    if matrix is None:
-        matrix = pymupdf.Matrix(1.0, 1.0) if zoom is None else pymupdf.Matrix(zoom, zoom)
-
+    background = (255, 255, 255, 0) if alpha else (255, 255, 255, 255)
     png_pages: list[bytes] = []
-    # Use context manager to ensure resources are freed
-    with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
-        for page_number in range(doc.page_count):
-            page = doc.load_page(page_number)
-            pix = page.get_pixmap(matrix=matrix, alpha=alpha)
-            png_pages.append(pix.tobytes("png"))
+    with pdf_probe.open_pdf(pdf_bytes) as document:
+        for page in document:
+            image = page.render(scale=1.0 if zoom is None else zoom, fill_color=background, may_draw_forms=True).to_pil()
+            buffer = BytesIO()
+            image.save(buffer, format="PNG")
+            png_pages.append(buffer.getvalue())
     return png_pages
 
 

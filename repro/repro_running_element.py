@@ -76,17 +76,23 @@ def documents() -> dict[str, str]:
 
 
 def running_text_position(pdf_bytes: bytes) -> str:
-    """Report where the running element's text ended up, if pymupdf is available."""
+    """Report where the running element's text ended up, if pypdfium2 is available."""
     try:
-        import pymupdf
+        import pypdfium2 as pdfium
     except ImportError:
         return ""
-    with pymupdf.open(stream=pdf_bytes, filetype="pdf") as document:
-        for word in document[0].get_text("words"):
-            if "RUNNINGTEXT" in word[4]:
-                where = "top margin box" if word[1] < PAGE_MARGIN_PX else f"page body (y={word[1]:.1f})"
-                return f", running text in {where}"
-    return ", running text MISSING"
+    document = pdfium.PdfDocument(pdf_bytes)
+    try:
+        page = document[0]
+        textpage = page.get_textpage()
+        match = textpage.search("RUNNINGTEXT", match_case=True).get_next()
+        if match is None:
+            return ", running text MISSING"
+        top = page.get_height() - textpage.get_charbox(match[0], loose=True)[3]
+    finally:
+        document.close()
+    where = "top margin box" if top < PAGE_MARGIN_PX else f"page body (y={top:.1f})"
+    return f", running text in {where}"
 
 
 label = f"{weasyprint.__version__}{'+patch' if patched else ''}"

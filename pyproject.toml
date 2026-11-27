@@ -46,7 +46,7 @@ test = [
     "requests==2.34.2",
     "pytest-mock==3.17.0",
     "httpx==0.28.1",
-    "coverage==7.17.4",
+    "coverage==7.17.5",
     "pypdfium2==5.15.2",
 ]
 
